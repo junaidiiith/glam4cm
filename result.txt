@@ -1,0 +1,7 @@
+Loading ecore_555 from pickle
+Loaded ecore_555 from pickle
+Graphs: 548
+Loading modelset from pickle
+Loaded modelset from pickle
+Graphs: 2043
+Training ecore using bert-base-uncased
