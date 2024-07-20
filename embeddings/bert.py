@@ -11,6 +11,8 @@ class BertEmbedder(Embedder):
     def __init__(self, model_name, ckpt=None):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(ckpt if ckpt else model_name)
+        self.model.to(device)
+        self.finetuned = bool(ckpt)
     
     def embed(self, text: Union[str, List[str]], aggregate='mean'):
         dataset = EncodingDataset(self.tokenizer, texts=text)
@@ -36,3 +38,5 @@ class BertEmbedder(Embedder):
                 embeddings = embeddings.mean(dim=1)
             else:
                 raise ValueError(f'Unknown aggregation method: {aggregate}') 
+        
+        return embeddings

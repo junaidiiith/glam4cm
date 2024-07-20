@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import List, Union
+import torch
 
 
 class Embedder:
@@ -8,5 +9,5 @@ class Embedder:
         self.finetuned = False
 
     @abstractmethod
-    def embed(self, text: Union[str, List[str]], aggregate='mean'):
+    def embed(self, text: Union[str, List[str]], aggregate='mean') -> torch.Tensor:
         pass

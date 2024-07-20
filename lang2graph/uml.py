@@ -22,7 +22,8 @@ class EcoreNxG(LangGraph):
             use_type=True,
             remove_generic_nodes=True,
         ):
-        super().__init__(graph_id=json_obj.get('ids'))
+        super().__init__()
+        self.graph_id = json_obj.get('ids')
         self.use_type = use_type
         self.remove_generic_nodes = remove_generic_nodes
         self.json_obj = json_obj
@@ -30,7 +31,7 @@ class EcoreNxG(LangGraph):
         self.label = json_obj.get('labels')
         self.is_duplicated = json_obj.get('is_duplicated')
         self.directed = json.loads(json_obj.get('graph')).get('directed')
-        self.create_graph(json_obj)
+        self.create_graph()
         self.text = json_obj.get('txt')
 
 

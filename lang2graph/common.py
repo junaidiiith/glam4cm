@@ -7,9 +7,9 @@ SEP = ' '
 
 
 class LangGraph(nx.DiGraph):
-    def __init__(self, graph_id):
+    def __init__(self):
         super().__init__()
-        self.graph_id = graph_id
+        self.id = uuid4().hex
 
     @abstractmethod
     def create_graph(self):
