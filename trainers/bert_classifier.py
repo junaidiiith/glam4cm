@@ -51,7 +51,7 @@ class CustomDataset(torch.utils.data.Dataset):
         return inputs
 
 
-def train_hf(model_name, model_ds: Dataset):
+def train_hf(model_name, model_ds: Dataset, epochs):
     max_len = max_length_map[model_name]
     i = 0
     print(f'Device used: {device}')
@@ -77,7 +77,7 @@ def train_hf(model_name, model_ds: Dataset):
         # Training arguments
         training_args = TrainingArguments(
             output_dir='./results',
-            num_train_epochs=3,
+            num_train_epochs=epochs,
             eval_strategy="epoch",
             per_device_train_batch_size=2,
             per_device_eval_batch_size=2,

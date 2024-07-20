@@ -1,57 +1,23 @@
 from typing import List
-import networkx as nx
+import torch
 from tqdm.auto import tqdm
 import pickle
 from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import json
 import os
+from embeddings.common import Embedder
+from lang2graph.common import LangGraph
 from settings import (
-    datasets_dir, seed
+    datasets_dir, 
+    seed,
+    graph_data_dir
 )
 import numpy as np
+from lang2graph.uml import EcoreNxG
+from torch_geometric.data import Data
 
 
-
-class GenericGraph(nx.DiGraph):
-    def __init__(self, json_obj: dict, use_type=False):
-        super().__init__()
-        self.use_type = use_type
-        self.json_obj = json_obj
-        self.graph_id = json_obj.get('ids')
-        self.graph_type = json_obj.get('model_type')
-        self.label = json_obj.get('labels')
-        self.is_duplicated = json_obj.get('is_duplicated')
-        self.directed = json.loads(json_obj.get('graph')).get('directed')
-        self.create_graph(json_obj)
-        self.text = json_obj.get('txt')
-
-
-    def create_graph(self, json_obj):
-        graph = json.loads(json_obj['graph'])
-        nodes = graph['nodes']
-        edges = graph['links']
-        for node in nodes:
-            self.add_node(node['id'], **node)
-        for edge in edges:
-            self.add_edge(edge['source'], edge['target'], **edge)
-    
-    # @property
-    # def text(self):
-    #     txt = list()
-    #     for _, d in self.nodes(data=True):
-    #         etype = d.get('type', '')
-    #         name = d.get('name', '')
-    #         node_data = f"{name}{etype if self.use_type else ''}"
-    #         txt.append(node_data)
-    #     return SEP.join(txt).strip()
-
-
-    def get_node_embeddings(self):
-        pass
-        
-    def __repr__(self):
-        return f'{self.json_obj}\nGraph({self.graph_id}, nodes={self.number_of_nodes()}, edges={self.number_of_edges()})'
 
 
 class Dataset:
@@ -62,6 +28,8 @@ class Dataset:
             save_dir = 'datasets/pickles',
             reload=False,
             remove_duplicates=False,
+            use_type=False,
+            remove_generic_nodes=False,
             extension='.jsonl'
         ):
         self.name = dataset_name
@@ -72,15 +40,17 @@ class Dataset:
 
         dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
         if reload or not dataset_exists:
-            self.graphs: List[GenericGraph] = []
+            self.graphs: List[EcoreNxG] = []
             data_path = os.path.join(dataset_dir, dataset_name)
             for file in os.listdir(data_path):
                 if file.endswith(self.extension) and file.startswith('ecore'):
                     json_objects = json.load(open(os.path.join(data_path, file)))
                     self.graphs += [
-                        GenericGraph(g) for g in tqdm(
-                            json_objects, desc=f'Loading {dataset_name.title()}'
-                        )
+                        EcoreNxG(
+                            g, 
+                            use_type=use_type, 
+                            remove_generic_nodes=remove_generic_nodes
+                        ) for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}')
                     ]
             self.save()
         
@@ -96,7 +66,7 @@ class Dataset:
     def remove_duplicates(self):
         self.graphs = self.dedup()
 
-    def dedup(self) -> List[GenericGraph]:
+    def dedup(self) -> List[EcoreNxG]:
         return [g for g in self.graphs if not g.is_duplicated]
     
     
@@ -154,3 +124,118 @@ class Dataset:
             self.graphs = pickle.load(f)
         
         print(f'Loaded {self.name} from pickle')
+
+
+
+# Create your dataset
+class EncodingDataset(torch.utils.data.Dataset):
+    def __init__(self, tokenizer, texts, labels=None, max_length=512):
+        self.inputs = tokenizer(
+            texts, 
+            return_tensors='pt', 
+            truncation=True, 
+            padding='max_length', 
+            max_length=max_length
+        )
+        if labels:
+            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long)
+ 
+
+    def __len__(self):
+        return len(self.inputs['input_ids'])
+    
+
+    def __getitem__(self, index):
+        item = {key: val[index] for key, val in self.inputs.items()}
+        return item
+    
+
+class TorchGraph:
+    def __init__(
+            self, 
+            graph: LangGraph, 
+            embedder: Embedder,
+            save_dir: str,
+        ):
+        self.graph = graph
+        self.embedder = embedder
+        
+        self.save_dir = save_dir
+        self.process_graph()
+    
+
+    def process_graph(self):
+        if self.load():
+            return
+        texts = self.graph.get_node_texts()
+        self.embeddings = self.embedder.embed(texts)
+        self.edge_index = torch.tensor(
+            list(self.graph.edges), dtype=torch.long).t().contiguous()
+        self.save()
+    
+
+    @property
+    def name(self):
+        return '.'.join(self.graph.graph_id.replace('/', '_').split('.')[:-1])
+
+
+    @property
+    def save_path(self):
+        path = os.path.join(self.save_dir, f'{self.name}')
+        if self.embedder.finetuned:
+            path = f'{path}_finetuned'
+        return path
+
+
+    def load(self):
+        if os.path.exists(self.save_path):
+            self.embeddings = torch.load(f"{self.save_path}/embeddings.pt")
+            self.edge_index = torch.load(f"{self.save_path}/edge_index.pt")
+            return True
+        return False
+    
+
+    def save(self):
+        os.makedirs(self.save_path, exist_ok=True)
+        torch.save(self.embeddings, f"{self.save_path}/embeddings.pt")
+        torch.save(self.edge_index, f"{self.save_path}/edge_index.pt")
+
+
+
+class GraphDataset(torch.utils.data.Dataset):
+    def __init__(
+            self, 
+            models_dataset: Dataset,
+            embedder: Embedder,
+            save_dir='datasets/graph_data',
+        ):
+        self.save_dir = f'{save_dir}/{models_dataset.name}'
+        os.makedirs(self.save_dir, exist_ok=True)
+        self.graphs = [
+            TorchGraph(g, embedder, save_dir=self.save_dir) 
+            for g in tqdm(models_dataset, desc=f'Processing {models_dataset.name}')
+        ]
+
+        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
+        self.labels = torch.tensor([self._c[g.label] for g in models_dataset], dtype=torch.long)
+        self.num_classes = len(self._c)
+        self.num_features = self.graphs[0].embeddings.shape[-1]
+
+    def __len__(self):
+        return len(self.graphs)
+    
+    def __getitem__(self, index: int):
+        return Data(
+            x=self.graphs[index].embeddings,
+            edge_index=self.graphs[index].edge_index,
+            y=self.labels[index]
+        )
+
+
+def get_embedding_graph_dataset(
+        dataset: Dataset,
+        embedder: Embedder,
+        save_dir=graph_data_dir,
+    ):
+    dataset = GraphDataset(dataset, embedder, save_dir=save_dir)
+    return dataset
