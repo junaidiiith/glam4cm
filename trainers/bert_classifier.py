@@ -9,7 +9,7 @@ from transformers import (
 import torch
 import numpy as np
 import random
-from data_loading.dataset import ModelDataset
+from data_loading.data import ModelDataset
 from settings import device, seed
 from sklearn.preprocessing import LabelEncoder
 from trainers.metrics import compute_metrics

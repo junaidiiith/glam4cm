@@ -2,7 +2,7 @@ from transformers import AutoModel, AutoTokenizer
 import torch
 from typing import List, Union
 from embeddings.common import Embedder
-from data_loading.dataset import EncodingDataset
+from data_loading.encoding import EncodingDataset
 from torch.utils.data import DataLoader
 from settings import device
 

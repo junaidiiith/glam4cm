@@ -1,5 +1,5 @@
 from trainers.bert_classifier import train_hf
-from data_loading.dataset import get_dataset
+from data_loading.models_dataset import ModelDataset 
 
 from argparse import ArgumentParser
 
@@ -14,8 +14,8 @@ def parse_args():
 
 def run(args):
     reload = args.reload
-    ecore = get_dataset('ecore', reload=reload)
-    modelset = get_dataset('modelset', reload=reload, remove_duplicates=True)
+    ecore = ModelDataset('ecore', reload=reload)
+    modelset = ModelDataset('modelset', reload=reload, remove_duplicates=True)
     # mar = ModelDataset('mar-ecore-github', reload=reload)
 
 

@@ -1,6 +1,16 @@
-from lang2graph.common import SEP, LangGraph
+from lang2graph.common import LangGraph
 import json
 
+from pyecore.resources import ResourceSet, URI
+from lang2graph.utils import (
+    run_with_timeout
+)
+import os
+
+
+
+REFERENCE = 'reference'
+SUPERTYPE = 'supertype'
 
 EGenericType = 'EGenericType'
 EPackage = 'EPackage'
@@ -15,80 +25,143 @@ EDataType = 'EDataType'
 GenericNodes = [EGenericType, EPackage]
 
 
+
 class EcoreNxG(LangGraph):
     def __init__(
             self, 
             json_obj: dict, 
             use_type=True,
-            remove_generic_nodes=True,
+            timeout = -1
         ):
         super().__init__()
+        self.xmi = json_obj.get('xmi')
         self.graph_id = json_obj.get('ids')
+        self.timeout = timeout
         self.use_type = use_type
-        self.remove_generic_nodes = remove_generic_nodes
         self.json_obj = json_obj
         self.graph_type = json_obj.get('model_type')
         self.label = json_obj.get('labels')
         self.is_duplicated = json_obj.get('is_duplicated')
         self.directed = json.loads(json_obj.get('graph')).get('directed')
-        self.create_graph()
+        self.__create_nx_from_xmi()
+        self.set_numbered_labels()
+        self.numbered_graph = self.get_numbered_graph()
         self.text = json_obj.get('txt')
+    
+    
 
-
-    def create_graph(self):
-        generic_nodes = list()
-        graph = json.loads(self.json_obj['graph'])
-        nodes = graph['nodes']
-        edges = graph['links']
-        for node in nodes:
-            self.add_node(node['id'], **node)
-            if node['eClass'] in GenericNodes:
-                generic_nodes.append(node['id'])
+    def __create_nx_from_file(self, file_name):
+        references, supertypes = get_ecore_data(file_name)
+        for class_name, class_references in references.items():
+            self.add_node(class_name)
+            
+            for class_reference in class_references.values():
+                if class_reference['type'] == 'EReference':
+                    self.add_edge(
+                        class_name,
+                        class_reference['eType'], 
+                        name=class_reference['name'], 
+                        type = REFERENCE,
+                        containment=class_reference['containment']
+                    )
                 
-        for edge in edges:
-            self.add_edge(edge['source'], edge['target'], **edge)
+                elif class_reference['type'] == 'EAttribute':
+                    if 'attributes' not in self.nodes[class_name]:
+                        self.nodes[class_name]['attributes'] = list()
+
+                    self.nodes[class_name]['attributes'].append(
+                        (class_reference['name'], class_reference['eType'])
+                    )
+
         
-        if self.remove_generic_nodes:
-            self.remove_nodes_from(generic_nodes)
-    
-    def get_graph_node_text(self, node):
-        data = self.nodes[node]
-        node_class = data.get('eClass')
-        node_name = data.get('name', '')
-
-        if self.use_type:
-            return f'{node_class}({node_name})'
-
-        return node_name
+        for class_name, class_super_types in supertypes.items():
+            for supertype_name, class_super_type in class_super_types.items():
+                self.nodes[supertype_name]['abstract'] = True
+                self.add_edge(
+                    class_name, 
+                    class_super_type['name'], 
+                    type = SUPERTYPE
+                )
 
 
-    def find_node_str_upto_distance(self, node, distance=1):
-        nodes_with_distance = self.find_nodes_within_distance(
-            node, 
-            distance=distance
-        )
-        d2n = {d: set() for _, d in nodes_with_distance}
-        for n, d in nodes_with_distance:
-            node_text = self.get_graph_node_text(n)
-            if node_text:
-                d2n[d].add(node_text)
+    def __create_nx_from_xmi(self):
+        with open('temp.xmi', 'w') as f:
+            f.write(self.xmi)
         
-        d2n = sorted(d2n.items(), key=lambda x: x[0])
-        node_buckets = [f"{SEP}".join(nbs) for _, nbs in d2n]
-        path_str = " | ".join(node_buckets)
-        
-        return path_str
-
-
-    def get_node_texts(self, distance=1):
-        node_texts = []
-        for node in self.nodes:
-            node_texts.append(
-                self.find_node_str_upto_distance(node, distance=distance)
+        if self.timeout != -1:
+            nxg = run_with_timeout(
+                self.__create_nx_from_file, 
+                args=('temp.xmi',), 
+                timeout_duration=self.timeout
             )
+        else:
+            nxg = self.__create_nx_from_file('temp.xmi')
         
-        return node_texts
-    
-        
+        os.remove('temp.xmi')
+        return nxg
+
+
     def __repr__(self):
         return f'{self.json_obj}\nGraph({self.graph_id}, nodes={self.number_of_nodes()}, edges={self.number_of_edges()})'
+
+
+
+def get_resource_from_file(file_name):
+    rset = ResourceSet()
+    resource = rset.get_resource(URI(file_name))
+    return resource
+
+
+def get_supertype_features(super_type):
+    feats = {feat.name for feat in super_type.eAllStructuralFeatures()}
+    for super_super_type in super_type.eAllSuperTypes():
+        feats = feats.union(get_supertype_features(super_super_type))
+    return feats
+
+
+def get_ereferences(classifier):
+    ereferences = {
+        feat.name: {
+            "name": feat.name,
+            "type": type(feat).__name__, 
+            "eType": feat.eType.name, 
+            "containment": getattr(feat, 'containment', None)
+        }
+        for feat in classifier.eAllStructuralFeatures()
+    }
+
+    super_type_feats = set()
+    for super_type in classifier.eAllSuperTypes():
+        super_type_feats = super_type_feats.union(get_supertype_features(super_type))
+    
+    for feat_name in super_type_feats:
+        if feat_name in ereferences:
+            del ereferences[feat_name]
+        
+    return ereferences
+
+
+def get_esupertypes(classifier):
+    esupertypes = {
+        supertype.name : {
+            "name": supertype.name,
+            "type": type(supertype).__name__, 
+        }
+        
+        for supertype in classifier.eAllSuperTypes()
+    }
+    return esupertypes
+
+
+def get_ecore_data(file_name):
+    resource = get_resource_from_file(file_name)
+    references, supertypes = dict(), dict()
+    for mm_root in resource.contents:
+        for classifier in mm_root.eClassifiers:
+            if type(classifier).__name__ == 'EClass':
+                ereferences = get_ereferences(classifier)
+                esupertypers = get_esupertypes(classifier)
+                references[classifier.name] = ereferences
+                supertypes[classifier.name] = esupertypers
+
+    return references, supertypes

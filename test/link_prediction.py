@@ -1,9 +1,10 @@
-from data_loading.models_dataset import ModelDataset
+from data_loading.data import get_dataset
 from embeddings.bert import BertEmbedder
-from data_loading.graph_dataset import GraphDataset
+from data_loading.data import GraphDataset
 from models.gnn_layers import GNNClassifier
-from trainers.graph_classifier import GNNTrainer
+from trainers.link_predictor import LinkPredictor
 from argparse import ArgumentParser
+
 
 
 def parse_args():
@@ -20,14 +21,18 @@ def parse_args():
 
 def run(args):
     reload = args.reload
-    modelset = ModelDataset(
+    modelset = get_dataset(
         args.dataset, 
         reload=reload, 
         remove_duplicates=args.remove_duplicates
     )
 
-    embedder = BertEmbedder(args.embed_model, ckpt=args.ckpt)
-    graph_dataset = GraphDataset(modelset, embedder)
+    embedder = BertEmbedder(args.model, ckpt=args.ckpt)
+    graph_dataset = GraphDataset(
+        modelset, 
+        embedder,
+        lp_graphs=True
+    )
 
     graph_classifier = GNNClassifier(
         gnn_conv_model=args.gnn_conv_model,
@@ -44,9 +49,7 @@ def run(args):
         alpha=0.1
     )
 
-    gnn_trainer = GNNTrainer(
+    gnn_trainer = LinkPredictor(
         graph_classifier,
         graph_dataset,
     )
-
-    gnn_trainer.train_epochs(1)

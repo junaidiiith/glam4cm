@@ -1,13 +1,11 @@
-from data_loading.dataset import GraphDataset, ModelDataset, get_embedding_graph_dataset
+from data_loading.graph_dataset import GraphDataset
+from data_loading.models_dataset import ModelDataset
 from embeddings.common import Embedder
 from settings import device
 import torch
 from models.gnn_layers import GNNClassifier
 from torch.functional import F
 
-from data_loading.loader import (
-    get_data_loaders
-)
 
 
 class GNNTrainer:
@@ -23,11 +21,7 @@ class GNNTrainer:
 
         self.model = model
         self.model.to(device)
-        self.dataloaders = get_data_loaders(
-            dataset,
-            tr=tr,
-            batch_size=batch_size
-        )
+        self.dataloaders = list()
         self.optimizer = torch.optim.Adam(
             model.parameters(), 
             lr=lr, 
@@ -80,7 +74,7 @@ def run(
         num_layers=3,
         num_epochs=100,
     ):
-    graph_dataset: GraphDataset = get_embedding_graph_dataset(embedder)
+    graph_dataset: GraphDataset = list()
     train_idx, test_idx = dataset.get_train_test_split()
 
     train_dataset = [graph_dataset[i] for i in train_idx]
