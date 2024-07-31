@@ -39,9 +39,10 @@ def run(args):
 
     graph_data_params = dict(
         distance=2,
-        reload=True
+        add_negative_train_samples=True,
+        neg_sampling_ratio=1,
     )
 
-    GraphDataset(ecore, **graph_data_params)
-    GraphDataset(modelset, **graph_data_params)
-    GraphDataset(mar, **graph_data_params)
+    GraphDataset(ecore, reload=False, **graph_data_params)
+    GraphDataset(modelset, reload=True, **graph_data_params)
+    GraphDataset(mar, reload=True, **graph_data_params)

@@ -74,17 +74,27 @@ class TorchGraph:
 
         data = Data(
             x=node_embeddings,
+            overall_edge_index=self.graph.edge_index,
             edge_index=edge_index,
             edge_attr=edge_embeddings,
-            train_data=train_data,
-            test_data=test_data,
+            train_pos_edge_label_index=train_data.pos_edge_label_index,
+            train_pos_edge_label=train_data.pos_edge_label,
+            train_neg_edge_label_index=train_data.neg_edge_label_index,
+            train_neg_edge_label=train_data.neg_edge_label,
+            test_pos_edge_label_index=test_data.pos_edge_label_index,
+            test_pos_edge_label=test_data.pos_edge_label,
+            test_neg_edge_label_index=test_data.neg_edge_label_index,
+            test_neg_edge_label=test_data.neg_edge_label,
+            y=self.graph.label,
+            num_nodes=self.graph.number_of_nodes(),
         )
 
         return data
     
 
     def validate_data(self):
-        pass
+        assert self.data.x.shape[0] == self.graph.number_of_nodes()
+        
 
     @property
     def name(self):

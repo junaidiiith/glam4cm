@@ -29,6 +29,44 @@ supported_conv_models = {
 }
 
 
+class FeedForward(nn.Module):
+    """
+    Create a feed forward neural network with ReLU activation
+    Use n hidden layers with hidden_dim units each
+    Use output_dim units in the output layer
+    Use Sequential to create the feed forward network
+    """
+
+    def __init__(
+            self, 
+            input_dim, 
+            hidden_dim=None, 
+            output_dim=None,
+            use_bias=False, 
+            num_layers=2, 
+            dropout=0.1
+        ):
+        super(FeedForward, self).__init__()
+
+        hidden_dim = hidden_dim if hidden_dim else input_dim
+        output_dim = output_dim if output_dim else hidden_dim
+
+        layers = nn.ModuleList()
+        layers.append(nn.Linear(input_dim, hidden_dim, bias=use_bias))
+        layers.append(nn.ReLU())
+        layers.append(nn.Dropout(dropout))
+        for _ in range(num_layers - 2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim, bias=use_bias))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout))
+        layers.append(nn.Linear(hidden_dim, output_dim, bias=use_bias))
+        self.ff = nn.Sequential(*layers)
+    
+
+    def forward(self, x):
+        return self.ff(x)
+
+
 class GNNConv(torch.nn.Module):
     """
         A general GNN model created using the PyTorch Geometric library
@@ -57,6 +95,7 @@ class GNNConv(torch.nn.Module):
             dropout=0.1,
         ):
         super(GNNConv, self).__init__()
+        self.model_name = model_name
 
         assert model_name in supported_conv_models, f"Model {model_name} not supported"
         should_have_heads = supported_conv_models[model_name]
@@ -142,11 +181,21 @@ class GNNConv(torch.nn.Module):
                         train_eps=True
                     )
                 )
-        else:
+        elif num_heads is None:
             self.conv_layers.append(
                 gnn_model(
                     hidden_dim if num_heads is None else num_heads*hidden_dim, 
                     output_dim, 
+                    aggr='SumAggregation',
+                    
+                )
+            )
+        else:
+            self.conv_layers.append(
+                gnn_model(
+                    num_heads*hidden_dim, 
+                    output_dim, 
+                    heads=num_heads, 
                     aggr='SumAggregation',
                     
                 )
@@ -261,3 +310,115 @@ class GNNClassifier(nn.Module):
         h = self.pool(h, batch)
         h = self.fc(h)
         return F.log_softmax(h, dim=-1)
+
+
+class LinkPredictor(nn.Module):
+    def __init__(
+            self, 
+            gnn_conv_model,
+            input_dim,
+            hidden_dim,
+            num_layers,
+            num_heads,
+            dropout = 0.1,
+            residual = False,
+            use_edge_attrs = False, 
+            add_classification_head=False,
+            num_edge_types=3,
+            edge_attrs_dim=768,
+            ff_hidden_dim=128,
+        ):
+        super(LinkPredictor, self).__init__()
+        self.conv = GNNConv(
+            model_name=gnn_conv_model,
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout,
+            residual=residual,
+        )
+
+        self.use_edge_attrs = use_edge_attrs
+        embed_dim = hidden_dim if num_heads is None else num_heads*hidden_dim
+        embed_dim *= 2
+        embed_dim = embed_dim + edge_attrs_dim if use_edge_attrs else embed_dim
+
+        self.link_pred_head = FeedForward(
+            input_dim=embed_dim, 
+            hidden_dim=ff_hidden_dim,
+            output_dim=1, 
+            dropout=dropout
+        )
+
+        self.classification_head = True
+        if add_classification_head:
+            self.edge_class_head = FeedForward(
+                input_dim=embed_dim, 
+                hidden_dim=ff_hidden_dim,
+                output_dim=num_edge_types, 
+                dropout=dropout
+            )
+
+
+    def forward(self, data):
+        # x: Node features [num_nodes, in_channels]
+        # edge_index: Graph connectivity [2, num_edges]
+        
+        # GNN layers
+        x = self.conv(data.x, data.edge_index)
+        x = F.relu(x)
+        
+        # For link prediction and edge classification, we use edge embeddings
+        row, col = data.edge_index
+        node_edge_features = torch.cat([x[row], x[col]], dim=1)  # [num_edges, hidden_channels*2]
+
+        if self.use_edge_attrs:
+            node_edge_features = torch.cat([node_edge_features, data.edge_attr], dim=1)
+        
+        # Link prediction
+        link_pred = torch.sigmoid(self.link_pred_head(node_edge_features)).squeeze()  # [num_edges]
+        
+        # Edge classification
+        if self.classification_head:
+            edge_class = self.edge_class_head(node_edge_features)  # [num_edges, num_edge_types]
+            return link_pred, edge_class
+
+        return link_pred
+    
+
+    def save_pretrained(self, path):
+        os.makedirs(path, exist_ok=True)
+        state_dict_path = f'{path}/link_predictor_state_dict.pt'
+        config_path = f'{path}/link_predictor_config.json'
+        with open(config_path, 'w') as f:
+            json.dump(
+                {
+                    "gnn_conv_model":"SAGEConv", 
+                    "input_dim": self.conv.input_dim,
+                    "hidden_dim": self.conv.embed_dim,
+                    "num_layers": self.conv.num_layers,
+                    "num_heads": self.conv.num_heads,
+                    "residual": self.conv.residual,
+                    "dropout": self.conv.dropout.p,
+                }, f)
+    
+        torch.save(self.state_dict(), state_dict_path)
+        print(f'Saved Link Predictor model at {path}')
+    
+
+    @staticmethod
+    def from_pretrained(state_dict_dir):
+        state_dict = torch.load(f"{state_dict_dir}/link_predictor_state_dict.pt", map_location=device)
+        link_predictor_config = json.load(open(f"{state_dict_dir}/link_predictor_config.json", 'r'))
+        link_predictor = LinkPredictor(
+            gnn_conv_model=link_predictor_config['gnn_conv_model'],
+            input_dim=link_predictor_config['input_dim'],
+            hidden_dim=link_predictor_config['hidden_dim'],
+            num_layers=link_predictor_config['num_layers'],
+            num_heads=link_predictor_config['num_heads'],
+            dropout=link_predictor_config['dropout'],
+            residual=link_predictor_config['residual'],
+        )
+        link_predictor.load_state_dict(state_dict)
+        return link_predictor

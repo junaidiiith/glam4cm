@@ -91,10 +91,13 @@ def create_graph_from_edge_index(graph, edge_index):
 
     # Add nodes and edges from the edge_index to the subgraph
     subgraph = nx.DiGraph()
+    subgraph.add_nodes_from(list(graph.numbered_graph.nodes(data=True)))
     subgraph.add_edges_from([(u, v, graph.numbered_graph.edges[u, v]) for u, v in edge_index.t().tolist()])
     for node, data in subgraph.nodes(data=True):
         data = graph.numbered_graph.nodes[node]
         subgraph.nodes[node].update(data)
+
+
 
     subgraph.label2id = graph.label2id
     subgraph.id2label = graph.id2label
