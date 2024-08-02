@@ -17,6 +17,7 @@ class GraphDataset(torch.utils.data.Dataset):
             distance=1,
             add_negative_train_samples=False,
             neg_sampling_ratio=1,
+            use_edge_types=False,
             reload=False,
         ):
         self.save_dir = f'{save_dir}/{models_dataset.name}'
@@ -29,6 +30,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 reload=reload,
                 use_neg_samples=add_negative_train_samples,
                 neg_samples_ratio=neg_sampling_ratio,
+                use_edge_types=use_edge_types,
             ) 
             for g in tqdm(models_dataset, desc=f'Processing {models_dataset.name}')
         ]
@@ -44,6 +46,15 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index: int):
         return self.graphs[index].data
+    
+
+    def __add__(self, other):
+        self.graphs += other.graphs
+        self.labels = torch.cat([self.labels, other.labels])
+        self._c.update(other._c)
+        self.num_classes = len(self._c)
+
+        return self
     
 
     def get_train_test_split(self, tr=0.8):

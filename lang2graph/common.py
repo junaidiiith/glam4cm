@@ -10,8 +10,10 @@ class LangGraph(nx.DiGraph):
     def __init__(self):
         super().__init__()
         self.id = uuid4().hex
-        self.label2id = {}
-        self.id2label = {}
+        self.node_label_to_id = {}
+        self.id_to_node_label = {}
+        self.edge_label_to_id = {}
+        self.id_to_edge_label = {}
 
 
     @abstractmethod
@@ -29,16 +31,20 @@ class LangGraph(nx.DiGraph):
 
 
     def set_numbered_labels(self):
-        self.label2id = {label: i for i, label in enumerate(self.nodes())}
-        self.id2label = {i: label for i, label in enumerate(self.nodes())}
+        self.node_label_to_id = {label: i for i, label in enumerate(self.nodes())}
+        self.id_to_node_label = {i: label for i, label in enumerate(self.nodes())}
+
+        self.edge_label_to_id = {label: i for i, label in enumerate(self.edges())}
+        self.id_to_edge_label = {i: label for i, label in enumerate(self.edges())}
 
 
     def get_numbered_graph(self) -> nx.DiGraph:
-        nodes = [(self.label2id[i], data) for i, data in list(self.nodes(data=True))]
-        edges = [(self.label2id[i], self.label2id[j], data) for i, j, data in list(self.edges(data=True))]
+        nodes = [(self.node_label_to_id[i], data) for i, data in list(self.nodes(data=True))]
+        edges = [(self.node_label_to_id[i], self.node_label_to_id[j], data) for i, j, data in list(self.edges(data=True))]
         graph = nx.DiGraph()
         graph.add_nodes_from(nodes)
         graph.add_edges_from(edges)
+
         return graph
 
 
@@ -54,11 +60,18 @@ class LangGraph(nx.DiGraph):
         edge_index = torch.tensor(list(self.numbered_graph.edges)).t().contiguous()
         return edge_index
     
+    def get_edge_id(self, edge):
+        return self.edge_label_to_id[edge]
+
+    def get_edge_label(self, edge_id):
+        return self.edge_label_to_id[edge_id]
+
+    
     def get_node_id(self, node):
-        return self.label2id[node]
+        return self.node_label_to_id[node]
     
     def get_node_label(self, node_id):
-        return self.id2label[node_id]
+        return self.node_label_to_id[node_id]
     
 
 
@@ -99,8 +112,10 @@ def create_graph_from_edge_index(graph, edge_index):
 
 
 
-    subgraph.label2id = graph.label2id
-    subgraph.id2label = graph.id2label
+    subgraph.node_label_to_id = graph.node_label_to_id
+    subgraph.id_to_node_label = graph.id_to_node_label
+    subgraph.edge_label_to_id = graph.edge_label_to_id
+    subgraph.id_to_edge_label = graph.id_to_edge_label
     try:
         assert subgraph.number_of_edges() == edge_index.size(1)
     except AssertionError as e:
@@ -138,7 +153,7 @@ def get_node_texts(graph, h: int):
                 next_level_nodes.update(neighbors - all_visited_nodes)
             all_visited_nodes.update(next_level_nodes)
             if next_level_nodes:
-                node_strs = [graph.id2label[i] for i in sorted(next_level_nodes)]
+                node_strs = [graph.id_to_node_label[i] for i in sorted(next_level_nodes)]
                 node_str += f" -> {', '.join(map(str, node_strs))}"
             current_level_nodes = next_level_nodes
 
@@ -147,7 +162,7 @@ def get_node_texts(graph, h: int):
     return node_texts
 
 
-def get_edge_texts(graph):
+def get_edge_texts(graph, use_edge_types=False):
     """
     Create edge string for each edge in a graph.
     
@@ -160,7 +175,10 @@ def get_edge_texts(graph):
     edge_texts = {}
 
     for u, v, data in graph.edges(data=True):
-        edge_texts[(u, v)] = f"{graph.id2label[u]} - {get_uml_edge_type(data)} - {graph.id2label[v]}"
+        if use_edge_types:
+            edge_texts[(u, v)] = f"{graph.node_label_to_id[u]} - {get_uml_edge_type(data)} - {graph.node_label_to_id[v]}"
+        else:
+            edge_texts[(u, v)] = f"{graph.node_label_to_id[u]} - {graph.node_label_to_id[v]}"
 
 
     assert len(edge_texts) == graph.number_of_edges(), f"#Edges text mismatch {len(edge_texts)} != {graph.number_of_edges()}"

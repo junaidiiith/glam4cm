@@ -7,7 +7,6 @@ FAST_TEXT_MODEL = 'uml-fasttext.bin'
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-
 seed = 42
 datasets_dir = 'datasets'
 ecore_json_path = os.path.join(datasets_dir, 'ecore_555/ecore_555.jsonl')

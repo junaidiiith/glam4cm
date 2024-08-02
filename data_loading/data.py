@@ -7,17 +7,22 @@ from lang2graph.uml import EcoreNxG
 from lang2graph.common import (
     create_graph_from_edge_index, 
     get_edge_texts, 
-    get_node_texts
+    get_node_texts,
+    get_uml_edge_type
 )
 
 from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
-from torch_geometric.data import Data
+import torch
+from torch_geometric.data import Data, Dataset
+from typing import List, Optional, Sequence, Union
+
 
 
 from settings import BERT_MODEL
 embedder = BertEmbedder(model_name=BERT_MODEL)
 
+edge_index_to_idx = lambda graph, edge_index: torch.tensor([graph.edge_to_idx[(u, v)] for u, v in edge_index.t().tolist()], dtype=torch.long)
 
 class TorchGraph:
     def __init__(
@@ -28,9 +33,12 @@ class TorchGraph:
             lptr=0.2,
             use_neg_samples=False,
             neg_samples_ratio=1,
+            use_edge_types=False,
             reload=False,
         ):
+
         self.reload = reload
+        self.use_edge_types = use_edge_types
         self.graph = graph
         self.distance = distance
         self.add_negative_train_samples = use_neg_samples
@@ -61,15 +69,30 @@ class TorchGraph:
             edge_index=self.graph.edge_index, 
             num_nodes=self.graph.number_of_nodes()
         ))
-        edge_index = train_data.edge_index
-        subgraph = create_graph_from_edge_index(self.graph, edge_index)
 
-        node_texts = get_node_texts(subgraph, self.distance)
+        train_idx = edge_index_to_idx(self.graph, train_data.edge_index)
+        test_idx = edge_index_to_idx(self.graph, test_data.pos_edge_label_index)
+
+
+        edge_index = train_data.edge_index
+        train_subgraph = create_graph_from_edge_index(
+            self.graph, 
+            edge_index
+        )
+
+
+        node_texts = get_node_texts(train_subgraph, self.distance)
         node_embeddings = embedder.embed(list(node_texts.values()))
 
-        edge_texts = get_edge_texts(subgraph)
+        edge_texts = get_edge_texts(self.graph, self.use_edge_types)
 
         edge_embeddings = embedder.embed(list(edge_texts.values()))
+        edge_classes = torch.tensor(
+            [
+                get_uml_edge_type(edge_data) 
+                for _, _, edge_data in self.graph.edges(data=True)
+            ], dtype=torch.long
+        )
 
 
         data = Data(
@@ -77,6 +100,9 @@ class TorchGraph:
             overall_edge_index=self.graph.edge_index,
             edge_index=edge_index,
             edge_attr=edge_embeddings,
+            edge_classes=edge_classes,
+            train_edge_idx = train_idx,
+            test_edge_idx = test_idx,
             train_pos_edge_label_index=train_data.pos_edge_label_index,
             train_pos_edge_label=train_data.pos_edge_label,
             train_neg_edge_label_index=train_data.neg_edge_label_index,
@@ -135,6 +161,107 @@ class TorchGraph:
         os.makedirs(self.save_idx, exist_ok=True)
         torch.save(self.data, f"{self.save_idx}/data.pt")
         self.save_to_mapping()
+
+
+
+class LinkPredictionCollater:
+    def __init__(
+            self, 
+            follow_batch: Optional[List[str]] = None, 
+            exclude_keys: Optional[List[str]] = None
+        ):
+        self.follow_batch = follow_batch
+        self.exclude_keys = exclude_keys
+
+    def __call__(self, batch: List[Data]):
+        # Initialize lists to collect batched properties
+        x = []
+        edge_index = []
+        edge_attr = []
+        y = []
+        overall_edge_index = []
+        edge_classes = []
+        train_edge_idx = []
+        test_edge_idx = []
+        train_pos_edge_label_index = []
+        train_pos_edge_label = []
+        train_neg_edge_label_index = []
+        train_neg_edge_label = []
+        test_pos_edge_label_index = []
+        test_pos_edge_label = []
+        test_neg_edge_label_index = []
+        test_neg_edge_label = []
+        
+        # Offsets for edge indices
+        node_offset = 0
+        edge_offset = 0
+
+        for data in batch:
+            x.append(data.x)
+            edge_index.append(data.edge_index + node_offset)
+            edge_attr.append(data.edge_attr)
+            y.append(data.y)
+            overall_edge_index.append(data.overall_edge_index + edge_offset)
+            edge_classes.append(data.edge_classes)
+
+            train_edge_idx.append(data.train_edge_idx + edge_offset)
+            test_edge_idx.append(data.test_edge_idx + edge_offset)
+
+            train_pos_edge_label_index.append(data.train_pos_edge_label_index + node_offset)
+            train_pos_edge_label.append(data.train_pos_edge_label)
+            train_neg_edge_label_index.append(data.train_neg_edge_label_index + node_offset)
+            train_neg_edge_label.append(data.train_neg_edge_label)
+
+            test_pos_edge_label_index.append(data.test_pos_edge_label_index + node_offset)
+            test_pos_edge_label.append(data.test_pos_edge_label)
+            test_neg_edge_label_index.append(data.test_neg_edge_label_index + node_offset)
+            test_neg_edge_label.append(data.test_neg_edge_label)
+
+            node_offset += data.num_nodes
+            edge_offset += data.edge_attr.size(0)
+
+        return Data(
+            x=torch.cat(x, dim=0),
+            edge_index=torch.cat(edge_index, dim=1),
+            edge_attr=torch.cat(edge_attr, dim=0),
+            y=torch.tensor(y),
+            overall_edge_index=torch.cat(overall_edge_index, dim=1),
+            edge_classes=torch.cat(edge_classes),
+            train_edge_idx=torch.cat(train_edge_idx),
+            test_edge_idx=torch.cat(test_edge_idx),
+            train_pos_edge_label_index=torch.cat(train_pos_edge_label_index, dim=1),
+            train_pos_edge_label=torch.cat(train_pos_edge_label),
+            train_neg_edge_label_index=torch.cat(train_neg_edge_label_index, dim=1),
+            train_neg_edge_label=torch.cat(train_neg_edge_label),
+            test_pos_edge_label_index=torch.cat(test_pos_edge_label_index, dim=1),
+            test_pos_edge_label=torch.cat(test_pos_edge_label),
+            test_neg_edge_label_index=torch.cat(test_neg_edge_label_index, dim=1),
+            test_neg_edge_label=torch.cat(test_neg_edge_label),
+            num_nodes=node_offset
+        )
+
+
+class LinkPredictionDataLoader(torch.utils.data.DataLoader):
+    def __init__(
+        self,
+        dataset: Union[Dataset, Sequence[Data]],
+        batch_size: int = 1,
+        shuffle: bool = False,
+        collate_fn=None,
+        follow_batch: Optional[List[str]] = None,
+        exclude_keys: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        if collate_fn is None:
+            collate_fn = LinkPredictionCollater(follow_batch, exclude_keys)
+        super().__init__(
+            dataset,
+            batch_size,
+            shuffle,
+            collate_fn=collate_fn,
+            **kwargs,
+        )
+
 
 
 

@@ -46,10 +46,13 @@ class EcoreNxG(LangGraph):
         self.__create_nx_from_xmi()
         self.set_numbered_labels()
         self.numbered_graph = self.get_numbered_graph()
+        
+        self.edge_to_idx = {edge: idx for idx, edge in enumerate(self.numbered_graph.edges())}
+        self.idx_to_edge = {idx: edge for idx, edge in enumerate(self.numbered_graph.edges())}
+
         self.text = json_obj.get('txt')
     
     
-
     def __create_nx_from_file(self, file_name):
         references, supertypes = get_ecore_data(file_name)
         for class_name, class_references in references.items():
