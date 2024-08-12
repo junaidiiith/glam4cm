@@ -1,3 +1,4 @@
+import pickle
 import torch
 import json
 import os
@@ -6,11 +7,11 @@ from embeddings.bert import BertEmbedder
 from lang2graph.uml import EcoreNxG
 from lang2graph.common import (
     create_graph_from_edge_index, 
-    get_edge_texts, 
     get_node_texts,
     get_uml_edge_type
 )
 
+from tokenization.special_tokens import *
 from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
@@ -22,7 +23,14 @@ from typing import List, Optional, Sequence, Union
 from settings import BERT_MODEL
 embedder = BertEmbedder(model_name=BERT_MODEL)
 
-edge_index_to_idx = lambda graph, edge_index: torch.tensor([graph.edge_to_idx[(u, v)] for u, v in edge_index.t().tolist()], dtype=torch.long)
+def edge_index_to_idx(graph, edge_index):
+    return torch.tensor(
+        [
+            graph.edge_to_idx[(u, v)] 
+            for u, v in edge_index.t().tolist()
+        ], 
+        dtype=torch.long
+    )
 
 class TorchGraph:
     def __init__(
@@ -37,6 +45,7 @@ class TorchGraph:
             reload=False,
         ):
 
+        self.xmi = graph.xmi
         self.reload = reload
         self.use_edge_types = use_edge_types
         self.graph = graph
@@ -50,7 +59,7 @@ class TorchGraph:
 
     def process_graph(self):
         if not self.load_pyg_data() or self.reload:
-            self.data = self.get_pyg_data()
+            self.data, self.node_texts, self.edge_texts = self.get_pyg_data()
             self.validate_data()
                     
         self.save()
@@ -73,26 +82,33 @@ class TorchGraph:
         train_idx = edge_index_to_idx(self.graph, train_data.edge_index)
         test_idx = edge_index_to_idx(self.graph, test_data.pos_edge_label_index)
 
+        assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
+        assert all([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.pos_edge_label_index.t().tolist()])
+
+        assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
+        assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
+
 
         edge_index = train_data.edge_index
-        train_subgraph = create_graph_from_edge_index(
-            self.graph, 
-            edge_index
-        )
-
-
-        node_texts = get_node_texts(train_subgraph, self.distance)
-        node_embeddings = embedder.embed(list(node_texts.values()))
-
-        edge_texts = get_edge_texts(self.graph, self.use_edge_types)
-
-        edge_embeddings = embedder.embed(list(edge_texts.values()))
         edge_classes = torch.tensor(
             [
-                get_uml_edge_type(edge_data) 
+                get_uml_edge_type(edge_data)[0]
                 for _, _, edge_data in self.graph.edges(data=True)
             ], dtype=torch.long
         )
+
+        node_texts = self.get_graph_node_strs(
+            edge_index, self.distance
+        ) ### Considering nodes with edges only in the subgraph
+        node_embeddings = embedder.embed(list(node_texts.values()))
+
+        edge_texts = self.get_graph_edge_strs_from_node_strs(
+            node_strs=node_texts, 
+            edge_index=self.graph.edge_index, 
+            use_edge_types=self.use_edge_types
+        ) ### Considering all edges
+
+        edge_embeddings = embedder.embed(list(edge_texts.values()))
 
 
         data = Data(
@@ -101,7 +117,7 @@ class TorchGraph:
             edge_index=edge_index,
             edge_attr=edge_embeddings,
             edge_classes=edge_classes,
-            train_edge_idx = train_idx,
+            train_edge_idx=train_idx,
             test_edge_idx = test_idx,
             train_pos_edge_label_index=train_data.pos_edge_label_index,
             train_pos_edge_label=train_data.pos_edge_label,
@@ -115,7 +131,34 @@ class TorchGraph:
             num_nodes=self.graph.number_of_nodes(),
         )
 
-        return data
+        return data, node_texts, edge_texts
+    
+
+    def get_graph_node_strs(self, edge_index: torch.Tensor, distance: int):
+        subgraph = create_graph_from_edge_index(self.graph, edge_index)
+        return get_node_texts(subgraph, distance)
+    
+
+    def get_graph_edge_strs_from_node_strs(
+            self, 
+            node_strs, 
+            edge_index: torch.Tensor, 
+            use_edge_types=False,
+            neg_samples=False
+        ):
+        if neg_samples:
+            assert not use_edge_types, "Edge types are not supported for negative samples"
+
+        edge_strs = dict()
+        for u, v in edge_index.t().tolist():
+            u_str = node_strs[u]
+            v_str = node_strs[v]
+            u_label = self.graph.id_to_node_label[u]
+            v_label = self.graph.id_to_node_label[v]
+            edge_str = f"{u_str} {NODE_SEP} {v_str}" if not use_edge_types else f"{u_str} {NODE_SEP} {get_uml_edge_type(self.graph.edges[u_label, v_label])[1]} {NODE_SEP} {v_str}"
+            edge_strs[(u, v)] = edge_str
+
+        return edge_strs
     
 
     def validate_data(self):
@@ -152,6 +195,8 @@ class TorchGraph:
         if os.path.exists(self.save_idx):
             self.save_to_mapping()
             self.data = torch.load(f"{self.save_idx}/data.pt")
+            self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
+            self.edge_texts = pickle.load(open(f"{self.save_idx}/edge_texts.pkl", 'rb'))
             return True
 
         return False
@@ -160,6 +205,8 @@ class TorchGraph:
     def save(self):
         os.makedirs(self.save_idx, exist_ok=True)
         torch.save(self.data, f"{self.save_idx}/data.pt")
+        pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
+        pickle.dump(self.edge_texts, open(f"{self.save_idx}/edge_texts.pkl", 'wb'))
         self.save_to_mapping()
 
 

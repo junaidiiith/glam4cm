@@ -3,10 +3,17 @@ from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
+from transformers import AutoTokenizer
 from data_loading.data import TorchGraph
 from data_loading.models_dataset import ModelDataset
+from data_loading.encoding import EncodingDataset
 from tqdm.auto import tqdm
 from settings import seed, graph_data_dir
+from settings import (
+    LP_TASK_EDGE_CLS,
+    LP_TASK_LINK_PRED,
+)
+
 
 
 class GraphDataset(torch.utils.data.Dataset):
@@ -20,6 +27,8 @@ class GraphDataset(torch.utils.data.Dataset):
             use_edge_types=False,
             reload=False,
         ):
+        super().__init__()
+        self.distance = distance
         self.save_dir = f'{save_dir}/{models_dataset.name}'
         os.makedirs(self.save_dir, exist_ok=True)
         self.graphs = [
@@ -45,7 +54,7 @@ class GraphDataset(torch.utils.data.Dataset):
     
 
     def __getitem__(self, index: int):
-        return self.graphs[index].data
+        return self.graphs[index]
     
 
     def __add__(self, other):
@@ -72,7 +81,74 @@ class GraphDataset(torch.utils.data.Dataset):
         n = len(self.graphs)
         for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
             yield train_idx, test_idx
+    
 
+    def get_link_prediction_data(
+            self, 
+            tokenizer: AutoTokenizer,
+            distance, 
+            task_type=LP_TASK_EDGE_CLS
+        ):
+        if task_type == LP_TASK_EDGE_CLS:
+            data = {'train_edges': [], 'train_edge_classes': [], 'test_edges': [], 'test_edge_classes': []}
+        elif task_type == LP_TASK_LINK_PRED:
+            data = {'train_pos_edges': [], 'train_neg_edges': [], 'test_pos_edges': [], 'test_neg_edges': []}
+        for graph in tqdm(self.graphs, desc='Getting link prediction data'):
+            pos_edge_idx = graph.data.edge_index
+            node_strs = graph.get_graph_node_strs(pos_edge_idx, distance)
+            train_pos_edge_index = graph.data.edge_index
+            train_neg_edge_index = graph.data.train_neg_edge_label_index
+            test_pos_edge_index = graph.data.test_pos_edge_label_index
+            test_neg_edge_index = graph.data.test_neg_edge_label_index
+
+            train_pos_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, train_pos_edge_index).values())
+            train_neg_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, train_neg_edge_index).values())
+            test_pos_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, test_pos_edge_index).values())
+            test_neg_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, test_neg_edge_index).values())
+
+            train_edge_classes = graph.data.edge_classes[graph.data.train_edge_idx] 
+            test_edge_classes = graph.data.edge_classes[graph.data.test_edge_idx]
+
+            if task_type == LP_TASK_EDGE_CLS:
+                data['train_edges'] += train_pos_edges
+                data['train_edge_classes'] += train_edge_classes
+                data['test_edges'] += test_pos_edges
+                data['test_edge_classes'] += test_edge_classes
+            elif task_type == LP_TASK_LINK_PRED:
+                data['train_pos_edges'] += train_pos_edges
+                data['train_neg_edges'] += train_neg_edges
+                data['test_pos_edges'] += test_pos_edges
+                data['test_neg_edges'] += test_neg_edges
+        
+
+        if task_type == LP_TASK_EDGE_CLS:
+            datasets = {
+                'train': EncodingDataset(
+                    tokenizer, 
+                    data['train_edges'], 
+                    data['train_edge_classes']
+                ),
+                'test': EncodingDataset(
+                    tokenizer, 
+                    data['test_edges'], 
+                    data['test_edge_classes']
+                )
+            }
+        elif task_type == LP_TASK_LINK_PRED:
+            datasets = {
+                'train': EncodingDataset(
+                    tokenizer, 
+                    data['train_pos_edges'] + data['train_neg_edges'], 
+                    [1] * len(data['train_pos_edges']) + [0] * len(data['train_neg_edges'])
+                ),
+                'test': EncodingDataset(
+                    tokenizer, 
+                    data['test_pos_edges'] + data['test_neg_edges'], 
+                    [1] * len(data['test_pos_edges']) + [0] * len(data['test_neg_edges'])
+                )
+            }
+        
+        return datasets
 
 
 def get_model_embeddings_dataset(

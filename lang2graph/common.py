@@ -2,9 +2,9 @@ from abc import abstractmethod
 import networkx as nx
 from uuid import uuid4
 import torch
+from tokenization.special_tokens import *
 
 SEP = ' '
-
 
 class LangGraph(nx.DiGraph):
     def __init__(self):
@@ -75,22 +75,7 @@ class LangGraph(nx.DiGraph):
     
 
 
-
-def get_uml_edge_type(edge_data):
-
-    # Reference = 2
-    # Containment = 1
-    # Supertype = 0
-
-    if edge_data['type'] == 'supertype':
-        return 0
-    if edge_data['containment']:
-        return 1
-    return 2
-
-
-
-def create_graph_from_edge_index(graph, edge_index):
+def create_graph_from_edge_index(graph, edge_index: torch.Tensor):
     """
     Create a subgraph from G using only the edges specified in edge_index.
     
@@ -142,7 +127,7 @@ def get_node_texts(graph, h: int):
     node_texts = {}
 
     for node in graph.nodes():
-        node_str = f"{node}"
+        node_str = f"{graph.id_to_node_label[node]}"
         current_level_nodes = {node}
         all_visited_nodes = {node}
 
@@ -154,7 +139,7 @@ def get_node_texts(graph, h: int):
             all_visited_nodes.update(next_level_nodes)
             if next_level_nodes:
                 node_strs = [graph.id_to_node_label[i] for i in sorted(next_level_nodes)]
-                node_str += f" -> {', '.join(map(str, node_strs))}"
+                node_str += f" {NODE_PATH_SEP} {', '.join(map(str, node_strs))}"
             current_level_nodes = next_level_nodes
 
         node_texts[node] = node_str
@@ -162,38 +147,19 @@ def get_node_texts(graph, h: int):
     return node_texts
 
 
-def get_edge_texts(graph, use_edge_types=False):
-    """
-    Create edge string for each edge in a graph.
-    
-    Parameters:
-    G (networkx.Graph): The graph.
-    
-    Returns:
-    dict: A dictionary where keys are edges and values are edge strings.
-    """
-    edge_texts = {}
-
-    for u, v, data in graph.edges(data=True):
-        if use_edge_types:
-            edge_texts[(u, v)] = f"{graph.node_label_to_id[u]} - {get_uml_edge_type(data)} - {graph.node_label_to_id[v]}"
-        else:
-            edge_texts[(u, v)] = f"{graph.node_label_to_id[u]} - {graph.node_label_to_id[v]}"
-
-
-    assert len(edge_texts) == graph.number_of_edges(), f"#Edges text mismatch {len(edge_texts)} != {graph.number_of_edges()}"
-    return edge_texts
-
-
 def get_uml_edge_type(edge_data):
+    uml_edge_types = {
+        'supertype': (0, 'is a'),
+        'reference': (1, 'references'),
+        'containment': (2, 'contains')
+    }
 
-    # Reference = 0
-    # Containment = 1
-    # Supertype = 2
+    edge_type = edge_data.get('type')
+    if edge_type == 'supertype':
+        return uml_edge_types['supertype']
+    
+    containment = edge_data.get('containment')
+    if containment:
+        return uml_edge_types['containment']
 
-    if edge_data['type'] == "supertype":
-        return 2
-    if edge_data['containment']:
-        return 1
-    return 0
-
+    return uml_edge_types['reference']

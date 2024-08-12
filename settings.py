@@ -18,3 +18,7 @@ modelsets_ecore_json_path = os.path.join(datasets_dir, 'modelset/ecore.jsonl')
 graph_data_dir = 'datasets/graph_data'
 
 # Path: settings.py
+
+
+LP_TASK_EDGE_CLS = 'edge_cls'
+LP_TASK_LINK_PRED = 'lp'
