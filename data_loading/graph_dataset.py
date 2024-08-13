@@ -8,6 +8,7 @@ from data_loading.data import TorchGraph
 from data_loading.models_dataset import ModelDataset
 from data_loading.encoding import EncodingDataset
 from tqdm.auto import tqdm
+from embeddings.common import get_embedding_model
 from settings import seed, graph_data_dir
 from settings import (
     LP_TASK_EDGE_CLS,
@@ -26,10 +27,14 @@ class GraphDataset(torch.utils.data.Dataset):
             neg_sampling_ratio=1,
             use_edge_types=False,
             reload=False,
+            use_embeddings=False,
+            embed_model_name='bert-base-uncased',
+            ckpt=None,
         ):
         super().__init__()
         self.distance = distance
         self.save_dir = f'{save_dir}/{models_dataset.name}'
+        embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
         os.makedirs(self.save_dir, exist_ok=True)
         self.graphs = [
             TorchGraph(
@@ -41,13 +46,14 @@ class GraphDataset(torch.utils.data.Dataset):
                 neg_samples_ratio=neg_sampling_ratio,
                 use_edge_types=use_edge_types,
             ) 
-            for g in tqdm(models_dataset, desc=f'Processing {models_dataset.name}')
+            for g in tqdm(models_dataset, desc='Creating graphs')
         ]
+        for g in tqdm(self.graphs, desc='Processing graphs'):
+            g.process_graph(embedder)
 
         self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
         self.labels = torch.tensor([self._c[g.label] for g in models_dataset], dtype=torch.long)
         self.num_classes = len(self._c)
-        self.num_features = self.graphs[0].data.x.shape[-1]
 
     def __len__(self):
         return len(self.graphs)
@@ -121,6 +127,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 data['test_neg_edges'] += test_neg_edges
         
 
+        print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
             datasets = {
                 'train': EncodingDataset(
@@ -147,6 +154,8 @@ class GraphDataset(torch.utils.data.Dataset):
                     [1] * len(data['test_pos_edges']) + [0] * len(data['test_neg_edges'])
                 )
             }
+        
+        print("Tokenized data")
         
         return datasets
 

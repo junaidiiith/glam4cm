@@ -4,8 +4,10 @@ from typing import List, Union
 from embeddings.common import Embedder
 from data_loading.encoding import EncodingDataset
 from torch.utils.data import DataLoader
-from settings import device
+from utils import get_device
 
+
+device = get_device()
 
 class BertEmbedder(Embedder):
     def __init__(self, model_name, ckpt=None):

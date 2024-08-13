@@ -1,3 +1,4 @@
+import torch
 import os
 import fnmatch
 import json
@@ -20,3 +21,7 @@ def xml_to_json(xml_string):
     xml_dict = xmltodict.parse(xml_string)
     json_data = json.dumps(xml_dict, indent=4)
     return json_data
+
+
+def get_device():
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
