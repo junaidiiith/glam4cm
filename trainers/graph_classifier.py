@@ -3,7 +3,7 @@ from data_loading.models_dataset import ModelDataset
 from embeddings.common import Embedder
 from settings import device
 import torch
-from models.gnn_layers import GNNClassifier
+from models.gnn_layers import GNNModel
 from torch.functional import F
 
 
@@ -82,7 +82,7 @@ def run(
 
 
     # Training the model
-    model = GNNClassifier(
+    model = GNNModel(
         input_dim=graph_dataset.num_features,
         hidden_dim=hidden_dim, 
         output_dim=graph_dataset.num_classes,

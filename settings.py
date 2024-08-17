@@ -22,3 +22,14 @@ graph_data_dir = 'datasets/graph_data'
 
 LP_TASK_EDGE_CLS = 'edge_cls'
 LP_TASK_LINK_PRED = 'lp'
+
+
+EPOCH = 'epoch'
+LOSS = 'loss'
+TRAIN_LOSS = 'train_loss'
+TEST_LOSS = 'test_loss'
+TEST_ACC = 'test_acc'
+
+TRAINING_PHASE = 'train'
+VALIDATION_PHASE = 'val'
+TESTING_PHASE = 'test'

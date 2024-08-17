@@ -2,7 +2,24 @@ import torch
 
 # Create your dataset
 class EncodingDataset(torch.utils.data.Dataset):
-    def __init__(self, tokenizer, texts, labels=None, max_length=512):
+    def __init__(
+            self, 
+            tokenizer, 
+            texts, 
+            labels=None, 
+            max_length=512,
+            remove_duplicates=True
+        ):
+
+        if remove_duplicates:
+            print(f'Dataset with {len(texts)} samples before removing duplicates')
+            texts_to_id = {text: i for i, text in enumerate(texts)}
+            texts = list(texts_to_id.keys())
+            labels = [labels[i] for i in texts_to_id.values()] if labels else None
+            
+        
+        print(f'Created dataset with {len(texts)} samples')
+
         self.inputs = tokenizer(
             texts, 
             return_tensors='pt', 
@@ -10,8 +27,9 @@ class EncodingDataset(torch.utils.data.Dataset):
             padding='max_length', 
             max_length=max_length
         )
+
         if labels:
-            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long)
+            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels else None
  
 
     def __len__(self):
@@ -19,5 +37,4 @@ class EncodingDataset(torch.utils.data.Dataset):
     
 
     def __getitem__(self, index):
-        item = {key: val[index] for key, val in self.inputs.items()}
-        return item
+        return {k: v[index] for k, v in self.inputs.items()}

@@ -34,7 +34,7 @@ class TorchGraph:
             graph: EcoreNxG, 
             save_dir: str,
             distance = 1,
-            lptr=0.2,
+            test_ratio=0.2,
             use_neg_samples=False,
             neg_samples_ratio=1,
             use_edge_types=False,
@@ -48,7 +48,7 @@ class TorchGraph:
         self.distance = distance
         self.add_negative_train_samples = use_neg_samples
         self.neg_sampling_ratio = neg_samples_ratio
-        self.lptr = lptr
+        self.test_ratio = test_ratio
         self.save_dir = save_dir
         self.process_graph()
     
@@ -64,7 +64,7 @@ class TorchGraph:
     def get_pyg_data(self, embedder: Embedder):
         transform = RandomLinkSplit(
             num_val=0, 
-            num_test=self.lptr, 
+            num_test=self.test_ratio, 
             add_negative_train_samples=self.add_negative_train_samples,
             neg_sampling_ratio=self.neg_sampling_ratio,
             split_labels=True
@@ -81,8 +81,17 @@ class TorchGraph:
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.pos_edge_label_index.t().tolist()])
 
-        assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
-        assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
+        if hasattr(test_data, 'neg_edge_label_index'):
+            assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
+        else:
+            test_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
+            test_data.neg_edge_label = torch.tensor([], dtype=torch.long)
+
+        if hasattr(train_data, 'neg_edge_label_index'):
+            assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
+        else:
+            train_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
+            train_data.neg_edge_label = torch.tensor([], dtype=torch.long)
 
 
         edge_index = train_data.edge_index
@@ -125,6 +134,7 @@ class TorchGraph:
             test_neg_edge_label=test_data.neg_edge_label,
             y=self.graph.label,
             num_nodes=self.graph.number_of_nodes(),
+            label=self.graph.label
         )
 
         return data, node_texts, edge_texts
@@ -168,7 +178,7 @@ class TorchGraph:
 
     @property
     def save_idx(self):
-        path = os.path.join(self.save_dir, f'{self.graph.id}')
+        path = os.path.join(self.save_dir, f'd={self.distance}_tr={self.test_ratio}_{self.graph.id}')
         return path
 
 
@@ -192,7 +202,7 @@ class TorchGraph:
             self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
             self.edge_texts = pickle.load(open(f"{self.save_idx}/edge_texts.pkl", 'rb'))
 
-            if embedder is not None:
+            if embedder is not None and self.data.x is None:
                 print("Embeddings not found. Generating...")
                 node_embeddings = embedder.embed(list(self.node_texts.values()))
                 edge_embeddings = embedder.embed(list(self.edge_texts.values()))

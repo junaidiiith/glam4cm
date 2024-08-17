@@ -23,6 +23,7 @@ class GraphDataset(torch.utils.data.Dataset):
             models_dataset: ModelDataset,
             save_dir='datasets/graph_data',
             distance=1,
+            test_ratio=0.2,
             add_negative_train_samples=False,
             neg_sampling_ratio=1,
             use_edge_types=False,
@@ -36,11 +37,16 @@ class GraphDataset(torch.utils.data.Dataset):
         self.save_dir = f'{save_dir}/{models_dataset.name}'
         embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
         os.makedirs(self.save_dir, exist_ok=True)
+        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
+        for i in range(len(models_dataset)):
+            models_dataset[i].label = self._c[models_dataset[i].label]
+
         self.graphs = [
             TorchGraph(
                 g, 
                 save_dir=self.save_dir,
                 distance=distance,
+                test_ratio=test_ratio,
                 reload=reload,
                 use_neg_samples=add_negative_train_samples,
                 neg_samples_ratio=neg_sampling_ratio,
@@ -89,7 +95,7 @@ class GraphDataset(torch.utils.data.Dataset):
             yield train_idx, test_idx
     
 
-    def get_link_prediction_data(
+    def get_link_prediction_lm_data(
             self, 
             tokenizer: AutoTokenizer,
             distance, 
@@ -129,6 +135,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
         print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
+            
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -158,18 +165,3 @@ class GraphDataset(torch.utils.data.Dataset):
         print("Tokenized data")
         
         return datasets
-
-
-def get_model_embeddings_dataset(
-        dataset: ModelDataset,
-        save_dir=graph_data_dir,
-        distance=1,
-        reload=False,
-    ):
-    dataset = GraphDataset(
-        dataset, 
-        save_dir=save_dir,
-        distance=distance,
-        reload = reload,
-    )
-    return dataset

@@ -17,7 +17,7 @@ class BertEmbedder(Embedder):
         self.finetuned = bool(ckpt)
     
     def embed(self, text: Union[str, List[str]], aggregate='mean'):
-        dataset = EncodingDataset(self.tokenizer, texts=text)
+        dataset = EncodingDataset(self.tokenizer, texts=text, remove_duplicates=False)
         loader = DataLoader(dataset, batch_size=128)
 
         with torch.no_grad():
