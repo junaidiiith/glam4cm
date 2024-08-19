@@ -83,6 +83,8 @@ class EcoreNxG(LangGraph):
                     class_super_type['name'], 
                     type = SUPERTYPE
                 )
+        
+        assert all(['name' in self.nodes[n] for n in self.nodes])
 
 
     def __create_nx_from_xmi(self):
