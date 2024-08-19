@@ -11,6 +11,7 @@ from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset
 from tqdm.auto import tqdm
 from embeddings.common import get_embedding_model
+from lang2graph.common import get_node_data, get_edge_data
 from lang2graph.archimate import ArchiMateNxG
 from settings import seed
 from settings import (
@@ -21,6 +22,7 @@ from settings import (
 
 metadata_map = {
     'archimate': {
+        "type": "archimate",
         "node": {
             "label": "name",
             "cls": ["type", "layer"]
@@ -30,6 +32,7 @@ metadata_map = {
         }
     },
     'ecore': {
+        "type": "ecore",
         "node": {
             "label": "name",
             "cls": "abstract",
@@ -37,75 +40,34 @@ metadata_map = {
         "edge": {
             "label": "name",
             "cls": "type"
+        },
+        "graph": {
+            "cls": "label"
         }
     }
 }
 
-
-class GraphEdgeDataset(torch.utils.data.Dataset):
+class GraphDataset(torch.utils.data.Dataset):
     def __init__(
-            self, 
-            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
-            save_dir='datasets/graph_data',
-            distance=1,
-            test_ratio=0.2,
-            add_negative_train_samples=False,
-            neg_sampling_ratio=1,
-            use_edge_types=False,
-            reload=False,
-            use_embeddings=False,
-            embed_model_name='bert-base-uncased',
-            ckpt=None,
-        ):
-        super().__init__()
+        self,
+        models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+        save_dir='datasets/graph_data',
+        distance=1,
+        use_embeddings=False,
+        embed_model_name='bert-base-uncased',
+        ckpt=None,
+        use_edge_types=False,
 
+    ):
         self.metadata = metadata_map['ecore']\
             if isinstance(models_dataset, EcoreModelDataset) else metadata_map['archimate']
 
         self.distance = distance
         self.save_dir = f'{save_dir}/{models_dataset.name}'
-        embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
+        self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
         os.makedirs(self.save_dir, exist_ok=True)
-        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
-        for i in range(len(models_dataset)):
-            models_dataset[i].label = self._c[models_dataset[i].label]
-
-        assert all([g.label in self._c.values() for g in models_dataset if g.label is not None]), "Labels not set correctly"
-
-        self.graphs = [
-            TorchEdgeGraph(
-                g, 
-                save_dir=self.save_dir,
-                metadata=self.metadata,
-                distance=distance,
-                test_ratio=test_ratio,
-                reload=reload,
-                use_neg_samples=add_negative_train_samples,
-                neg_samples_ratio=neg_sampling_ratio,
-                use_edge_types=use_edge_types,
-            ) 
-            for g in tqdm(models_dataset, desc='Creating graphs')
-        ]
-        for g in tqdm(self.graphs, desc='Processing graphs'):
-            g.process_graph(embedder)
-
-        self.num_classes = len(self._c)
-        self.num_edge_classes = len(set(sum([g.data.edge_classes.tolist() for g in self.graphs], [])))
-
-        train_count, test_count = dict(), dict()
-        for g in self.graphs:
-            t1 = dict(Counter(g.data.edge_classes[g.data.train_edge_idx].tolist()))
-            t2 = dict(Counter(g.data.edge_classes[g.data.test_edge_idx].tolist()))
-            for k in t1:
-                train_count[k] = train_count.get(k, 0) + t1[k]
-            
-            for k in t2:
-                test_count[k] = test_count.get(k, 0) + t2[k]
-
-        print(f"Train edge classes: {train_count}")
-        print(f"Test edge classes: {test_count}")
-
-        
+        self.use_edge_types = use_edge_types
+        self.graphs = list()
 
     def __len__(self):
         return len(self.graphs)
@@ -139,6 +101,140 @@ class GraphEdgeDataset(torch.utils.data.Dataset):
         n = len(self.graphs)
         for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
             yield train_idx, test_idx
+    
+
+    def add_cls_labels(self):
+        self.add_node_labels()
+        self.add_edge_labels()
+        self.add_graph_labels()
+
+
+    def add_node_labels(self):
+        model_type = self.metadata.get('type')
+        labels = self.metadata[model_type]['node']['cls']
+        if isinstance(labels, str):
+            labels = [labels]
+        
+        for label in labels:
+            label_values = list()
+            for torch_graph in self.graphs:
+                for _, node_data in torch_graph.graph.nodes(data=True):
+                    label_values.append(get_node_data(node_data, label, model_type))
+        
+            self.node_label_map = {l: i for i, l in enumerate(list(set(node_label for node_labels in label_values for node_label in node_labels)))}
+            label_values = [
+                [
+                    self.node_label_map[node_label] 
+                    for node_label in node_labels
+                ]
+                for node_labels in label_values
+            ]
+            
+            for torch_graph, node_classes in zip(self.graphs, label_values):
+                setattr(torch_graph.data, f"node_{label}", torch.tensor(node_classes))
+                
+
+    def add_edge_labels(self):
+        model_type = self.metadata.get('type')
+        labels = self.metadata[model_type]['node']['cls']
+        if isinstance(labels, str):
+            labels = [labels]
+        
+        for label in labels:
+            label_values = list()
+            for torch_graph in self.graphs:
+                for _, _, edge_data in torch_graph.graph.edges(data=True):
+                    label_values.append(get_edge_data(edge_data, label, model_type))
+        
+            self.edge_label_map = {l: i for i, l in enumerate(list(set(edge_label for edge_labels in label_values for edge_label in edge_labels)))}
+            label_values = [
+                [
+                    self.edge_label_map[edge_label] 
+                    for edge_label in edge_labels
+                ]
+                for edge_labels in label_values
+            ]
+            
+            for torch_graph, edge_classes in zip(self.graphs, label_values):
+                setattr(torch_graph.data, f"edge_{label}", torch.tensor(edge_classes))
+
+
+    def add_graph_labels(self):
+        model_type = self.metadata.get('type')
+        if 'graph' in self.metadata[model_type]:
+            label = self.metadata[model_type]['graph']['cls']
+            if hasattr(label, self.graphs[0].graph):
+                graph_labels = list()
+                for torch_graph in self.graphs:
+                    graph_labels.append(getattr(torch_graph.graph, label))
+            
+                self.graph_label_map = {l: i for i, l in enumerate(list(set(graph_label for graph_label in graph_labels)))}
+                graph_labels = [
+                    self.graph_label_map[graph_label]
+                    for graph_label in graph_labels
+                ]
+
+                for torch_graph, graph_label in zip(self.graphs, graph_labels):
+                    setattr(torch_graph.data, f"graph_{label}", torch.tensor([graph_label]))
+                
+
+
+class GraphEdgeDataset(GraphDataset):
+    def __init__(
+            self, 
+            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+            save_dir='datasets/graph_data',
+            distance=1,
+            test_ratio=0.2,
+            add_negative_train_samples=False,
+            neg_sampling_ratio=1,
+            use_edge_types=False,
+            reload=False,
+            use_embeddings=False,
+            embed_model_name='bert-base-uncased',
+            ckpt=None,
+        ):
+        super().__init__(
+            models_dataset=models_dataset,
+            save_dir=save_dir,
+            distance=distance,
+            use_embeddings=use_embeddings,
+            embed_model_name=embed_model_name,
+            ckpt=ckpt,
+            use_edge_types=use_edge_types
+        )
+
+        self.graphs = [
+            TorchEdgeGraph(
+                g, 
+                save_dir=self.save_dir,
+                metadata=self.metadata,
+                distance=distance,
+                test_ratio=test_ratio,
+                reload=reload,
+                use_neg_samples=add_negative_train_samples,
+                neg_samples_ratio=neg_sampling_ratio,
+                use_edge_types=use_edge_types,
+            ) 
+            for g in tqdm(models_dataset, desc='Creating graphs')
+        ]
+        for g in tqdm(self.graphs, desc='Processing graphs'):
+            g.process_graph(self.embedder)
+
+        self.add_cls_labels()
+
+        train_count, test_count = dict(), dict()
+        for g in self.graphs:
+            t1 = dict(Counter(g.data.edge_classes[g.data.train_edge_idx].tolist()))
+            t2 = dict(Counter(g.data.edge_classes[g.data.test_edge_idx].tolist()))
+            for k in t1:
+                train_count[k] = train_count.get(k, 0) + t1[k]
+            
+            for k in t2:
+                test_count[k] = test_count.get(k, 0) + t2[k]
+
+        print(f"Train edge classes: {train_count}")
+        print(f"Test edge classes: {test_count}")
     
 
     def get_link_prediction_lm_data(
@@ -214,7 +310,7 @@ class GraphEdgeDataset(torch.utils.data.Dataset):
     
 
 
-class GraphNodeDataset(torch.utils.data.Dataset):
+class GraphNodeDataset(GraphDataset):
     def __init__(
             self, 
             models_dataset: Union[EcoreModelDataset, ArchiMateNxG],
@@ -227,20 +323,14 @@ class GraphNodeDataset(torch.utils.data.Dataset):
             embed_model_name='bert-base-uncased',
             ckpt=None,
         ):
-        super().__init__()
-        self.distance = distance
-        self.save_dir = f'{save_dir}/{models_dataset.name}'
-        embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
-        os.makedirs(self.save_dir, exist_ok=True)
-        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
-        for i in range(len(models_dataset)):
-            models_dataset[i].label = self._c[models_dataset[i].label]
-
-        assert all([g.label in self._c.values() for g in models_dataset if g.label is not None]), "Labels not set correctly"
-
-        self.metadata = metadata_map['ecore']\
-            if isinstance(models_dataset, EcoreModelDataset) else metadata_map['archimate']
-
+        super().__init__(
+            models_dataset=models_dataset,
+            save_dir=save_dir,
+            distance=distance,
+            use_embeddings=use_embeddings,
+            embed_model_name=embed_model_name,
+            ckpt=ckpt
+        )
 
         self.graphs = [
             TorchNodeGraph(
@@ -255,10 +345,9 @@ class GraphNodeDataset(torch.utils.data.Dataset):
             for g in tqdm(models_dataset, desc='Creating graphs')
         ]
         for g in tqdm(self.graphs, desc='Processing graphs'):
-            g.process_graph(embedder)
+            g.process_graph(self.embedder)
 
-        self.num_classes = len(self._c)
-        self.num_node_classes = len(set(sum([g.data.node_classes.tolist() for g in self.graphs], [])))
+        self.add_cls_labels()
 
         train_count, test_count = dict(), dict()
         for g in self.graphs:
@@ -273,41 +362,6 @@ class GraphNodeDataset(torch.utils.data.Dataset):
         print(f"Train Node classes: {train_count}")
         print(f"Test Node classes: {test_count}")
 
-        
-
-    def __len__(self):
-        return len(self.graphs)
-    
-
-    def __getitem__(self, index: int):
-        return self.graphs[index]
-    
-
-    def __add__(self, other):
-        self.graphs += other.graphs
-        self.labels = torch.cat([self.labels, other.labels])
-        self._c.update(other._c)
-        self.num_classes = len(self._c)
-
-        return self
-    
-
-    def get_train_test_split(self, tr=0.8):
-        n = len(self.graphs)
-        train_size = int(n * tr)
-        idx = list(range(n))
-        shuffle(idx)
-        train_idx = idx[:train_size]
-        test_idx = idx[train_size:]
-        return train_idx, test_idx
-    
-
-    def k_fold_split(self, k=10):
-        kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
-        n = len(self.graphs)
-        for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
-            yield train_idx, test_idx
-    
 
     def get_node_classification_lm_data(
             self, 

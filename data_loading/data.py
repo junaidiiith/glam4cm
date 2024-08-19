@@ -8,7 +8,7 @@ from lang2graph.uml import EcoreNxG
 from lang2graph.common import (
     create_graph_from_edge_index, 
     get_node_texts,
-    get_uml_edge_type
+    get_edge_data
 )
 
 from tokenization.special_tokens import *
@@ -66,6 +66,9 @@ class TorchEdgeGraph:
 
     
     def get_pyg_data(self, embedder: Embedder):
+        
+        d = Data()
+
         transform = RandomLinkSplit(
             num_val=0, 
             num_test=self.test_ratio, 
@@ -81,6 +84,9 @@ class TorchEdgeGraph:
 
         train_idx = edge_index_to_idx(self.graph, train_data.edge_index)
         test_idx = edge_index_to_idx(self.graph, test_data.pos_edge_label_index)
+        setattr(d, 'train_edge_idx', train_idx)
+        setattr(d, 'test_edge_idx', test_idx)
+
 
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.pos_edge_label_index.t().tolist()])
@@ -97,51 +103,39 @@ class TorchEdgeGraph:
             train_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
             train_data.neg_edge_label = torch.tensor([], dtype=torch.long)
 
+        setattr(d, 'train_pos_edge_label_index', train_data.pos_edge_label_index)
+        setattr(d, 'train_pos_edge_label', train_data.pos_edge_label)
+        setattr(d, 'train_neg_edge_label_index', train_data.neg_edge_label_index)
+        setattr(d, 'train_neg_edge_label', train_data.neg_edge_label)
+        setattr(d, 'test_pos_edge_label_index', test_data.pos_edge_label_index)
+        setattr(d, 'test_pos_edge_label', test_data.pos_edge_label)
+        setattr(d, 'test_neg_edge_label_index', test_data.neg_edge_label_index)
+        setattr(d, 'test_neg_edge_label', test_data.neg_edge_label)
+
 
         edge_index = train_data.edge_index
-        edge_classes = torch.tensor(
-            [
-                get_edge_type(edge_data, self.metadata)[0]
-                for _, _, edge_data in self.graph.edges(data=True)
-            ], dtype=torch.long
-        )
+        setattr(d, 'overall_edge_index', self.graph.edge_index)
+        setattr(d, 'edge_index', edge_index)
+
         node_texts = self.get_graph_node_strs(
             edge_index, self.distance
-        ) ### Considering nodes with edges only in the subgraph
+        )
 
         edge_texts = self.get_graph_edge_strs_from_node_strs(
             node_strs=node_texts, 
             edge_index=self.graph.edge_index, 
             use_edge_types=self.use_edge_types
-        ) ### Considering all edges
+        )
 
-        node_embeddings, edge_embeddings = None, None
         if embedder is not None:
             node_embeddings = embedder.embed(list(node_texts.values()))
             edge_embeddings = embedder.embed(list(edge_texts.values()))
-    
-        data = Data(
-            x=node_embeddings,
-            overall_edge_index=self.graph.edge_index,
-            edge_index=edge_index,
-            edge_attr=edge_embeddings,
-            edge_classes=edge_classes,
-            train_edge_idx=train_idx,
-            test_edge_idx = test_idx,
-            train_pos_edge_label_index=train_data.pos_edge_label_index,
-            train_pos_edge_label=train_data.pos_edge_label,
-            train_neg_edge_label_index=train_data.neg_edge_label_index,
-            train_neg_edge_label=train_data.neg_edge_label,
-            test_pos_edge_label_index=test_data.pos_edge_label_index,
-            test_pos_edge_label=test_data.pos_edge_label,
-            test_neg_edge_label_index=test_data.neg_edge_label_index,
-            test_neg_edge_label=test_data.neg_edge_label,
-            y=torch.tensor([self.graph.label], dtype=torch.long),
-            num_nodes=self.graph.number_of_nodes(),
-            label=self.graph.label
-        )
 
-        return data, node_texts, edge_texts
+            setattr(d, 'x', node_embeddings)
+            setattr(d, 'edge_attr', edge_embeddings)
+
+        setattr(d, 'num_nodes', self.graph.number_of_nodes())
+        return d, node_texts, edge_texts
     
 
     def get_graph_node_strs(self, edge_index: torch.Tensor, distance: int):
@@ -160,12 +154,15 @@ class TorchEdgeGraph:
             assert not use_edge_types, "Edge types are not supported for negative samples"
 
         edge_strs = dict()
+        node_label = self.metadata['node']['label']
         for u, v in edge_index.t().tolist():
             u_str = node_strs[u]
             v_str = node_strs[v]
             u_label = self.graph.id_to_node_label[u]
             v_label = self.graph.id_to_node_label[v]
-            edge_str = f"{u_str} {NODE_SEP} {v_str}" if not use_edge_types else f"{u_str} {NODE_SEP} {get_uml_edge_type(self.graph.edges[u_label, v_label])[1]} {NODE_SEP} {v_str}"
+            edge_data = self.graph.edges[u_label, v_label]
+            edge_label = edge_data.get(node_label, "")
+            edge_str = f"{u_str} {edge_label} {v_str}" if not use_edge_types else f"{u_str} {edge_label} {get_edge_data(edge_data, "type", self.metadata['type'])[1]} {v_str}"
             edge_strs[(u, v)] = edge_str
 
         return edge_strs
@@ -258,6 +255,7 @@ class TorchNodeGraph:
 
     
     def get_pyg_data(self, embedder: Embedder):
+        d = Data()
         train_nodes, test_nodes = train_test_split(
             list(self.graph.numbered_graph.nodes), test_size=self.test_ratio, shuffle=True, random_state=42
         )
@@ -265,10 +263,16 @@ class TorchNodeGraph:
         train_idx = torch.tensor(train_nodes, dtype=torch.long)
         test_idx = torch.tensor(test_nodes, dtype=torch.long)
 
+        setattr(d, 'train_node_idx', train_idx)
+        setattr(d, 'test_node_idx', test_idx)
+
         assert all([self.graph.numbered_graph.has_node(n) for n in train_nodes])
         assert all([self.graph.numbered_graph.has_node(n) for n in test_nodes])
 
         edge_index = self.graph.edge_index
+        setattr(d, 'edge_index', edge_index)
+
+
         node_texts = self.get_graph_node_strs(
             edge_index, self.distance
         ) ### Considering nodes with edges only in the subgraph
@@ -276,40 +280,10 @@ class TorchNodeGraph:
         node_embeddings= None
         if embedder is not None:
             node_embeddings = embedder.embed(list(node_texts.values()))
+            setattr(d, 'x', node_embeddings)
         
-        node_cls_labels = self.metadata['node']['cls']
-        node_cls_labels = [node_cls_labels] if isinstance(node_cls_labels, str) else node_cls_labels
-        node_classes_list = list()
-        for cls_label in node_cls_labels:
-            node_classes = [
-                cls_label in self.graph.numbered_graph.nodes[node]
-                and self.graph.numbered_graph.nodes[node][cls_label]
-                for node in train_nodes
-            ] +\
-            [
-                cls_label in self.graph.numbered_graph.nodes[node]
-                and self.graph.numbered_graph.nodes[node][cls_label]
-                for node in test_nodes
-            ]
-
-            node_classes_list.append(node_classes)
-        
-        node_classes = torch.tensor(node_classes_list, dtype=torch.long).t()
-        
-        if node_classes.size(1) == 1:
-            node_classes = node_classes.squeeze(1)
-            
-        data = Data(
-            x=node_embeddings,
-            edge_index=edge_index,
-            train_node_idx=train_idx,
-            test_node_idx = test_idx,
-            node_classes = torch.tensor(node_classes, dtype=torch.long),
-            y=torch.tensor([self.graph.label], dtype=torch.long),
-            num_nodes=self.graph.number_of_nodes(),
-        )
-
-        return data, node_texts
+        setattr(d, 'num_nodes', self.graph.number_of_nodes())
+        return d, node_texts
     
 
     def get_graph_node_strs(self, edge_index: torch.Tensor, distance: int):

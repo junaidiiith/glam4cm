@@ -113,7 +113,7 @@ def create_graph_from_edge_index(graph, edge_index: torch.Tensor):
 
 
 
-def get_node_texts(graph, h: int):
+def get_node_texts(graph, h: int, label='name'):
     """
     Create node string for each node n in a graph using neighbors of n up to h hops.
     
@@ -127,7 +127,7 @@ def get_node_texts(graph, h: int):
     node_texts = {}
 
     for node in graph.nodes():
-        node_str = f"{graph.id_to_node_label[node]}"
+        node_str = graph.nodes[node][label]
         current_level_nodes = {node}
         all_visited_nodes = {node}
 
@@ -138,8 +138,8 @@ def get_node_texts(graph, h: int):
                 next_level_nodes.update(neighbors - all_visited_nodes)
             all_visited_nodes.update(next_level_nodes)
             if next_level_nodes:
-                node_strs = [graph.id_to_node_label[i] for i in sorted(next_level_nodes)]
-                node_str += f" {NODE_PATH_SEP} {', '.join(map(str, node_strs))}"
+                node_strs = [graph.nodes[i][label] for i in sorted(next_level_nodes)]
+                node_str += f" {NODE_PATH_SEP} {', '.join(node_strs)}"
             current_level_nodes = next_level_nodes
 
         node_texts[node] = node_str
@@ -147,19 +147,60 @@ def get_node_texts(graph, h: int):
     return node_texts
 
 
-def get_uml_edge_type(edge_data):
-    uml_edge_types = {
-        'supertype': (0, 'is a'),
-        'reference': (1, 'references'),
-        'containment': (2, 'contains')
-    }
+def get_node_data(
+    node_data: dict,
+    node_label: str,
+    model_type: str,
+):
+    if model_type == 'archimate':
+        return get_archimate_node_data(node_data, node_label)
+    elif model_type == 'uml':
+        return get_uml_node_data(node_data, node_label)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
 
+
+
+def get_edge_data(
+    edge_data: dict,
+    edge_label: str,
+    model_type: str,
+):
+    if model_type == 'archimate':
+        return get_archimate_edge_data(edge_data, edge_label)
+    elif model_type == 'uml':
+        return get_uml_edge_data(edge_data, edge_label)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+
+
+def get_archimate_node_data(edge_data: dict, node_label: str):
+    return edge_data.get(node_label)
+
+def get_uml_node_data(node_data: dict, node_label: str):
+    return node_data.get(node_label, '')
+
+
+def get_archimate_edge_data(edge_data: dict):
+    return edge_data.get('type')
+
+
+def get_uml_edge_data(edge_data: dict, edge_label: str):
+    if edge_label == 'type':
+        return get_uml_edge_type(edge_data)
+    elif edge_label in edge_data:
+        return edge_data[edge_label]
+    else:
+        raise ValueError(f"Unknown edge label: {edge_label}")
+
+
+def get_uml_edge_type(edge_data):
     edge_type = edge_data.get('type')
     if edge_type == 'supertype':
-        return uml_edge_types['supertype']
+        return 'supertype'
     
     containment = edge_data.get('containment')
     if containment:
-        return uml_edge_types['containment']
+        return 'containment'
 
-    return uml_edge_types['reference']
+    return 'reference'
