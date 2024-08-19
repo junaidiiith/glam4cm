@@ -1,16 +1,17 @@
 from collections import Counter
 import os
 from random import shuffle
+from typing import Union
 from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
 from transformers import AutoTokenizer
 from data_loading.data import TorchEdgeGraph, TorchNodeGraph
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset
 from tqdm.auto import tqdm
 from embeddings.common import get_embedding_model
-from lang2graph.common import get_node_texts
+from lang2graph.archimate import ArchiMateNxG
 from settings import seed
 from settings import (
     LP_TASK_EDGE_CLS,
@@ -18,11 +19,33 @@ from settings import (
 )
 
 
+metadata_map = {
+    'archimate': {
+        "node": {
+            "label": "name",
+            "cls": ["type", "layer"]
+        },
+        "edge": {
+            "label": "type",
+        }
+    },
+    'ecore': {
+        "node": {
+            "label": "name",
+            "cls": "abstract",
+        },
+        "edge": {
+            "label": "name",
+            "cls": "type"
+        }
+    }
+}
+
 
 class GraphEdgeDataset(torch.utils.data.Dataset):
     def __init__(
             self, 
-            models_dataset: ModelDataset,
+            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
             save_dir='datasets/graph_data',
             distance=1,
             test_ratio=0.2,
@@ -35,6 +58,10 @@ class GraphEdgeDataset(torch.utils.data.Dataset):
             ckpt=None,
         ):
         super().__init__()
+
+        self.metadata = metadata_map['ecore']\
+            if isinstance(models_dataset, EcoreModelDataset) else metadata_map['archimate']
+
         self.distance = distance
         self.save_dir = f'{save_dir}/{models_dataset.name}'
         embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
@@ -49,6 +76,7 @@ class GraphEdgeDataset(torch.utils.data.Dataset):
             TorchEdgeGraph(
                 g, 
                 save_dir=self.save_dir,
+                metadata=self.metadata,
                 distance=distance,
                 test_ratio=test_ratio,
                 reload=reload,
@@ -189,7 +217,7 @@ class GraphEdgeDataset(torch.utils.data.Dataset):
 class GraphNodeDataset(torch.utils.data.Dataset):
     def __init__(
             self, 
-            models_dataset: ModelDataset,
+            models_dataset: Union[EcoreModelDataset, ArchiMateNxG],
             save_dir='datasets/graph_data',
             distance=1,
             test_ratio=0.2,
@@ -210,9 +238,14 @@ class GraphNodeDataset(torch.utils.data.Dataset):
 
         assert all([g.label in self._c.values() for g in models_dataset if g.label is not None]), "Labels not set correctly"
 
+        self.metadata = metadata_map['ecore']\
+            if isinstance(models_dataset, EcoreModelDataset) else metadata_map['archimate']
+
+
         self.graphs = [
             TorchNodeGraph(
                 g, 
+                metadata=self.metadata,
                 save_dir=self.save_dir,
                 distance=distance,
                 test_ratio=test_ratio,

@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import EcoreModelDataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -70,7 +70,7 @@ def run(args):
     )
     dataset_name = args.dataset
     distance = args.distance
-    dataset = ModelDataset(dataset_name, reload=args.reload, **config_params)
+    dataset = EcoreModelDataset(dataset_name, reload=args.reload, **config_params)
 
     print("Loaded dataset")
 

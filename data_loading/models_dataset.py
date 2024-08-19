@@ -5,6 +5,7 @@ from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import json
 import os
+from lang2graph.archimate import ArchiMateNxG
 from settings import (
     datasets_dir, 
     seed,
@@ -13,68 +14,26 @@ import numpy as np
 from lang2graph.uml import EcoreNxG
 
 
-
 class ModelDataset:
     def __init__(
-            self, 
-            dataset_name: str, 
-            dataset_dir=datasets_dir,
-            save_dir='datasets/pickles',
-            reload=False,
-            remove_duplicates=False,
-            use_type=False,
-            extension='.jsonl',
-            min_edges: int = -1,
-            min_enr: float = -1,
-            timeout=-1
-        ):
+        self,
+        dataset_name: str,
+        dataset_dir=datasets_dir,
+        save_dir='datasets/pickles',
+        min_edges: int = -1,
+        min_enr: float = -1,
+        timeout=-1
+    ):
         self.name = dataset_name
         self.dataset_dir = dataset_dir
         self.save_dir = save_dir
-        self.extension = extension
-        self.min_edges = min_edges
-        self.min_enr = min_enr
         os.makedirs(save_dir, exist_ok=True)
 
-        dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
-        if reload or not dataset_exists:
-            self.graphs: List[EcoreNxG] = []
-            data_path = os.path.join(dataset_dir, dataset_name)
-            for file in os.listdir(data_path):
-                if file.endswith(self.extension) and file.startswith('ecore'):
-                    json_objects = json.load(open(os.path.join(data_path, file)))
-                    for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
-                        if remove_duplicates and g['is_duplicated']:
-                            continue
-                        try:
-                            nxg = EcoreNxG(
-                                g, 
-                                use_type=use_type, 
-                                timeout=timeout
-                            )
-                            self.graphs.append(nxg)
-                        except Exception as e:
-                            continue
-            self.__filter_graphs()
-            self.save()
-        else:
-            self.load()
-        
-        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
-        
-        if remove_duplicates:
-            self.remove_duplicates()
-
-        print(f'Graphs: {len(self.graphs)}')
+        self.min_edges = min_edges
+        self.min_enr = min_enr
+        self.timeout = timeout
 
 
-    def remove_duplicates(self):
-        self.graphs = self.dedup()
-
-    def dedup(self) -> List[EcoreNxG]:
-        return [g for g in self.graphs if not g.is_duplicated]
-    
-    
     def get_train_test_split(self, train_size=0.8):
         n = len(self.graphs)
         train_size = int(n * train_size)
@@ -123,7 +82,7 @@ class ModelDataset:
         print(f'Saved {self.name} to pickle')
 
 
-    def __filter_graphs(self):        
+    def filter_graphs(self):
         graphs = list()
         for graph in self.graphs:
             addable = True
@@ -144,5 +103,117 @@ class ModelDataset:
         with open(os.path.join(self.save_dir, f'{self.name}.pkl'), 'rb') as f:
             self.graphs = pickle.load(f)
         
-        self.__filter_graphs()
+        self.filter_graphs()
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+
+
+class EcoreModelDataset(ModelDataset):
+    def __init__(
+            self, 
+            dataset_name: str, 
+            dataset_dir=datasets_dir,
+            save_dir='datasets/pickles',
+            reload=False,
+            remove_duplicates=False,
+            extension='.jsonl',
+            min_edges: int = -1,
+            min_enr: float = -1,
+            timeout=-1
+        ):
+        super().__init__(
+            dataset_name, 
+            dataset_dir=dataset_dir, 
+            save_dir=save_dir, 
+            min_edges=min_edges, 
+            min_enr=min_enr,
+            timeout=timeout
+        )
+        os.makedirs(save_dir, exist_ok=True)
+        self.extension = extension
+
+        dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
+        if reload or not dataset_exists:
+            self.graphs: List[EcoreNxG] = []
+            data_path = os.path.join(dataset_dir, dataset_name)
+            for file in os.listdir(data_path):
+                if file.endswith(self.extension) and file.startswith('ecore'):
+                    json_objects = json.load(open(os.path.join(data_path, file)))
+                    for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
+                        if remove_duplicates and g['is_duplicated']:
+                            continue
+                        try:
+                            nxg = EcoreNxG(
+                                g, 
+                                timeout=timeout
+                            )
+                            self.graphs.append(nxg)
+                        except Exception as e:
+                            continue
+            self.filter_graphs()
+            self.save()
+        else:
+            self.load()
+        
+        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+        
+        if remove_duplicates:
+            self.remove_duplicates()
+
+        print(f'Graphs: {len(self.graphs)}')
+
+
+    def remove_duplicates(self):
+        self.graphs = self.dedup()
+
+    def dedup(self) -> List[EcoreNxG]:
+        return [g for g in self.graphs if not g.is_duplicated]
+
+
+
+class ArchiMateModelDataset(ModelDataset):
+    def __init__(
+            self, 
+            dataset_name: str, 
+            dataset_dir=datasets_dir,
+            save_dir='datasets/pickles',
+            reload=False,
+            min_edges: int = -1,
+            min_enr: float = -1,
+            timeout=-1
+        ):
+        super().__init__(
+            dataset_name, 
+            dataset_dir=dataset_dir, 
+            save_dir=save_dir, 
+            min_edges=min_edges, 
+            min_enr=min_enr,
+            timeout=timeout
+        )
+        os.makedirs(save_dir, exist_ok=True)
+        
+        dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
+        if reload or not dataset_exists:
+            self.graphs: List[ArchiMateNxG] = []
+            data_path = os.path.join(dataset_dir, dataset_name, 'processed-models')
+            for model_dir in tqdm(os.listdir(data_path), desc=f'Loading {dataset_name.title()}'):
+                model_dir = os.path.join(data_path, model_dir)
+                if os.path.isdir(model_dir):
+                    model_file = os.path.join(model_dir, 'model.json')
+                    if os.path.exists(model_file):
+                        model = json.load(open(model_file))
+                        try:
+                            nxg = ArchiMateNxG(
+                                model, 
+                                timeout=timeout
+                            )
+                            self.graphs.append(nxg)
+                        except Exception as e:
+                            raise e
+                
+            self.filter_graphs()
+            self.save()
+        else:
+            self.load()
+        
+        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+        print(f'Graphs: {len(self.graphs)}')

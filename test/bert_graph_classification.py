@@ -1,5 +1,5 @@
 from trainers.bert_classifier import train_hf
-from data_loading.models_dataset import ModelDataset 
+from data_loading.models_dataset import EcoreModelDataset 
 
 from argparse import ArgumentParser
 
@@ -22,7 +22,7 @@ def run(args):
         reload=args.reload
     )
     dataset_name = args.dataset
-    dataset = ModelDataset(dataset_name, **config_params)
+    dataset = EcoreModelDataset(dataset_name, **config_params)
 
     model_name = args.model_name
     epochs = args.epochs

@@ -30,14 +30,12 @@ class EcoreNxG(LangGraph):
     def __init__(
             self, 
             json_obj: dict, 
-            use_type=True,
             timeout = -1
         ):
         super().__init__()
         self.xmi = json_obj.get('xmi')
         self.graph_id = json_obj.get('ids')
         self.timeout = timeout
-        self.use_type = use_type
         self.json_obj = json_obj
         self.graph_type = json_obj.get('model_type')
         self.label = json_obj.get('labels')
@@ -56,7 +54,7 @@ class EcoreNxG(LangGraph):
     def __create_nx_from_file(self, file_name):
         references, supertypes = get_ecore_data(file_name)
         for class_name, class_references in references.items():
-            self.add_node(class_name)
+            self.add_node(class_name, name=class_name)
             
             for class_reference in class_references.values():
                 if class_reference['type'] == 'EReference':

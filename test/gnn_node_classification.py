@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from data_loading.graph_dataset import GraphNodeDataset
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import EcoreModelDataset
 from models.gnn_layers import GNNConv, NodeClassifer
 from tokenization.special_tokens import *
 from trainers.gnn_node_classifier import Trainer
@@ -59,7 +59,7 @@ def run(args):
     )
     dataset_name = args.dataset
 
-    dataset = ModelDataset(dataset_name, reload=False, **config_params)
+    dataset = EcoreModelDataset(dataset_name, reload=False, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,

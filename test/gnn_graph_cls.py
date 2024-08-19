@@ -1,4 +1,4 @@
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import EcoreModelDataset
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, GraphClassifer
 from trainers.gnn_graph_classifier import Trainer
@@ -58,7 +58,7 @@ def run(args):
     )
     dataset_name = args.dataset
 
-    dataset = ModelDataset(dataset_name, reload=False, **config_params)
+    dataset = EcoreModelDataset(dataset_name, reload=False, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,

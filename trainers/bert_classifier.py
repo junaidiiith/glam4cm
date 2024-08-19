@@ -9,7 +9,7 @@ from transformers import (
 import torch
 import numpy as np
 import random
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import EcoreModelDataset
 from settings import device, seed
 from sklearn.preprocessing import LabelEncoder
 from trainers.metrics import compute_metrics
@@ -51,7 +51,7 @@ class CustomDataset(torch.utils.data.Dataset):
         return inputs
 
 
-def train_hf(model_name, model_ds: ModelDataset, epochs):
+def train_hf(model_name, model_ds: EcoreModelDataset, epochs):
     max_len = max_length_map[model_name]
     i = 0
     print(f'Device used: {device}')

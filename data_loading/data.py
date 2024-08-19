@@ -32,6 +32,7 @@ class TorchEdgeGraph:
     def __init__(
             self, 
             graph: EcoreNxG, 
+            metadata: dict,
             save_dir: str,
             distance = 1,
             test_ratio=0.2,
@@ -41,10 +42,13 @@ class TorchEdgeGraph:
             reload=False,
         ):
 
+        self.graph = graph
+        self.metadata = metadata
+        
         self.xmi = graph.xmi
         self.reload = reload
         self.use_edge_types = use_edge_types
-        self.graph = graph
+        
         self.distance = distance
         self.add_negative_train_samples = use_neg_samples
         self.neg_sampling_ratio = neg_samples_ratio
@@ -97,7 +101,7 @@ class TorchEdgeGraph:
         edge_index = train_data.edge_index
         edge_classes = torch.tensor(
             [
-                get_uml_edge_type(edge_data)[0]
+                get_edge_type(edge_data, self.metadata)[0]
                 for _, _, edge_data in self.graph.edges(data=True)
             ], dtype=torch.long
         )
@@ -227,15 +231,15 @@ class TorchEdgeGraph:
 class TorchNodeGraph:
     def __init__(
             self, 
-            graph: EcoreNxG, 
+            graph: EcoreNxG,
+            metadata: dict,
             save_dir: str,
             distance = 1,
             test_ratio=0.2,
-            cls_attribute='abstract',
             reload=False,
         ):
 
-        self.cls_attribute = cls_attribute
+        self.metadata = metadata
         self.xmi = graph.xmi
         self.reload = reload
         self.graph = graph
@@ -273,18 +277,27 @@ class TorchNodeGraph:
         if embedder is not None:
             node_embeddings = embedder.embed(list(node_texts.values()))
         
+        node_cls_labels = self.metadata['node']['cls']
+        node_cls_labels = [node_cls_labels] if isinstance(node_cls_labels, str) else node_cls_labels
+        node_classes_list = list()
+        for cls_label in node_cls_labels:
+            node_classes = [
+                cls_label in self.graph.numbered_graph.nodes[node]
+                and self.graph.numbered_graph.nodes[node][cls_label]
+                for node in train_nodes
+            ] +\
+            [
+                cls_label in self.graph.numbered_graph.nodes[node]
+                and self.graph.numbered_graph.nodes[node][cls_label]
+                for node in test_nodes
+            ]
 
-        node_classes = [
-            self.cls_attribute in self.graph.numbered_graph.nodes[node]
-            and self.graph.numbered_graph.nodes[node][self.cls_attribute]
-            for node in train_nodes
-        ] +\
-        [
-            self.cls_attribute in self.graph.numbered_graph.nodes[node]
-            and self.graph.numbered_graph.nodes[node][self.cls_attribute]
-            for node in test_nodes
-        ]
-
+            node_classes_list.append(node_classes)
+        
+        node_classes = torch.tensor(node_classes_list, dtype=torch.long).t()
+        
+        if node_classes.size(1) == 1:
+            node_classes = node_classes.squeeze(1)
             
         data = Data(
             x=node_embeddings,

@@ -3,7 +3,7 @@ import random
 import torch
 import numpy as np
 
-from data_loading.models_dataset import ModelDataset
+from data_loading.models_dataset import EcoreModelDataset
 from data_loading.graph_dataset import (
     GraphNodeDataset,
     GraphEdgeDataset
@@ -33,9 +33,9 @@ def run():
         min_enr = 1.2,
         min_edges = 10
     )
-    ecore = ModelDataset('ecore_555', reload=False, **config_params)
-    modelset = ModelDataset('modelset', reload=True, remove_duplicates=True, **config_params)
-    mar = ModelDataset('mar-ecore-github', reload=True, **config_params)
+    ecore = EcoreModelDataset('ecore_555', reload=False, **config_params)
+    modelset = EcoreModelDataset('modelset', reload=True, remove_duplicates=True, **config_params)
+    mar = EcoreModelDataset('mar-ecore-github', reload=True, **config_params)
 
     graph_data_params = dict(
         distance=2,
