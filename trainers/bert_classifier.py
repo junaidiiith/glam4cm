@@ -9,7 +9,7 @@ from transformers import (
 import torch
 import numpy as np
 import random
-from data_loading.data import ModelDataset
+from data_loading.models_dataset import ModelDataset
 from settings import device, seed
 from sklearn.preprocessing import LabelEncoder
 from trainers.metrics import compute_metrics
@@ -74,16 +74,20 @@ def train_hf(model_name, model_ds: ModelDataset, epochs):
         train_ds = CustomDataset(X_train, y_train, tokenizer, max_length=max_len)
         test_ds = CustomDataset(X_test, y_test, tokenizer, max_length=max_len)
 
+        dataset_name = model_ds.name
+        output_dir = f'./results/{dataset_name}'
+        logs_dir = f'./logs/{dataset_name}'
+
         # Training arguments
         training_args = TrainingArguments(
-            output_dir='./results',
+            output_dir=output_dir,
             num_train_epochs=epochs,
             eval_strategy="epoch",
             per_device_train_batch_size=2,
             per_device_eval_batch_size=2,
             warmup_steps=500,
             weight_decay=0.01,
-            logging_dir='./logs',
+            logging_dir=logs_dir,
             logging_steps=10,
         )
 

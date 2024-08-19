@@ -14,7 +14,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run(args):
+def run():
     
     seed = 42
     random.seed(seed)
@@ -25,7 +25,7 @@ def run(args):
 
 
     from data_loading.models_dataset import ModelDataset
-    from data_loading.graph_dataset import GraphDataset
+    from data_loading.graph_dataset import GraphEdgeDataset
 
     
     config_params = dict(
@@ -43,6 +43,6 @@ def run(args):
         neg_sampling_ratio=1,
     )
 
-    GraphDataset(ecore, reload=False, **graph_data_params)
-    GraphDataset(modelset, reload=True, **graph_data_params)
-    GraphDataset(mar, reload=True, **graph_data_params)
+    GraphEdgeDataset(ecore, reload=False, **graph_data_params)
+    GraphEdgeDataset(modelset, reload=True, **graph_data_params)
+    GraphEdgeDataset(mar, reload=True, **graph_data_params)

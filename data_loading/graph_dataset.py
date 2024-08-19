@@ -1,15 +1,17 @@
+from collections import Counter
 import os
 from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
 from transformers import AutoTokenizer
-from data_loading.data import TorchGraph
+from data_loading.data import TorchEdgeGraph, TorchNodeGraph
 from data_loading.models_dataset import ModelDataset
 from data_loading.encoding import EncodingDataset
 from tqdm.auto import tqdm
 from embeddings.common import get_embedding_model
-from settings import seed, graph_data_dir
+from lang2graph.common import get_node_texts
+from settings import seed
 from settings import (
     LP_TASK_EDGE_CLS,
     LP_TASK_LINK_PRED,
@@ -17,7 +19,7 @@ from settings import (
 
 
 
-class GraphDataset(torch.utils.data.Dataset):
+class GraphEdgeDataset(torch.utils.data.Dataset):
     def __init__(
             self, 
             models_dataset: ModelDataset,
@@ -41,8 +43,10 @@ class GraphDataset(torch.utils.data.Dataset):
         for i in range(len(models_dataset)):
             models_dataset[i].label = self._c[models_dataset[i].label]
 
+        assert all([g.label in self._c.values() for g in models_dataset if g.label is not None]), "Labels not set correctly"
+
         self.graphs = [
-            TorchGraph(
+            TorchEdgeGraph(
                 g, 
                 save_dir=self.save_dir,
                 distance=distance,
@@ -57,9 +61,23 @@ class GraphDataset(torch.utils.data.Dataset):
         for g in tqdm(self.graphs, desc='Processing graphs'):
             g.process_graph(embedder)
 
-        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
-        self.labels = torch.tensor([self._c[g.label] for g in models_dataset], dtype=torch.long)
         self.num_classes = len(self._c)
+        self.num_edge_classes = len(set(sum([g.data.edge_classes.tolist() for g in self.graphs], [])))
+
+        train_count, test_count = dict(), dict()
+        for g in self.graphs:
+            t1 = dict(Counter(g.data.edge_classes[g.data.train_edge_idx].tolist()))
+            t2 = dict(Counter(g.data.edge_classes[g.data.test_edge_idx].tolist()))
+            for k in t1:
+                train_count[k] = train_count.get(k, 0) + t1[k]
+            
+            for k in t2:
+                test_count[k] = test_count.get(k, 0) + t2[k]
+
+        print(f"Train edge classes: {train_count}")
+        print(f"Test edge classes: {test_count}")
+
+        
 
     def __len__(self):
         return len(self.graphs)
@@ -165,3 +183,134 @@ class GraphDataset(torch.utils.data.Dataset):
         print("Tokenized data")
         
         return datasets
+    
+
+
+class GraphNodeDataset(torch.utils.data.Dataset):
+    def __init__(
+            self, 
+            models_dataset: ModelDataset,
+            save_dir='datasets/graph_data',
+            distance=1,
+            test_ratio=0.2,
+            cls_attribute='abstract',
+            reload=False,
+            use_embeddings=False,
+            embed_model_name='bert-base-uncased',
+            ckpt=None,
+        ):
+        super().__init__()
+        self.distance = distance
+        self.save_dir = f'{save_dir}/{models_dataset.name}'
+        embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
+        os.makedirs(self.save_dir, exist_ok=True)
+        self._c = {label:j for j, label in enumerate({g.label for g in models_dataset})}
+        for i in range(len(models_dataset)):
+            models_dataset[i].label = self._c[models_dataset[i].label]
+
+        assert all([g.label in self._c.values() for g in models_dataset if g.label is not None]), "Labels not set correctly"
+
+        self.graphs = [
+            TorchNodeGraph(
+                g, 
+                save_dir=self.save_dir,
+                distance=distance,
+                test_ratio=test_ratio,
+                reload=reload,
+                cls_attribute=cls_attribute,
+            ) 
+            for g in tqdm(models_dataset, desc='Creating graphs')
+        ]
+        for g in tqdm(self.graphs, desc='Processing graphs'):
+            g.process_graph(embedder)
+
+        self.num_classes = len(self._c)
+        self.num_node_classes = len(set(sum([g.data.node_classes.tolist() for g in self.graphs], [])))
+
+        train_count, test_count = dict(), dict()
+        for g in self.graphs:
+            t1 = dict(Counter(g.data.node_classes[g.data.train_node_idx].tolist()))
+            t2 = dict(Counter(g.data.node_classes[g.data.test_node_idx].tolist()))
+            for k in t1:
+                train_count[k] = train_count.get(k, 0) + t1[k]
+            
+            for k in t2:
+                test_count[k] = test_count.get(k, 0) + t2[k]
+
+        print(f"Train Node classes: {train_count}")
+        print(f"Test Node classes: {test_count}")
+
+        
+
+    def __len__(self):
+        return len(self.graphs)
+    
+
+    def __getitem__(self, index: int):
+        return self.graphs[index]
+    
+
+    def __add__(self, other):
+        self.graphs += other.graphs
+        self.labels = torch.cat([self.labels, other.labels])
+        self._c.update(other._c)
+        self.num_classes = len(self._c)
+
+        return self
+    
+
+    def get_train_test_split(self, tr=0.8):
+        n = len(self.graphs)
+        train_size = int(n * tr)
+        idx = list(range(n))
+        shuffle(idx)
+        train_idx = idx[:train_size]
+        test_idx = idx[train_size:]
+        return train_idx, test_idx
+    
+
+    def k_fold_split(self, k=10):
+        kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+        n = len(self.graphs)
+        for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
+            yield train_idx, test_idx
+    
+
+    def get_node_classification_lm_data(
+            self, 
+            tokenizer: AutoTokenizer,
+            distance, 
+        ):
+        data = {'train_nodes': [], 'train_node_classes': [], 'test_nodes': [], 'test_node_classes': []}
+        for graph in tqdm(self.graphs, desc='Getting link prediction data'):
+            node_strs = list(graph.get_graph_node_strs(graph.data.edge_index, distance).values())
+            train_node_strs = [node_strs[i.item()] for i in graph.data.train_node_idx]
+            test_node_strs = [node_strs[i.item()] for i in graph.data.test_node_idx]
+            
+            train_node_classes = graph.data.node_classes[graph.data.train_node_idx] 
+            test_node_classes = graph.data.node_classes[graph.data.test_node_idx]
+
+            data['train_nodes'] += train_node_strs
+            data['train_node_classes'] += train_node_classes.tolist()
+            data['test_nodes'] += test_node_strs
+            data['test_node_classes'] += test_node_classes.tolist()
+                    
+
+        print("Tokenizing data")
+            
+        dataset = {
+            'train': EncodingDataset(
+                tokenizer, 
+                data['train_nodes'], 
+                data['train_node_classes']
+            ),
+            'test': EncodingDataset(
+                tokenizer, 
+                data['test_nodes'], 
+                data['test_node_classes']
+            )
+        }
+        
+        print("Tokenized data")
+        
+        return dataset

@@ -2,14 +2,8 @@ from collections import Counter
 from argparse import ArgumentParser
 import os
 from transformers import TrainingArguments, Trainer
-import torch
-from data_loading.graph_dataset import GraphDataset
-from data_loading.data import ModelDataset
-from encoding.common import oversample_dataset
-from settings import (
-    LP_TASK_LINK_PRED,
-    LP_TASK_EDGE_CLS
-)
+from data_loading.graph_dataset import GraphEdgeDataset
+from data_loading.models_dataset import ModelDataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -75,7 +69,6 @@ def run(args):
         remove_duplicates = args.remove_duplicates
     )
     dataset_name = args.dataset
-    task_name = LP_TASK_LINK_PRED
     distance = args.distance
     dataset = ModelDataset(dataset_name, reload=args.reload, **config_params)
 
@@ -90,7 +83,7 @@ def run(args):
     )
 
     print("Loading graph dataset")
-    graph_dataset = GraphDataset(dataset, **graph_data_params)
+    graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
     model_name = args.model
@@ -99,10 +92,9 @@ def run(args):
     tokenizer = get_tokenizer(model_name, special_tokens, max_length)
 
     print("Getting link prediction data")
-    bert_dataset = graph_dataset.get_link_prediction_data(
+    bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
         distance=distance,
-        task_type=task_name
     )
 
 
@@ -113,13 +105,13 @@ def run(args):
     output_dir = os.path.join(
         'results',
         dataset_name,
-        task_name
+        'lp',
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
-        task_name
+        'lp'
     )
 
     training_args = TrainingArguments(

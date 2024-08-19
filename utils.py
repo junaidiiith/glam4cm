@@ -1,5 +1,8 @@
+import argparse
+from collections import Counter
 import random
 import numpy as np
+from sklearn.metrics import accuracy_score
 import torch
 import os
 import fnmatch
@@ -39,7 +42,14 @@ def set_seed(seed):
 def randomize_features(d, num_feats):
     for i, data in enumerate(d):
         num_nodes = data.num_nodes
-        num_edges = data.overall_edge_index.shape[1]
+        num_edges = data.overall_edge_index.shape[1] if hasattr(data, 'overall_edge_index') else data.edge_index.shape[1]
         d[i].x = torch.randn((num_nodes, num_feats))
         d[i].edge_attr = torch.randn((num_edges, num_feats))
     return d
+
+
+def merge_namespaces(ns1, ns2):
+    merged_ns = argparse.Namespace()
+    merged_ns.__dict__.update(ns1.__dict__)
+    merged_ns.__dict__.update(ns2.__dict__)
+    return merged_ns

@@ -1,10 +1,9 @@
 from argparse import ArgumentParser
 import os
 from transformers import TrainingArguments, Trainer
-from data_loading.graph_dataset import GraphEdgeDataset
+from data_loading.graph_dataset import GraphNodeDataset
 from data_loading.models_dataset import ModelDataset
 from encoding.common import oversample_dataset
-from settings import LP_TASK_EDGE_CLS
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -25,7 +24,7 @@ def compute_metrics(pred):
     preds = pred.predictions.argmax(-1)
     acc = (preds == labels).mean()
     f1_macro = f1_score(labels, preds, average='macro')
-    accuracy = accuracy_score(labels, preds, average='macro')
+    accuracy = accuracy_score(labels, preds)
     recall = recall_score(labels, preds, average='macro')
     balanced_acc = balanced_accuracy_score(labels, preds)
 
@@ -48,7 +47,7 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
     parser.add_argument('--remove_duplicates', action='store_true')
-    parser.add_argument('--distance', type=int, default=2)
+    parser.add_argument('--distance', type=int, default=1)
     parser.add_argument('--model', type=str, default='bert-base-uncased')
     parser.add_argument('--epochs', type=int, default=3)
     parser.add_argument('--reload', action='store_true')
@@ -84,7 +83,7 @@ def run(args):
     )
 
     print("Loading graph dataset")
-    graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
+    graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
     model_name = args.model
@@ -93,10 +92,9 @@ def run(args):
     tokenizer = get_tokenizer(model_name, special_tokens, max_length)
 
     print("Getting link prediction data")
-    bert_dataset = graph_dataset.get_link_prediction_lm_data(
+    bert_dataset = graph_dataset.get_node_classification_lm_data(
         tokenizer=tokenizer,
         distance=distance,
-        task_type=LP_TASK_EDGE_CLS
     )
 
     if args.oversampling_ratio != -1:
@@ -112,13 +110,13 @@ def run(args):
     output_dir = os.path.join(
         'results',
         dataset_name,
-        'edge_cls',
+        'node_cls',
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
-        'edge_cls',
+        'node_cls',
     )
 
     training_args = TrainingArguments(
@@ -129,10 +127,10 @@ def run(args):
         warmup_steps=500,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=200,
+        logging_steps=20,
         eval_strategy='steps',
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=20,
+        save_steps=20,
         save_total_limit=2,
         load_best_model_at_end=True,
         fp16=True,
@@ -147,3 +145,5 @@ def run(args):
     )
 
     trainer.train()
+    results = trainer.evaluate()
+    print(results)

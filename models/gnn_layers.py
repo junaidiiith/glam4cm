@@ -1,10 +1,13 @@
 import torch
+from torch.nn import functional as F
 from torch_geometric.nn import aggr
-from utils import get_device
+from torch_geometric.nn import (
+    global_add_pool,
+    global_max_pool,
+    global_mean_pool,
+)
 import torch_geometric
 import torch.nn as nn
-
-device = get_device()
 
 
 aggregation_methods = {
@@ -24,9 +27,14 @@ supported_conv_models = {
     'GATv2Conv': True,
 }
 
+global_pooling_methods = {
+    'sum': global_add_pool,
+    'mean': global_mean_pool,
+    'max': global_max_pool,
+}
 
 
-class GNNModel(torch.nn.Module):
+class GNNConv(torch.nn.Module):
     """
         A general GNN model created using the PyTorch Geometric library
         model_name: the name of the GNN model
@@ -54,7 +62,7 @@ class GNNModel(torch.nn.Module):
             dropout=0.1,
             aggregation='sum',
         ):
-        super(GNNModel, self).__init__()
+        super(GNNConv, self).__init__()
 
         assert model_name in supported_conv_models, f"Model {model_name} not supported. Choose from {supported_conv_models.keys()}"
         heads_supported = supported_conv_models[model_name]
@@ -118,7 +126,7 @@ class GNNModel(torch.nn.Module):
         return h
   
 
-class MLPPredictor(nn.Module):
+class EdgeClassifer(nn.Module):
 
     """
     An MLP predictor for link prediction
@@ -133,26 +141,28 @@ class MLPPredictor(nn.Module):
 
     def __init__(
             self, 
-            h_feats, 
+            input_dim,
+            hidden_dim, 
+            num_classes,
             num_layers=2, 
-            num_classes=1,
             dropout=0.3,
             bias=True
         ):
         super().__init__()
         self.layers = nn.ModuleList()
-        self.embed_dim = h_feats
+        self.input_dim = input_dim
+        self.embed_dim = hidden_dim
         self.num_layers = num_layers
         self.num_classes = num_classes
 
-        in_feats = h_feats * 2
+        in_feats = input_dim * 2
         for _ in range(num_layers - 1):
-            self.layers.append(nn.Linear(in_feats, h_feats, bias=bias))
+            self.layers.append(nn.Linear(in_feats, hidden_dim, bias=bias))
             self.layers.append(nn.ReLU())
             self.layers.append(nn.Dropout(dropout))
-            in_feats = h_feats
+            input_dim = hidden_dim
         
-        self.layers.append(nn.Linear(h_feats, num_classes, bias=bias))
+        self.layers.append(nn.Linear(hidden_dim, num_classes, bias=bias))
 
 
     def forward(self, x, edge_index):
@@ -160,5 +170,85 @@ class MLPPredictor(nn.Module):
         for layer in self.layers:
             h = layer(h)
         
-        h = h.squeeze(1)
-        return h
+        return F.softmax(h, dim=-1)
+    
+
+class NodeClassifer(nn.Module):
+
+    """
+    An MLP predictor for link prediction
+
+    h_feats: the input dimension
+    num_classes: the number of classes
+    num_layers: the number of layers in the MLP
+
+    This class concatenates the node embeddings of the two nodes in the edge
+    The concatenated embeddings are then passed through an MLP
+    """
+
+    def __init__(
+            self, 
+            input_dim,
+            hidden_dim, 
+            num_classes,
+            num_layers=2, 
+            dropout=0.3,
+            bias=True
+        ):
+        super().__init__()
+        self.layers = nn.ModuleList()
+        self.embed_dim = hidden_dim
+        self.num_layers = num_layers
+        self.num_classes = num_classes
+
+        for _ in range(num_layers - 1):
+            self.layers.append(nn.Linear(input_dim, hidden_dim, bias=bias))
+            self.layers.append(nn.ReLU())
+            self.layers.append(nn.Dropout(dropout))
+            input_dim = hidden_dim
+        
+        self.layers.append(nn.Linear(hidden_dim, num_classes, bias=bias))
+
+
+    def forward(self, x):
+        h = x
+        for layer in self.layers:
+            h = layer(h)
+        
+        return F.log_softmax(h, dim=-1)
+    
+
+class GraphClassifer(nn.Module):
+
+    """
+    An MLP predictor for link prediction
+
+    h_feats: the input dimension
+    num_classes: the number of classes
+    num_layers: the number of layers in the MLP
+
+    This class concatenates the node embeddings of the two nodes in the edge
+    The concatenated embeddings are then passed through an MLP
+    """
+
+    def __init__(
+            self, 
+            input_dim, 
+            num_classes,
+            global_pool='mean',
+            bias=False
+        ):
+        super().__init__()
+        self.layers = nn.ModuleList()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+
+        self.layers.append(nn.Linear(input_dim, num_classes, bias=bias))
+        self.global_pool = global_pooling_methods[global_pool]
+
+    def forward(self, x, batch):
+        h = self.global_pool(x, batch)
+        for layer in self.layers:
+            h = layer(h)
+        
+        return h.log_softmax(dim=-1)

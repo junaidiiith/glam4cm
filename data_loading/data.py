@@ -1,8 +1,8 @@
 import pickle
+from sklearn.model_selection import train_test_split
 import torch
 import json
 import os
-from data_loading.models_dataset import ModelDataset
 from embeddings.common import Embedder
 from lang2graph.uml import EcoreNxG
 from lang2graph.common import (
@@ -28,7 +28,7 @@ def edge_index_to_idx(graph, edge_index):
         dtype=torch.long
     )
 
-class TorchGraph:
+class TorchEdgeGraph:
     def __init__(
             self, 
             graph: EcoreNxG, 
@@ -132,7 +132,7 @@ class TorchGraph:
             test_pos_edge_label=test_data.pos_edge_label,
             test_neg_edge_label_index=test_data.neg_edge_label_index,
             test_neg_edge_label=test_data.neg_edge_label,
-            y=self.graph.label,
+            y=torch.tensor([self.graph.label], dtype=torch.long),
             num_nodes=self.graph.number_of_nodes(),
             label=self.graph.label
         )
@@ -178,7 +178,7 @@ class TorchGraph:
 
     @property
     def save_idx(self):
-        path = os.path.join(self.save_dir, f'd={self.distance}_tr={self.test_ratio}_{self.graph.id}')
+        path = os.path.join(self.save_dir, f'eg_d={self.distance}_tr={self.test_ratio}_{self.graph.id}')
         return path
 
 
@@ -222,6 +222,138 @@ class TorchGraph:
         pickle.dump(self.edge_texts, open(f"{self.save_idx}/edge_texts.pkl", 'wb'))
         self.save_to_mapping()
 
+
+
+class TorchNodeGraph:
+    def __init__(
+            self, 
+            graph: EcoreNxG, 
+            save_dir: str,
+            distance = 1,
+            test_ratio=0.2,
+            cls_attribute='abstract',
+            reload=False,
+        ):
+
+        self.cls_attribute = cls_attribute
+        self.xmi = graph.xmi
+        self.reload = reload
+        self.graph = graph
+        self.distance = distance
+        self.test_ratio = test_ratio
+        self.save_dir = save_dir
+        self.process_graph()
+    
+
+    def process_graph(self, embedder=None):
+        if not self.load_pyg_data(embedder) or self.reload:
+            self.data, self.node_texts = self.get_pyg_data(embedder)
+            self.validate_data()
+                    
+        self.save()
+
+    
+    def get_pyg_data(self, embedder: Embedder):
+        train_nodes, test_nodes = train_test_split(
+            list(self.graph.numbered_graph.nodes), test_size=self.test_ratio, shuffle=True, random_state=42
+        )
+
+        train_idx = torch.tensor(train_nodes, dtype=torch.long)
+        test_idx = torch.tensor(test_nodes, dtype=torch.long)
+
+        assert all([self.graph.numbered_graph.has_node(n) for n in train_nodes])
+        assert all([self.graph.numbered_graph.has_node(n) for n in test_nodes])
+
+        edge_index = self.graph.edge_index
+        node_texts = self.get_graph_node_strs(
+            edge_index, self.distance
+        ) ### Considering nodes with edges only in the subgraph
+
+        node_embeddings= None
+        if embedder is not None:
+            node_embeddings = embedder.embed(list(node_texts.values()))
+        
+
+        node_classes = [
+            self.cls_attribute in self.graph.numbered_graph.nodes[node]
+            and self.graph.numbered_graph.nodes[node][self.cls_attribute]
+            for node in train_nodes
+        ] +\
+        [
+            self.cls_attribute in self.graph.numbered_graph.nodes[node]
+            and self.graph.numbered_graph.nodes[node][self.cls_attribute]
+            for node in test_nodes
+        ]
+
+            
+        data = Data(
+            x=node_embeddings,
+            edge_index=edge_index,
+            train_node_idx=train_idx,
+            test_node_idx = test_idx,
+            node_classes = torch.tensor(node_classes, dtype=torch.long),
+            y=torch.tensor([self.graph.label], dtype=torch.long),
+            num_nodes=self.graph.number_of_nodes(),
+        )
+
+        return data, node_texts
+    
+
+    def get_graph_node_strs(self, edge_index: torch.Tensor, distance: int):
+        subgraph = create_graph_from_edge_index(self.graph, edge_index)
+        return get_node_texts(subgraph, distance)
+    
+
+    def validate_data(self):
+        assert self.data.num_nodes == self.graph.number_of_nodes()
+        
+
+    @property
+    def name(self):
+        return '.'.join(self.graph.graph_id.replace('/', '_').split('.')[:-1])
+
+
+    @property
+    def save_idx(self):
+        path = os.path.join(self.save_dir, f'ng_d={self.distance}_tr={self.test_ratio}_{self.graph.id}')
+        return path
+
+
+    def save_to_mapping(self):
+        graph_embedding_file_map = dict()
+        fp = f'{self.save_dir}/mapping.json'
+        if os.path.exists(fp):
+            graph_embedding_file_map = json.load(open(fp, 'r'))
+        else:
+            graph_embedding_file_map = dict()
+        
+        graph_embedding_file_map[self.name] = self.graph.id
+        json.dump(graph_embedding_file_map, open(fp, 'w'), indent=4)
+
+
+    def load_pyg_data(self, embedder=None):
+
+        if os.path.exists(self.save_idx):
+            self.save_to_mapping()
+            self.data = torch.load(f"{self.save_idx}/data.pt")
+            self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
+            
+            if embedder is not None and self.data.x is None:
+                print("Embeddings not found. Generating...")
+                node_embeddings = embedder.embed(list(self.node_texts.values()))
+                self.data.x = node_embeddings
+                self.save()
+
+            return True
+
+        return False
+
+
+    def save(self):
+        os.makedirs(self.save_idx, exist_ok=True)
+        torch.save(self.data, f"{self.save_idx}/data.pt")
+        pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
+        self.save_to_mapping()
 
 
 class LinkPredictionCollater:
@@ -314,6 +446,7 @@ class LinkPredictionDataLoader(torch.utils.data.DataLoader):
     ):
         if collate_fn is None:
             collate_fn = LinkPredictionCollater(follow_batch, exclude_keys)
+        
         super().__init__(
             dataset,
             batch_size,
@@ -321,20 +454,3 @@ class LinkPredictionDataLoader(torch.utils.data.DataLoader):
             collate_fn=collate_fn,
             **kwargs,
         )
-
-
-
-
-def get_models_dataset(
-        dataset_name, 
-        reload=False, 
-        remove_duplicates=False, 
-        use_type=False, 
-    ):
-    return ModelDataset(
-        dataset_name, 
-        reload=reload, 
-        remove_duplicates=remove_duplicates, 
-        use_type=use_type, 
-    )
-    
