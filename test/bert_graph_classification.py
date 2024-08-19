@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='modelset', choices=['modelset', 'ecore', 'mar'])
+    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
     parser.add_argument('--model_name', type=str, default='bert-base-uncased')
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--reload', action='store_true')

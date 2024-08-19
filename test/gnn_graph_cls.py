@@ -4,7 +4,7 @@ from models.gnn_layers import GNNConv, GraphClassifer
 from trainers.gnn_graph_classifier import Trainer
 from argparse import ArgumentParser
 
-from utils import randomize_features, set_seed
+from utils import set_seed
 
 
 def parse_args():

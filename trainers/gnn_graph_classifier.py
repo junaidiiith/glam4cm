@@ -89,7 +89,7 @@ class Trainer:
             self.gnn_conv.train()
             self.classifier.train()
             
-            h = self.gnn_conv(data.x.to(device), data.overall_edge_index.to(device))
+            h = self.gnn_conv(data.x.to(device), data.edge_index.to(device))
             g_pred = self.classifier(h, data.batch.to(device))
 
             preds.append(g_pred.cpu().detach())
@@ -119,7 +119,7 @@ class Trainer:
             epoch_loss = 0
             preds, labels = list(), list()
             for data in self.dataloaders['test']:
-                h = self.gnn_conv(data.x.to(device), data.overall_edge_index.to(device))
+                h = self.gnn_conv(data.x.to(device), data.edge_index.to(device))
                 g_pred = self.classifier(h, data.batch.to(device))
 
                 preds.append(g_pred.cpu().detach())

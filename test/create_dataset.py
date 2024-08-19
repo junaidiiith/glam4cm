@@ -1,12 +1,17 @@
+from argparse import ArgumentParser
 import random
 import torch
 import numpy as np
 
-
-from argparse import ArgumentParser
+from data_loading.models_dataset import ModelDataset
+from data_loading.graph_dataset import (
+    GraphNodeDataset,
+    GraphEdgeDataset
+)
 
 def parse_args():
     parser = ArgumentParser()
+    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--remove_duplicates', action='store_true')
     parser.add_argument('--timeout', type=int, default=-1)
@@ -21,11 +26,6 @@ def run():
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-
-
-
-    from data_loading.models_dataset import ModelDataset
-    from data_loading.graph_dataset import GraphEdgeDataset
 
     
     config_params = dict(
@@ -46,3 +46,8 @@ def run():
     GraphEdgeDataset(ecore, reload=False, **graph_data_params)
     GraphEdgeDataset(modelset, reload=True, **graph_data_params)
     GraphEdgeDataset(mar, reload=True, **graph_data_params)
+
+
+    GraphNodeDataset(ecore, reload=False, **graph_data_params)
+    GraphNodeDataset(modelset, reload=True, **graph_data_params)
+    GraphNodeDataset(mar, reload=True, **graph_data_params)

@@ -4,7 +4,7 @@ from data_loading.models_dataset import ModelDataset
 from models.gnn_layers import GNNConv, NodeClassifer
 from tokenization.special_tokens import *
 from trainers.gnn_node_classifier import Trainer
-from utils import randomize_features, set_seed
+from utils import set_seed
 
 
 def parse_args():
@@ -44,7 +44,6 @@ def parse_args():
     parser.add_argument('--gnn_model', type=str, default='SAGEConv')
 
     return parser.parse_args()
-
 
 
 
