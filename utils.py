@@ -1,5 +1,4 @@
-import argparse
-from collections import Counter
+from argparse import ArgumentParser
 import random
 import numpy as np
 from sklearn.metrics import accuracy_score
@@ -48,8 +47,17 @@ def randomize_features(d, num_feats):
     return d
 
 
-def merge_namespaces(ns1, ns2):
-    merged_ns = argparse.Namespace()
-    merged_ns.__dict__.update(ns1.__dict__)
-    merged_ns.__dict__.update(ns2.__dict__)
-    return merged_ns
+def merge_argument_parsers(p1: ArgumentParser, p2: ArgumentParser):
+    merged_parser = ArgumentParser(description="Merged Parser")
+
+    # Combine arguments from parser1
+    for action in p1._actions:
+        if action.dest != "help":  # Skip the help action
+            merged_parser._add_action(action)
+
+    # Combine arguments from parser2
+    for action in p2._actions:
+        if action.dest != "help":  # Skip the help action
+            merged_parser._add_action(action)
+
+    return merged_parser

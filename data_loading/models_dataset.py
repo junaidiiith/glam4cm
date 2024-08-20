@@ -217,3 +217,10 @@ class ArchiMateModelDataset(ModelDataset):
         
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
         print(f'Graphs: {len(self.graphs)}')
+    
+
+    def remove_duplicates(self):
+        self.graphs = self.dedup()
+
+    def dedup(self) -> List[EcoreNxG]:
+        return list({str(g.edges(data=True)): g for g in self.graphs}.values())

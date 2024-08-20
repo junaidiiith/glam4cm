@@ -1,9 +1,9 @@
 from collections import Counter
-from argparse import ArgumentParser
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.models_dataset import EcoreModelDataset
+from test.common_args import get_common_args_parser
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -42,21 +42,8 @@ def compute_metrics(pred):
 
 
 def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
-    parser.add_argument('--remove_duplicates', action='store_true')
-    parser.add_argument('--distance', type=int, default=2)
-    parser.add_argument('--model', type=str, default='bert-base-uncased')
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--reload', action='store_true')
-    parser.add_argument('--timeout', type=int, default=120)
-    parser.add_argument('--tr', type=float, default=0.2)
-    parser.add_argument('--min_enr', type=float, default=1.2)
-    parser.add_argument('--min_edges', type=int, default=10)
-    parser.add_argument('--neg_sampling_ratio', type=int, default=1)
-    parser.add_argument('--seed', type=int, default=42)
+    parser = get_common_args_parser()
     return parser.parse_args()
-
 
 
 def run(args):

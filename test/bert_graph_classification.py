@@ -1,14 +1,9 @@
+from test.common_args import get_common_args_parser
 from trainers.bert_classifier import train_hf
 from data_loading.models_dataset import EcoreModelDataset 
 
-from argparse import ArgumentParser
-
 def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
-    parser.add_argument('--model_name', type=str, default='bert-base-uncased')
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--reload', action='store_true')
+    parser = get_common_args_parser()
     return parser.parse_args()
 
 

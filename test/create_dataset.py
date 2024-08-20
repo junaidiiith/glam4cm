@@ -1,25 +1,21 @@
-from argparse import ArgumentParser
 import random
 import torch
 import numpy as np
 
-from data_loading.models_dataset import EcoreModelDataset
+from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.graph_dataset import (
     GraphNodeDataset,
     GraphEdgeDataset
 )
+from test.common_args import get_common_args_parser
+
 
 def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
-    parser.add_argument('--reload', action='store_true')
-    parser.add_argument('--remove_duplicates', action='store_true')
-    parser.add_argument('--timeout', type=int, default=-1)
-
+    parser = get_common_args_parser()
     return parser.parse_args()
 
 
-def run():
+def run(args):
     
     seed = 42
     random.seed(seed)
@@ -29,25 +25,28 @@ def run():
 
     
     config_params = dict(
-        timeout = 120,
-        min_enr = 1.2,
-        min_edges = 10
+        timeout = args.timeout,
+        min_enr = args.min_enr,
+        min_edges = args.min_edges,
     )
-    ecore = EcoreModelDataset('ecore_555', reload=False, **config_params)
-    modelset = EcoreModelDataset('modelset', reload=True, remove_duplicates=True, **config_params)
-    mar = EcoreModelDataset('mar-ecore-github', reload=True, **config_params)
+    ecore = EcoreModelDataset('ecore_555', reload=args.reload, **config_params)
+    modelset = EcoreModelDataset('modelset', reload=args.reload, remove_duplicates=True, **config_params)
+    mar = EcoreModelDataset('mar-ecore-github', reload=args.reload, **config_params)
+    eamodelset = ArchiMateModelDataset('eamodelset', reload=args.reload, **config_params)
 
     graph_data_params = dict(
-        distance=2,
-        add_negative_train_samples=True,
+        distance=args.distance,
+        add_negative_train_samples=args.add_neg_samples,
         neg_sampling_ratio=1,
     )
 
     GraphEdgeDataset(ecore, reload=False, **graph_data_params)
     GraphEdgeDataset(modelset, reload=True, **graph_data_params)
     GraphEdgeDataset(mar, reload=True, **graph_data_params)
+    GraphEdgeDataset(eamodelset, reload=True, **graph_data_params)
 
 
     GraphNodeDataset(ecore, reload=False, **graph_data_params)
     GraphNodeDataset(modelset, reload=True, **graph_data_params)
     GraphNodeDataset(mar, reload=True, **graph_data_params)
+    GraphNodeDataset(eamodelset, reload=True, **graph_data_params)

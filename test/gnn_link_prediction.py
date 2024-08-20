@@ -1,49 +1,16 @@
-from argparse import ArgumentParser
 from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.models_dataset import EcoreModelDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
 from tokenization.special_tokens import *
 from trainers.gnn_edge_classifier import Trainer
-from utils import randomize_features, set_seed
-
+from utils import merge_argument_parsers, set_seed
+from test.common_args import get_common_args_parser, get_gnn_args_parser
 
 
 def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github'])
-    parser.add_argument('--remove_duplicates', action='store_true')
-    parser.add_argument('--distance', type=int, default=1)
-    parser.add_argument('--embed_model', type=str, default='bert-base-uncased')
-    parser.add_argument('--ckpt', type=str, default='modelset_ec_ft')
-    parser.add_argument('--reload', action='store_true')
-    parser.add_argument('--use_embeddings', action='store_true')
-    parser.add_argument('--timeout', type=int, default=120)
-    parser.add_argument('--min_enr', type=float, default=1.2)
-    parser.add_argument('--min_edges', type=int, default=10)
-    parser.add_argument('--seed', type=int, default=42)
-
-    parser.add_argument('--tr', type=float, default=0.2)
-    parser.add_argument('--neg_sampling_ratio', type=int, default=1)
-
-    parser.add_argument('--gnn_model', type=str, default='SAGEConv')
-    parser.add_argument('--input_dim', type=int, default=768)
-    parser.add_argument('--hidden_dim', type=int, default=128)
-    parser.add_argument('--output_dim', type=int, default=128)
-
-    parser.add_argument('--num_conv_layers', type=int, default=3)
-    parser.add_argument('--num_mlp_layers', type=int, default=3)
-    parser.add_argument('--num_heads', type=int, default=4)
-
-    parser.add_argument('--residual', action='store_true')
-    parser.add_argument('--randomize', action='store_true')
-    parser.add_argument('--bias', action='store_true')
-    parser.add_argument('--l_norm', action='store_true')
-    parser.add_argument('--aggregation', type=str, default='sum')
-    parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--num_epochs', type=int, default=100)
-
+    common_parser = get_common_args_parser()
+    gnn_parser = get_gnn_args_parser()
+    parser = merge_argument_parsers(common_parser, gnn_parser)
     return parser.parse_args()
 
 
