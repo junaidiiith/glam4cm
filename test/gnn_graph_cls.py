@@ -1,12 +1,12 @@
-from data_loading.models_dataset import EcoreModelDataset
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, GraphClassifer
-from trainers.gnn_graph_classifier import Trainer
+from test.utils import get_models_dataset
+from trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
 from test.common_args import get_common_args_parser, get_gnn_args_parser
 from utils import merge_argument_parsers, set_seed
 
 
-def parse_args():
+def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
@@ -22,11 +22,12 @@ def run(args):
         timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
-        remove_duplicates = args.remove_duplicates
+        remove_duplicates = args.remove_duplicates,
+        reload = args.reload,
     )
     dataset_name = args.dataset
 
-    dataset = EcoreModelDataset(dataset_name, reload=False, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,
@@ -85,7 +86,7 @@ def run(args):
         graph_dataset,
         tr=args.tr,
         lr=args.lr,
-        num_epochs=args.epochs,
+        num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         randomize_ne=randomize
     )

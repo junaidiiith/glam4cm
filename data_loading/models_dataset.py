@@ -115,7 +115,6 @@ class EcoreModelDataset(ModelDataset):
             save_dir='datasets/pickles',
             reload=False,
             remove_duplicates=False,
-            extension='.jsonl',
             min_edges: int = -1,
             min_enr: float = -1,
             timeout=-1
@@ -129,14 +128,13 @@ class EcoreModelDataset(ModelDataset):
             timeout=timeout
         )
         os.makedirs(save_dir, exist_ok=True)
-        self.extension = extension
 
         dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
         if reload or not dataset_exists:
             self.graphs: List[EcoreNxG] = []
             data_path = os.path.join(dataset_dir, dataset_name)
             for file in os.listdir(data_path):
-                if file.endswith(self.extension) and file.startswith('ecore'):
+                if file.endswith('.jsonl') and file.startswith('ecore'):
                     json_objects = json.load(open(os.path.join(data_path, file)))
                     for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
                         if remove_duplicates and g['is_duplicated']:
@@ -177,9 +175,10 @@ class ArchiMateModelDataset(ModelDataset):
             dataset_dir=datasets_dir,
             save_dir='datasets/pickles',
             reload=False,
+            remove_duplicates=False,
             min_edges: int = -1,
             min_enr: float = -1,
-            timeout=-1
+            timeout=-1,
         ):
         super().__init__(
             dataset_name, 
@@ -215,6 +214,9 @@ class ArchiMateModelDataset(ModelDataset):
         else:
             self.load()
         
+        if remove_duplicates:
+            self.remove_duplicates()
+        
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
         print(f'Graphs: {len(self.graphs)}')
     
@@ -222,5 +224,5 @@ class ArchiMateModelDataset(ModelDataset):
     def remove_duplicates(self):
         self.graphs = self.dedup()
 
-    def dedup(self) -> List[EcoreNxG]:
+    def dedup(self) -> List[ArchiMateNxG]:
         return list({str(g.edges(data=True)): g for g in self.graphs}.values())

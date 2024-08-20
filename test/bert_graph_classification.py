@@ -1,9 +1,11 @@
 from test.common_args import get_common_args_parser
+from test.utils import get_models_dataset
 from trainers.bert_classifier import train_hf
-from data_loading.models_dataset import EcoreModelDataset 
 
-def parse_args():
+
+def get_parser():
     parser = get_common_args_parser()
+    parser.add_argument('--model', type=str, default='bert-base-uncased')
     return parser.parse_args()
 
 
@@ -17,8 +19,8 @@ def run(args):
         reload=args.reload
     )
     dataset_name = args.dataset
-    dataset = EcoreModelDataset(dataset_name, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     model_name = args.model_name
-    epochs = args.epochs
+    epochs = args.num_epochs
     train_hf(model_name, dataset, epochs=epochs)

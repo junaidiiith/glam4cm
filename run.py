@@ -9,15 +9,15 @@ from test import (
     bert_edge_classification,
     gnn_node_classification
 )
-from test.bert_graph_classification import parse_args as bert_parse_args
-from test.gnn_graph_cls import parse_args as gnn_parse_args
-from test.create_dataset import parse_args as create_dataset_parse_args
-from test.bert_link_prediction import parse_args as bert_lp_parse_args
-from test.gnn_edge_classification import parse_args as gnn_ec_parse_args
-from test.gnn_link_prediction import parse_args as gnn_lp_parse_args
-from test.bert_edge_classification import parse_args as bert_ec_parse_args
-from test.gnn_node_classification import parse_args as gnn_nc_parse_args
-from test.bert_node_classification import parse_args as bert_nc_parse_args
+from test.bert_graph_classification import get_parser as bert_parse_args
+from test.gnn_graph_cls import get_parser as gnn_parse_args
+from test.create_dataset import get_parser as create_dataset_parse_args
+from test.bert_link_prediction import get_parser as bert_lp_parse_args
+from test.gnn_edge_classification import get_parser as gnn_ec_parse_args
+from test.gnn_link_prediction import get_parser as gnn_lp_parse_args
+from test.bert_edge_classification import get_parser as bert_ec_parse_args
+from test.gnn_node_classification import get_parser as gnn_nc_parse_args
+from test.bert_node_classification import get_parser as bert_nc_parse_args
 
 
 tasks_handler_map = {
@@ -34,6 +34,6 @@ tasks_handler_map = {
 
 
 if __name__ == '__main__':
-    task_id = 6
+    task_id = 7
     hander, task_args = tasks_handler_map[task_id]
     hander(task_args())

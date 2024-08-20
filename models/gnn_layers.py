@@ -160,7 +160,7 @@ class EdgeClassifer(nn.Module):
             self.layers.append(nn.Linear(in_feats, hidden_dim, bias=bias))
             self.layers.append(nn.ReLU())
             self.layers.append(nn.Dropout(dropout))
-            input_dim = hidden_dim
+            in_feats = hidden_dim
         
         self.layers.append(nn.Linear(hidden_dim, num_classes, bias=bias))
 
@@ -173,7 +173,7 @@ class EdgeClassifer(nn.Module):
         return F.softmax(h, dim=-1)
     
 
-class NodeClassifer(nn.Module):
+class NodeClassifier(nn.Module):
 
     """
     An MLP predictor for link prediction

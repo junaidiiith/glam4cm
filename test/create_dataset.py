@@ -10,9 +10,9 @@ from data_loading.graph_dataset import (
 from test.common_args import get_common_args_parser
 
 
-def parse_args():
+def get_parser():
     parser = get_common_args_parser()
-    return parser.parse_args()
+    return parser.parse_args().parse_args()
 
 
 def run(args):

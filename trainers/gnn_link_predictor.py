@@ -3,7 +3,6 @@ from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
 from typing import List
-import pandas as pd
 from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score, 
@@ -18,16 +17,13 @@ from models.gnn_layers import (
     EdgeClassifer
 )
 from utils import get_device, randomize_features
-from itertools import chain
-from tqdm.auto import tqdm
-import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim import Adam
+
+from trainers.gnn_trainer import Trainer
 
 device = get_device()
 
 
-class Trainer:
+class GNNLinkPredictionTrainer(Trainer):
     """
     Trainer class for GNN Link Prediction
     This class is used to train the GNN model for the link prediction task
@@ -38,33 +34,29 @@ class Trainer:
             model: GNNConv, 
             predictor: EdgeClassifer, 
             dataset: List[GraphEdgeDataset],
+            cls_label='type',
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False
+            randomize_ne = False,
+            ne_features=768
         ) -> None:
-        self.model = model
-        self.predictor = predictor
-        self.model.to(device)
-        self.predictor.to(device)
 
-        self.num_epochs = num_epochs
-
+        super().__init__(
+            model=model,
+            predictor=predictor,
+            lr=lr,
+            cls_label=cls_label,
+            num_epochs=num_epochs
+        )
 
         dataset = [g.data for g in dataset]
         shuffle(dataset)
 
         if randomize_ne:
-            dataset = randomize_features(dataset, 768)
+            dataset = randomize_features(dataset, ne_features)
         
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-        self.optimizer = Adam(chain(model.parameters(), predictor.parameters()), lr=lr)
-        self.scheduler = CosineAnnealingLR(self.optimizer, T_max=num_epochs)
-        
-        self.edge2index = lambda g: torch.stack(list(g.edges())).contiguous()
-        self.results = list()
-        self.criterion = nn.CrossEntropyLoss()
 
         print("GNN Trainer initialized.")
 
@@ -77,7 +69,6 @@ class Trainer:
         all_preds, all_labels = list(), list()
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
-        # for i, data in tqdm(enumerate(self.dataloader), desc=f"Training batches", total=len(self.dataloader)):
         for data in self.dataloader:
             self.optimizer.zero_grad()
             self.model.zero_grad()
@@ -111,7 +102,6 @@ class Trainer:
         with torch.no_grad():
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
-            # for _, data in tqdm(enumerate(self.dataloader), desc=f"Evaluating batches", total=len(self.dataloader)):
             for data in self.dataloader:
                 h = self.get_logits(data.x, data.test_pos_edge_label_index)
                 pos_score = self.get_prediction_score(data.test_pos_edge_label_index, h)
@@ -134,20 +124,6 @@ class Trainer:
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
             
 
-    def get_logits(self, x, edge_index):
-        edge_index = edge_index.to(device)
-        x = x.to(device)
-        h = self.model(x, edge_index)
-        return h
-    
-
-    def get_prediction_score(self, edge_index, h):
-        h = h.to(device)
-        edge_index = edge_index.to(device)
-        prediction_score = self.predictor(h, edge_index)
-        return prediction_score
-    
-
     def compute_loss(self, pos_score, neg_score):
         pos_label = torch.ones(pos_score.size(0), dtype=torch.long).to(device)
         neg_label = torch.zeros(neg_score.size(0), dtype=torch.long).to(device)
@@ -159,7 +135,6 @@ class Trainer:
         return loss
 
     
-
     def compute_metrics(self, pos_score, neg_score):
         pos_label = torch.ones(pos_score.size(0), dtype=torch.long).to(device)
         neg_label = torch.zeros(neg_score.size(0), dtype=torch.long).to(device)
@@ -183,19 +158,3 @@ class Trainer:
             'recall': recall,
             'balanced_accuracy': balanced_accuracy
         }
-    
-    
-    def plot_metrics(self):
-        results = pd.DataFrame(self.results)
-        df = pd.DataFrame(results, index=range(1, len(results)+1))
-        df['epoch'] = df.index
-
-        columns = [c for c in df.columns if c not in ['epoch', 'phase']]
-        df.loc[df['phase'] == 'test'].plot(x='epoch', y=columns, kind='line')
-
-
-    def run(self):
-        for _ in tqdm(range(self.num_epochs), desc="Running Epochs"):
-            self.train()
-            self.test()
-        

@@ -1,13 +1,13 @@
 from data_loading.graph_dataset import GraphEdgeDataset
-from data_loading.models_dataset import EcoreModelDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
+from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from trainers.gnn_edge_classifier import Trainer
+from trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
 from utils import merge_argument_parsers, set_seed
 from test.common_args import get_common_args_parser, get_gnn_args_parser
 
 
-def parse_args():
+def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
@@ -22,11 +22,12 @@ def run(args):
         timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
-        remove_duplicates = args.remove_duplicates
+        remove_duplicates = args.remove_duplicates,
+        reload = args.reload,
     )
     dataset_name = args.dataset
 
-    dataset = EcoreModelDataset(dataset_name, reload=False, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,
@@ -47,7 +48,7 @@ def run(args):
     randomize = args.randomize or graph_dataset[0].data.x is None
     input_dim = args.input_dim
 
-    model_name = args.gnn_model
+    model_name = args.gnn_conv_model
 
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim

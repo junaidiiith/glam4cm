@@ -1,9 +1,7 @@
 from random import shuffle
-from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
-from typing import List
-import pandas as pd
+from torch_geometric.loader import DataLoader
 from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score, 
@@ -17,17 +15,14 @@ from models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
-from utils import get_device, randomize_features
-from itertools import chain
-from tqdm.auto import tqdm
-import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim import Adam
 
+from trainers.gnn_trainer import Trainer
+from utils import get_device, randomize_features
+from tqdm.auto import tqdm
 device = get_device()
 
 
-class Trainer:
+class GNNEdgeClassificationTrainer(Trainer):
     """
     Trainer class for GNN Link Prediction
     This class is used to train the GNN model for the link prediction task
@@ -37,34 +32,36 @@ class Trainer:
             self, 
             model: GNNConv, 
             predictor: EdgeClassifer, 
-            dataset: List[GraphEdgeDataset],
+            dataset: GraphEdgeDataset,
+            cls_label='type',
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False
+            randomize_ne = False,
+            ne_features=768
         ) -> None:
-        self.model = model
-        self.predictor = predictor
-        self.model.to(device)
-        self.predictor.to(device)
-        
+
+        super().__init__(
+            model=model,
+            predictor=predictor,
+            cls_label=cls_label,
+            lr=lr,
+            num_epochs=num_epochs,
+        )
+
         dataset = [g.data for g in dataset]
         shuffle(dataset)
 
         if randomize_ne:
-            dataset = randomize_features(dataset, 768)
+            dataset = randomize_features(dataset, ne_features)
 
-        self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-        self.optimizer = Adam(chain(model.parameters(), predictor.parameters()), lr=lr)
-        self.scheduler = CosineAnnealingLR(self.optimizer, T_max=num_epochs)
-        
-        self.edge2index = lambda g: torch.stack(list(g.edges())).contiguous()
-        self.results = list()
-        self.criterion = nn.CrossEntropyLoss()
+        self.dataloader = DataLoader(
+            dataset, 
+            batch_size=batch_size, 
+            shuffle=True
+        )
 
         print("GNN Trainer initialized.")
-
 
 
     def train(self):
@@ -74,7 +71,6 @@ class Trainer:
         all_preds, all_labels = list(), list()
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
-        # for i, data in tqdm(enumerate(self.dataloader), desc=f"Training batches", total=len(self.dataloader)):
         for data in self.dataloader:
             self.optimizer.zero_grad()
             self.model.zero_grad()
@@ -83,9 +79,9 @@ class Trainer:
             h = self.get_logits(data.x, data.train_pos_edge_label_index)
 
             scores = self.get_prediction_score(data.train_pos_edge_label_index, h)
-            labels = data.edge_classes[data.train_edge_idx]
+            labels = getattr(data, f"edge_{self.cls_label}")[data.train_edge_idx]
             loss = self.compute_loss(scores, labels)
-            all_preds.append(scores)
+            all_preds.append(scores.detach())
             all_labels.append(labels)
 
             loss.backward()
@@ -108,13 +104,12 @@ class Trainer:
         with torch.no_grad():
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
-            # for _, data in tqdm(enumerate(self.dataloader), desc=f"Evaluating batches", total=len(self.dataloader)):
             for data in self.dataloader:
                 h = self.get_logits(data.x, data.test_pos_edge_label_index)
 
                 scores = self.get_prediction_score(data.test_pos_edge_label_index, h)
-                labels = data.edge_classes[data.test_edge_idx]
-                all_preds.append(scores)
+                labels = getattr(data, f"edge_{self.cls_label}")[data.test_edge_idx]
+                all_preds.append(scores.detach())
                 all_labels.append(labels)
                 loss = self.compute_loss(scores, labels)
                 
@@ -132,27 +127,6 @@ class Trainer:
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
             
 
-    def get_logits(self, x, edge_index):
-        edge_index = edge_index.to(device)
-        x = x.to(device)
-        h = self.model(x, edge_index)
-        return h
-    
-
-    def get_prediction_score(self, edge_index, h):
-        h = h.to(device)
-        edge_index = edge_index.to(device)
-        prediction_score = self.predictor(h, edge_index)
-        return prediction_score
-    
-
-
-
-    def compute_loss(self, scores, labels):
-        loss = self.criterion(scores, labels.to(device))
-        return loss
-    
-
     def compute_metrics(self, scores, labels):
         preds = torch.argmax(scores, dim=-1)
         roc_auc = roc_auc_score(labels.cpu().numpy(), scores.cpu().numpy(), multi_class='ovr')
@@ -169,18 +143,3 @@ class Trainer:
             'recall': recall,
             'accuracy': accuracy,
         }
-    
-    def plot_metrics(self):
-        results = pd.DataFrame(self.results)
-        df = pd.DataFrame(results, index=range(1, len(results)+1))
-        df['epoch'] = df.index
-
-        columns = [c for c in df.columns if c not in ['epoch', 'phase']]
-        df.loc[df['phase'] == 'test'].plot(x='epoch', y=columns, kind='line')
-
-
-    def run_epochs(self, num_epochs):
-        for _ in tqdm(range(num_epochs), desc="Running Epochs"):
-            self.train()
-            self.test()
-        

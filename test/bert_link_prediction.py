@@ -2,8 +2,8 @@ from collections import Counter
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
-from data_loading.models_dataset import EcoreModelDataset
 from test.common_args import get_common_args_parser
+from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -41,8 +41,10 @@ def compute_metrics(pred):
 
 
 
-def parse_args():
+def get_parser():
+
     parser = get_common_args_parser()
+    parser.add_argument('--model', type=str, default='bert-base-uncased')
     return parser.parse_args()
 
 
@@ -53,11 +55,12 @@ def run(args):
         timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
-        remove_duplicates = args.remove_duplicates
+        remove_duplicates = args.remove_duplicates,
+        reload = args.reload
     )
     dataset_name = args.dataset
     distance = args.distance
-    dataset = EcoreModelDataset(dataset_name, reload=args.reload, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     print("Loaded dataset")
 
@@ -103,7 +106,7 @@ def run(args):
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=args.epochs,
+        num_train_epochs=args.num_epochs,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=128,
         warmup_steps=500,

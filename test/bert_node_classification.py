@@ -2,8 +2,8 @@ from test.common_args import get_common_args_parser
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphNodeDataset
-from data_loading.models_dataset import EcoreModelDataset
 from encoding.common import oversample_dataset
+from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
 from transformers import BertForSequenceClassification
@@ -43,9 +43,19 @@ def get_num_labels(dataset):
     return len(set(train_labels + test_labels))
 
 
-def parse_args():
+def get_parser():
     parser = get_common_args_parser()
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
+    parser.add_argument('--model', type=str, default='bert-base-uncased')
+    parser.add_argument('--cls_label', type=str, required=True)
+
+    parser.add_argument('--num_log_steps', type=int, default=200)
+    parser.add_argument('--num_eval_steps', type=int, default=200)
+    parser.add_argument('--num_save_steps', type=int, default=200)
+    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--eval_batch_size', type=int, default=128)
+    
+
     return parser.parse_args()
 
 
@@ -57,11 +67,12 @@ def run(args):
         timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
-        remove_duplicates = args.remove_duplicates
+        remove_duplicates = args.remove_duplicates,
+        reload=args.reload
     )
     dataset_name = args.dataset
     distance = args.distance
-    dataset = EcoreModelDataset(dataset_name, reload=args.reload, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     print("Loaded dataset")
 
@@ -75,6 +86,8 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
+    assert hasattr(graph_dataset, f'num_nodes_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+
     model_name = args.model
     special_tokens = get_special_tokens()
     max_length = 512
@@ -82,6 +95,7 @@ def run(args):
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_node_classification_lm_data(
+        label=args.cls_label,
         tokenizer=tokenizer,
         distance=distance,
     )
@@ -110,16 +124,16 @@ def run(args):
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=args.epochs,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=128,
+        num_train_epochs=args.num_epochs,
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.eval_batch_size,
         warmup_steps=500,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=20,
+        logging_steps=args.num_log_steps,
         eval_strategy='steps',
-        eval_steps=20,
-        save_steps=20,
+        eval_steps=args.num_eval_steps,
+        save_steps=args.num_save_steps,
         save_total_limit=2,
         load_best_model_at_end=True,
         fp16=True,

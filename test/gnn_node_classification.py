@@ -1,20 +1,18 @@
 from data_loading.graph_dataset import GraphNodeDataset
-from data_loading.models_dataset import EcoreModelDataset
-from models.gnn_layers import GNNConv, NodeClassifer
+from models.gnn_layers import GNNConv, NodeClassifier
+from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from trainers.gnn_node_classifier import Trainer
+from trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
 from utils import merge_argument_parsers, set_seed
 from test.common_args import get_common_args_parser, get_gnn_args_parser
 
 
-def parse_args():
+def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
+    parser.add_argument('--cls_label', type=str, required=True)
     return parser.parse_args()
-
-
-
 
 
 def run(args):
@@ -25,11 +23,12 @@ def run(args):
         timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
-        remove_duplicates = args.remove_duplicates
+        remove_duplicates = args.remove_duplicates,
+        reload = args.reload,
     )
     dataset_name = args.dataset
 
-    dataset = EcoreModelDataset(dataset_name, reload=False, **config_params)
+    dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,
@@ -44,13 +43,15 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    num_classes = graph_dataset.num_node_classes
+    num_nodes_label = f"num_nodes_{args.cls_label}"
+    assert hasattr(graph_dataset, num_nodes_label), f"Graph dataset does not have attribute {num_nodes_label}"
+    num_classes = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
 
     randomize = args.randomize or graph_dataset[0].data.x is None
     input_dim = args.input_dim
 
-    model_name = args.gnn_model
+    model_name = args.gnn_conv_model
 
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim
@@ -77,7 +78,7 @@ def run(args):
         aggregation=aggregation
     )
 
-    mlp_predictor = NodeClassifer(
+    mlp_predictor = NodeClassifier(
         input_dim=output_dim,
         hidden_dim=hidden_dim,
         num_layers=num_mlp_layers, 
@@ -90,6 +91,7 @@ def run(args):
         gnn_conv_model, 
         mlp_predictor, 
         graph_dataset,
+        cls_label=args.cls_label,
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,

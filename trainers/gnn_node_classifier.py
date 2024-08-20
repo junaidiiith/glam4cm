@@ -2,8 +2,6 @@ from random import shuffle
 from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
-from typing import List
-import pandas as pd
 from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score, 
@@ -14,19 +12,15 @@ from sklearn.metrics import (
 from data_loading.graph_dataset import GraphNodeDataset
 from models.gnn_layers import (
     GNNConv, 
-    NodeClassifer
+    NodeClassifier
 )
 from utils import get_device, randomize_features
-from itertools import chain
-from tqdm.auto import tqdm
-import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim import Adam
+from trainers.gnn_trainer import Trainer
 
 device = get_device()
 
 
-class Trainer:
+class GNNNodeClassificationTrainer(Trainer):
     """
     Trainer class for GNN Link Prediction
     This class is used to train the GNN model for the link prediction task
@@ -35,18 +29,22 @@ class Trainer:
     def __init__(
             self, 
             model: GNNConv, 
-            predictor: NodeClassifer, 
-            dataset: List[GraphNodeDataset],
+            predictor: NodeClassifier, 
+            dataset: GraphNodeDataset,
+            cls_label,
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
             randomize_ne = False
         ) -> None:
-        self.model = model
-        self.predictor = predictor
-        self.model.to(device)
-        self.predictor.to(device)
-        
+
+        super().__init__(
+            model=model,
+            predictor=predictor,
+            cls_label=cls_label,
+            lr=lr,
+            num_epochs=num_epochs
+        )
 
         dataset = [g.data for g in dataset]
         shuffle(dataset)
@@ -55,16 +53,6 @@ class Trainer:
             dataset = randomize_features(dataset, 768)
 
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-        self.optimizer = Adam(chain(model.parameters(), predictor.parameters()), lr=lr)
-        self.scheduler = CosineAnnealingLR(self.optimizer, T_max=num_epochs)
-        
-        self.edge2index = lambda g: torch.stack(list(g.edges())).contiguous()
-        self.results = list()
-        self.criterion = nn.CrossEntropyLoss()
-
-        self.num_epochs = num_epochs
-
         print("GNN Trainer initialized.")
 
 
@@ -84,7 +72,7 @@ class Trainer:
             
             h = self.get_logits(data.x, data.edge_index)
             scores = self.get_prediction_score(h)[data.train_node_idx]
-            labels = data.node_classes[data.train_node_idx]
+            labels = getattr(data, f"node_{self.cls_label}")[data.train_node_idx]
             loss = self.compute_loss(scores, labels)
             
             all_preds.append(scores.detach())
@@ -114,7 +102,7 @@ class Trainer:
             for data in self.dataloader:
                 h = self.get_logits(data.x, data.edge_index)
                 scores = self.get_prediction_score(h)[data.test_node_idx]
-                labels = data.node_classes[data.test_node_idx]
+                labels = getattr(data, f"node_{self.cls_label}")[data.test_node_idx]
 
                 loss = self.compute_loss(scores, labels)
                 epoch_loss += loss.item()
@@ -136,23 +124,7 @@ class Trainer:
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
-            
 
-    def get_logits(self, x, edge_index):
-        edge_index = edge_index.to(device)
-        x = x.to(device)
-        h = self.model(x, edge_index)
-        return h
-    
-
-    def get_prediction_score(self, h):
-        h = h.to(device)
-        prediction_score = self.predictor(h)
-        return prediction_score
-
-    def compute_loss(self, scores, labels):
-        loss = self.criterion(scores, labels.to(device))
-        return loss
     
 
     def compute_metrics(self, scores, labels):
@@ -169,17 +141,3 @@ class Trainer:
             'recall': recall,
             'accuracy': accuracy,
         }
-    
-    def plot_metrics(self):
-        results = pd.DataFrame(self.results)
-        df = pd.DataFrame(results, index=range(1, len(results)+1))
-        df['epoch'] = df.index
-
-        columns = [c for c in df.columns if c not in ['epoch', 'phase']]
-        df.loc[df['phase'] == 'test'].plot(x='epoch', y=columns, kind='line')
-
-
-    def run(self):
-        for _ in tqdm(range(self.num_epochs), desc="Running Epochs"):
-            self.train()
-            self.test()

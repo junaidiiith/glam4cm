@@ -112,7 +112,8 @@ class GraphDataset(torch.utils.data.Dataset):
             
             for torch_graph, node_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"node_{label}", torch.tensor(node_classes))
-                
+            
+            setattr(self, f"num_nodes_{label}", len(self.node_label_map))
 
     def add_edge_labels(self):
         model_type = self.metadata.type
@@ -139,6 +140,8 @@ class GraphDataset(torch.utils.data.Dataset):
             
             for torch_graph, edge_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"edge_{label}", torch.tensor(edge_classes))
+            
+            setattr(self, f"num_edges_{label}", len(self.edge_label_map))
 
 
     def add_graph_labels(self):
@@ -229,6 +232,7 @@ class GraphEdgeDataset(GraphDataset):
 
     def get_link_prediction_lm_data(
             self, 
+            label: str,
             tokenizer: AutoTokenizer,
             distance, 
             task_type=LP_TASK_EDGE_CLS
@@ -253,8 +257,8 @@ class GraphEdgeDataset(GraphDataset):
 
             train_idx = graph.data.train_edge_idx
             test_idx = graph.data.test_edge_idx
-            train_edge_classes = getattr(graph.data, f'edge_{self.metadata.edge_cls}')[train_idx]
-            test_edge_classes = getattr(graph.data, f'edge_{self.metadata.edge_cls}')[test_idx]
+            train_edge_classes = getattr(graph.data, f'edge_{label}')[train_idx]
+            test_edge_classes = getattr(graph.data, f'edge_{label}')[test_idx]
 
             if task_type == LP_TASK_EDGE_CLS:
                 data['train_edges'] += train_pos_edges

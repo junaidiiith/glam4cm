@@ -11,14 +11,14 @@ def get_common_args_parser():
     ### Models Dataset Creation
     parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github', 'eamodelset'])
     parser.add_argument('--remove_duplicates', action='store_true')
-    parser.add_argument('--distance', type=int, default=1)
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--timeout', type=int, default=120)
-    parser.add_argument('--min_enr', type=float, default=1.2)
+    parser.add_argument('--min_enr', type=float, default=-1.0)
     parser.add_argument('--min_edges', type=int, default=10)
     
 
     ### Model Dataset Loading
+    parser.add_argument('--distance', type=int, default=1)
     parser.add_argument('--use_embeddings', action='store_true')
     parser.add_argument('--embed_model', type=str, default='bert-base-uncased')
     parser.add_argument('--ckpt', type=str, default=None)
