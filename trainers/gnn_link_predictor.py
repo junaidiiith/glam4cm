@@ -1,5 +1,5 @@
-from random import shuffle
 from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data
 import torch
 from collections import defaultdict
 from typing import List
@@ -11,15 +11,14 @@ from sklearn.metrics import (
     accuracy_score
 )
 
-from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
-from utils import get_device, randomize_features
 
 from trainers.gnn_trainer import Trainer
 
+from utils import get_device
 device = get_device()
 
 
@@ -33,13 +32,11 @@ class GNNLinkPredictionTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: EdgeClassifer, 
-            dataset: List[GraphEdgeDataset],
+            dataset: List[Data],
             cls_label='type',
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False,
-            ne_features=768
         ) -> None:
 
         super().__init__(
@@ -48,15 +45,9 @@ class GNNLinkPredictionTrainer(Trainer):
             lr=lr,
             cls_label=cls_label,
             num_epochs=num_epochs
-        )
-
-        dataset = [g.data for g in dataset]
-        shuffle(dataset)
-
-        if randomize_ne:
-            dataset = randomize_features(dataset, ne_features)
-        
+        )        
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        self.results = list()
 
         print("GNN Trainer initialized.")
 

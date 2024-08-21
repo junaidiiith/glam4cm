@@ -1,4 +1,4 @@
-from random import shuffle
+from typing import List
 from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
@@ -9,7 +9,7 @@ from sklearn.metrics import (
     accuracy_score
 )
 
-from data_loading.graph_dataset import GraphNodeDataset
+from torch_geometric.data import Data
 from models.gnn_layers import (
     GNNConv, 
     NodeClassifier
@@ -30,12 +30,11 @@ class GNNNodeClassificationTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: NodeClassifier, 
-            dataset: GraphNodeDataset,
+            dataset: List[Data],
             cls_label,
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False
         ) -> None:
 
         super().__init__(
@@ -46,12 +45,7 @@ class GNNNodeClassificationTrainer(Trainer):
             num_epochs=num_epochs
         )
 
-        dataset = [g.data for g in dataset]
-        shuffle(dataset)
-
-        if randomize_ne:
-            dataset = randomize_features(dataset, 768)
-
+        self.results = list()
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         print("GNN Trainer initialized.")
 

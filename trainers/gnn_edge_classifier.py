@@ -1,4 +1,4 @@
-from random import shuffle
+from typing import List
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
@@ -10,15 +10,14 @@ from sklearn.metrics import (
     accuracy_score
 )
 
-from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
 
+from torch_geometric.data import Data
 from trainers.gnn_trainer import Trainer
-from utils import get_device, randomize_features
-from tqdm.auto import tqdm
+from utils import get_device
 device = get_device()
 
 
@@ -32,13 +31,11 @@ class GNNEdgeClassificationTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: EdgeClassifer, 
-            dataset: GraphEdgeDataset,
+            dataset: List[Data],
             cls_label='type',
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False,
-            ne_features=768
         ) -> None:
 
         super().__init__(
@@ -48,12 +45,6 @@ class GNNEdgeClassificationTrainer(Trainer):
             lr=lr,
             num_epochs=num_epochs,
         )
-
-        dataset = [g.data for g in dataset]
-        shuffle(dataset)
-
-        if randomize_ne:
-            dataset = randomize_features(dataset, ne_features)
 
         self.dataloader = DataLoader(
             dataset, 

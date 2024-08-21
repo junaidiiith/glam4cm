@@ -1,8 +1,8 @@
-from test.common_args import get_common_args_parser
+from test.common_args import get_bert_args_parser, get_common_args_parser
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphNodeDataset
-from encoding.common import oversample_dataset
+from data_loading.utils import oversample_dataset
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
@@ -15,7 +15,7 @@ from sklearn.metrics import (
     balanced_accuracy_score
 )
 
-from utils import set_seed
+from utils import merge_argument_parsers, set_seed
 
 
 
@@ -44,17 +44,12 @@ def get_num_labels(dataset):
 
 
 def get_parser():
-    parser = get_common_args_parser()
-    parser.add_argument('--oversampling_ratio', type=float, default=-1)
-    parser.add_argument('--model', type=str, default='bert-base-uncased')
-    parser.add_argument('--cls_label', type=str, required=True)
+    common_parser = get_common_args_parser()
+    bert_parser = get_bert_args_parser()
+    parser = merge_argument_parsers(common_parser, bert_parser)
 
-    parser.add_argument('--num_log_steps', type=int, default=200)
-    parser.add_argument('--num_eval_steps', type=int, default=200)
-    parser.add_argument('--num_save_steps', type=int, default=200)
-    parser.add_argument('--train_batch_size', type=int, default=32)
-    parser.add_argument('--eval_batch_size', type=int, default=128)
-    
+    parser.add_argument('--oversampling_ratio', type=float, default=-1)
+    parser.add_argument('--cls_label', type=str, required=True)
 
     return parser.parse_args()
 
@@ -79,7 +74,7 @@ def run(args):
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr,
+        test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
         add_neg_samples=args.add_neg_samples,
@@ -97,9 +92,9 @@ def run(args):
     assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
     num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
 
-    model_name = args.model
+    model_name = args.model_name
     special_tokens = get_special_tokens()
-    max_length = 512
+    max_length = args.max_length
     tokenizer = get_tokenizer(model_name, special_tokens, max_length)
 
     print("Getting link prediction data")
@@ -113,12 +108,11 @@ def run(args):
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
-    print("Training model")
-    num_labels = get_num_labels(bert_dataset)
-    print(f'Number of labels: {num_labels}')
+
     model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
     model.resize_token_embeddings(len(tokenizer))
-
+    
+    print("Training model")
     output_dir = os.path.join(
         'results',
         dataset_name,
@@ -136,7 +130,6 @@ def run(args):
         num_train_epochs=args.num_epochs,
         per_device_train_batch_size=args.train_batch_size,
         per_device_eval_batch_size=args.eval_batch_size,
-        warmup_steps=500,
         weight_decay=0.01,
         logging_dir=logs_dir,
         logging_steps=args.num_log_steps,

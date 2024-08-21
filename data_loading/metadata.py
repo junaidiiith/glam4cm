@@ -12,9 +12,7 @@ class GraphMetadata:
 
     @property
     def node_attributes(self):
-        if 'attributes' in self.node:
-            return self.node.get('attributes')
-        return None
+        return self.node.get('attributes')
     
     @property
     def edge_label(self):
@@ -26,9 +24,11 @@ class GraphMetadata:
     
     @property
     def graph_cls(self):
-        if 'cls' in self.graph:
-            return self.graph.get('cls')
-        return None
+        return self.graph.get('cls')
+        
+    @property
+    def graph_label(self):
+        return self.graph.get('label')
 
 
 
@@ -45,6 +45,7 @@ class EcoreMetaData(GraphMetadata):
             "cls": "type"
         }
         self.graph = {
+            "label": "text",
             "cls": "label"
         }
 
@@ -61,3 +62,5 @@ class ArchimateMetaData(GraphMetadata):
             "label": "type",
             "cls": "type"
         }
+
+        self.graph = {}

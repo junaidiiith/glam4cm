@@ -1,13 +1,13 @@
 from argparse import ArgumentParser
 import random
 import numpy as np
-from sklearn.metrics import accuracy_score
 import torch
 import os
 import fnmatch
 import json
 from typing import List
 import xmltodict
+from torch_geometric.data import Data
 
 
 def find_files_with_extension(root_dir, extension):
@@ -38,13 +38,12 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-def randomize_features(d, num_feats):
-    for i, data in enumerate(d):
+def randomize_features(dataset: List[Data], num_feats):
+    for data in dataset:
         num_nodes = data.num_nodes
         num_edges = data.overall_edge_index.shape[1] if hasattr(data, 'overall_edge_index') else data.edge_index.shape[1]
-        d[i].x = torch.randn((num_nodes, num_feats))
-        d[i].edge_attr = torch.randn((num_edges, num_feats))
-    return d
+        data.x = torch.randn((num_nodes, num_feats))
+        data.edge_attr = torch.randn((num_edges, num_feats))
 
 
 def merge_argument_parsers(p1: ArgumentParser, p2: ArgumentParser):
@@ -61,3 +60,26 @@ def merge_argument_parsers(p1: ArgumentParser, p2: ArgumentParser):
             merged_parser._add_action(action)
 
     return merged_parser
+
+
+def is_meaningful_line(line: str):
+    stripped_line: str = line.strip()
+    # Ignore empty lines, comments, and docstrings
+    if stripped_line == "" or stripped_line.startswith("#") or stripped_line.startswith('"""') or stripped_line.startswith("'''"):
+        return False
+    return True
+
+def count_lines_of_code_in_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+        meaningful_lines = [line for line in lines if is_meaningful_line(line)]
+    return len(meaningful_lines)
+
+def count_total_lines_of_code(directory):
+    total_lines = 0
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                total_lines += count_lines_of_code_in_file(file_path)
+    return total_lines

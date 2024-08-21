@@ -6,49 +6,30 @@ from transformers import (
     AutoModelForSequenceClassification, 
     AutoTokenizer
 )
-import torch
-import numpy as np
-import random
+from data_loading.graph_dataset import GraphDataset
 from data_loading.models_dataset import EcoreModelDataset
-from settings import device, seed
+from settings import device
 from sklearn.preprocessing import LabelEncoder
 from trainers.metrics import compute_metrics
 
-
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
 
 max_length_map = {
     'bert-base-uncased': 512,
     'allenai/longformer-base-4096': 4096
 }
 
-# Create your dataset
-class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self, texts, labels, tokenizer, max_length):
-        self.texts = texts
-        self.labels = labels
-        self.tokenizer = tokenizer
-        self.max_length = max_length
+class BertTrainer:
+    def __init__(
+        self,
+        dataset: GraphDataset,
+        model_name,
+        num_epochs=3
+    ):
+        self.dataset = dataset
+        self.model_name = model_name
+        self.num_epochs = num_epochs
 
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        text = self.texts[idx]
-        label = self.labels[idx]
-        inputs = self.tokenizer(
-            text, 
-            return_tensors='pt', 
-            truncation=True, 
-            padding='max_length', 
-            max_length=self.max_length
-        )
-        inputs = {k: v.squeeze(0) for k, v in inputs.items()}
-        inputs['labels'] = torch.tensor(label, dtype=torch.long)
-        return inputs
+        dataset = dataset.get_lm_graph_classification_data() 
 
 
 def train_hf(model_name, model_ds: EcoreModelDataset, epochs):
@@ -85,7 +66,6 @@ def train_hf(model_name, model_ds: EcoreModelDataset, epochs):
             eval_strategy="epoch",
             per_device_train_batch_size=2,
             per_device_eval_batch_size=2,
-            warmup_steps=500,
             weight_decay=0.01,
             logging_dir=logs_dir,
             logging_steps=10,

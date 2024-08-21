@@ -7,6 +7,8 @@ from lang2graph.utils import (
 )
 import os
 
+from tokenization.utils import doc_tokenizer
+
 
 
 REFERENCE = 'reference'
@@ -48,7 +50,7 @@ class EcoreNxG(LangGraph):
         self.edge_to_idx = {edge: idx for idx, edge in enumerate(self.numbered_graph.edges())}
         self.idx_to_edge = {idx: edge for idx, edge in enumerate(self.numbered_graph.edges())}
 
-        self.text = json_obj.get('txt')
+        self.text = doc_tokenizer(json_obj.get('txt'))
     
     
     def __create_nx_from_file(self, file_name):

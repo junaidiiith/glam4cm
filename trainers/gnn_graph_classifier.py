@@ -1,3 +1,4 @@
+from typing import List, Tuple
 from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score, 
@@ -7,14 +8,13 @@ from sklearn.metrics import (
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
-from random import shuffle
 
-from data_loading.graph_dataset import GraphEdgeDataset
+from torch_geometric.data import Data
 from models.gnn_layers import (
     GNNConv,
     GraphClassifer
 )
-from utils import get_device, randomize_features
+from utils import get_device
 from trainers.gnn_trainer import Trainer
 
 device = get_device()
@@ -30,13 +30,11 @@ class GNNGraphClassificationTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: GraphClassifer,
-            dataset: GraphEdgeDataset,
-            tr=0.2,
+            dataset: List[Tuple[Data, Data]],
+            cls_label='label',
             lr=1e-4,
             num_epochs=100,
             batch_size=32,
-            randomize_ne = False,
-            ne_features=768
         ) -> None:
 
         super().__init__(
@@ -47,17 +45,11 @@ class GNNGraphClassificationTrainer(Trainer):
             num_epochs=num_epochs
         )
 
-        tr = 1 - tr
+        self.cls_label = cls_label
         self.dataloaders = dict()
-        dataset = [g.data for g in dataset]
-        shuffle(dataset)
-        if randomize_ne:
-            dataset = randomize_features(dataset, ne_features)
-
-        train_dataset = dataset[:int(tr * len(dataset))]
-        test_dataset = dataset[int(tr * len(dataset)):]
-        self.dataloaders['train'] = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        self.dataloaders['test'] = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        self.dataloaders['train'] = DataLoader(dataset['train'], batch_size=batch_size, shuffle=True)
+        self.dataloaders['test'] = DataLoader(dataset['test'], batch_size=batch_size, shuffle=False)
+        self.results = list()
 
         print("GNN Trainer initialized.")
 
@@ -68,7 +60,7 @@ class GNNGraphClassificationTrainer(Trainer):
 
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
-        preds, labels = list(), list()
+        preds, all_labels = list(), list()
         # for i, data in tqdm(enumerate(self.dataloader), desc=f"Training batches", total=len(self.dataloader)):
         for data in self.dataloaders['train']:
             self.optimizer.zero_grad()
@@ -78,10 +70,12 @@ class GNNGraphClassificationTrainer(Trainer):
             h = self.model(data.x.to(device), data.edge_index.to(device))
             g_pred = self.predictor(h, data.batch.to(device))
 
-            preds.append(g_pred.cpu().detach())
-            labels.append(data.y.cpu().detach())
             
-            loss = self.criterion(g_pred, data.y.to(device))
+            labels = getattr(data, f"graph_{self.cls_label}")
+            loss = self.criterion(g_pred, labels.to(device))
+
+            preds.append(g_pred.cpu().detach())
+            all_labels.append(labels.cpu())
 
             loss.backward()
             self.optimizer.step()
@@ -90,7 +84,7 @@ class GNNGraphClassificationTrainer(Trainer):
                         
         
         preds = torch.cat(preds, dim=0)
-        labels = torch.cat(labels, dim=0)
+        labels = torch.cat(all_labels, dim=0)
         
         epoch_metrics = self.compute_metrics(preds, labels)
         epoch_metrics['loss'] = epoch_loss
@@ -100,23 +94,25 @@ class GNNGraphClassificationTrainer(Trainer):
 
     def test(self):
         self.model.eval()
-        self.classifier.eval()
+        self.predictor.eval()
         with torch.no_grad():
             epoch_loss = 0
-            preds, labels = list(), list()
+            preds, all_labels = list(), list()
             for data in self.dataloaders['test']:
                 h = self.model(data.x.to(device), data.edge_index.to(device))
                 g_pred = self.predictor(h, data.batch.to(device))
+                labels = getattr(data, f"graph_{self.cls_label}")
 
                 preds.append(g_pred.cpu().detach())
-                labels.append(data.y.cpu().detach())
+                all_labels.append(labels.cpu())
+            
 
-                loss = self.criterion(g_pred, data.y.to(device))
+                loss = self.criterion(g_pred, labels.to(device))
                 epoch_loss += loss.item()
 
             
             preds = torch.cat(preds, dim=0)
-            labels = torch.cat(labels, dim=0)
+            labels = torch.cat(all_labels, dim=0)
 
             epoch_metrics = self.compute_metrics(preds, labels)
             epoch_metrics['loss'] = epoch_loss

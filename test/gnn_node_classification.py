@@ -33,7 +33,7 @@ def run(args):
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr,
+        test_ratio=args.test_ratio,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         ckpt=args.ckpt
@@ -90,7 +90,7 @@ def run(args):
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
-        graph_dataset,
+        graph_dataset.get_torch_geometric_data(),
         cls_label=args.cls_label,
         lr=args.lr,
         num_epochs=args.num_epochs,

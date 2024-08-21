@@ -58,7 +58,7 @@ class TorchGraph:
         self.distance = distance
         self.test_ratio = test_ratio
         self.save_dir = save_dir
-        
+    
 
     def get_graph_node_strs(self, edge_index: torch.Tensor, distance = None):
         if distance is None:

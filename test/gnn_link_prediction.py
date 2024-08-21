@@ -32,7 +32,7 @@ def run(args):
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr,
+        test_ratio=args.test_ratio,
         add_negative_train_samples=True,
         neg_sampling_ratio=args.neg_sampling_ratio,
         use_embeddings=args.use_embeddings,
@@ -84,7 +84,7 @@ def run(args):
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
-        graph_dataset,
+        graph_dataset.get_torch_geometric_data(),
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,

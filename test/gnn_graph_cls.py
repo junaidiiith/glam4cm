@@ -1,9 +1,9 @@
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, GraphClassifer
-from test.utils import get_models_dataset
 from trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
 from test.common_args import get_common_args_parser, get_gnn_args_parser
 from utils import merge_argument_parsers, set_seed
+from test.utils import get_models_dataset
 
 
 def get_parser():
@@ -11,6 +11,7 @@ def get_parser():
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
 
+    parser.add_argument('--cls_label', type=str, default='label')
     parser.add_argument('--global_pool', type=str, default='mean')
     return parser.parse_args()
 
@@ -32,25 +33,27 @@ def run(args):
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr,
+        test_ratio=args.test_ratio,
         add_negative_train_samples=True,
         neg_sampling_ratio=args.neg_sampling_ratio,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt
+        ckpt=args.ckpt,
+        no_shuffle=args.no_shuffle,
+        randomize_ne=args.randomize,
+        random_ne_dim=args.random_ne_dim,
     )
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
+    cls_label = f"num_graph_{args.cls_label}"
+    assert hasattr(graph_dataset, cls_label), f"Dataset does not have attribute {cls_label}"
+    num_classes = getattr(graph_dataset, cls_label)
 
-    randomize = args.randomize or graph_dataset[0].data.x is None
-    input_dim = graph_dataset[0].data.x.size(1)
 
     model_name = args.gnn_conv_model
-
-    num_classes = graph_dataset.num_classes
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim
     num_conv_layers = args.num_conv_layers
@@ -60,6 +63,7 @@ def run(args):
     dropout = args.dropout
     aggregation = args.aggregation
 
+    input_dim = graph_dataset[0].data.x.shape[1]
 
     gnn_conv_model = GNNConv(
         model_name=model_name,
@@ -83,12 +87,10 @@ def run(args):
     trainer = Trainer(
         gnn_conv_model,
         classifier, 
-        graph_dataset,
-        tr=args.tr,
+        graph_dataset.get_gnn_graph_classification_data(),
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        randomize_ne=randomize
     )
 
     trainer.run()

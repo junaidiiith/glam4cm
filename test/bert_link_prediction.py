@@ -2,7 +2,7 @@ from collections import Counter
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
-from test.common_args import get_common_args_parser
+from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
@@ -16,7 +16,7 @@ from sklearn.metrics import (
 )
 import torch.nn.functional as F
 
-from utils import set_seed
+from utils import merge_argument_parsers, set_seed
 
 
 def compute_metrics(pred):
@@ -43,14 +43,9 @@ def compute_metrics(pred):
 
 def get_parser():
 
-    parser = get_common_args_parser()
-    parser.add_argument('--model', type=str, default='bert-base-uncased')
-
-    parser.add_argument('--num_log_steps', type=int, default=200)
-    parser.add_argument('--num_eval_steps', type=int, default=200)
-    parser.add_argument('--num_save_steps', type=int, default=200)
-    parser.add_argument('--train_batch_size', type=int, default=32)
-    parser.add_argument('--eval_batch_size', type=int, default=128)
+    common_parser = get_common_args_parser()
+    bert_parser = get_bert_args_parser()
+    parser = merge_argument_parsers(common_parser, bert_parser)
 
     return parser.parse_args()
 
@@ -74,7 +69,7 @@ def run(args):
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr,
+        test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_embeddings=args.use_embeddings,
         add_neg_samples=args.add_neg_samples,
@@ -87,9 +82,9 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    model_name = args.model
+    model_name = args.model_name
     special_tokens = get_special_tokens()
-    max_length = 512
+    max_length = args.max_length
     tokenizer = get_tokenizer(model_name, special_tokens, max_length)
 
     print("Getting link prediction data")
@@ -122,7 +117,6 @@ def run(args):
         num_train_epochs=args.num_epochs,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=128,
-        warmup_steps=500,
         weight_decay=0.01,
         logging_dir=logs_dir,
         logging_steps=200,
