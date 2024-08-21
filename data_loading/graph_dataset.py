@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 import os
 from random import shuffle
 from typing import Union
@@ -237,10 +237,7 @@ class GraphEdgeDataset(GraphDataset):
             distance, 
             task_type=LP_TASK_EDGE_CLS
         ):
-        if task_type == LP_TASK_EDGE_CLS:
-            data = {'train_edges': [], 'train_edge_classes': [], 'test_edges': [], 'test_edge_classes': []}
-        elif task_type == LP_TASK_LINK_PRED:
-            data = {'train_pos_edges': [], 'train_neg_edges': [], 'test_pos_edges': [], 'test_neg_edges': []}
+        data = defaultdict(list)
         for graph in tqdm(self.graphs, desc='Getting link prediction data'):
             pos_edge_idx = graph.data.edge_index
             
@@ -250,27 +247,30 @@ class GraphEdgeDataset(GraphDataset):
             test_pos_edge_index = graph.data.test_pos_edge_label_index
             test_neg_edge_index = graph.data.test_neg_edge_label_index
 
-            train_pos_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, train_pos_edge_index).values())
-            train_neg_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, train_neg_edge_index).values())
-            test_pos_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, test_pos_edge_index).values())
-            test_neg_edges = list(graph.get_graph_edge_strs_from_node_strs(node_strs, test_neg_edge_index).values())
+            edge_indices = {
+                'train_pos': train_pos_edge_index,
+                'train_neg': train_neg_edge_index,
+                'test_pos': test_pos_edge_index,
+                'test_neg': test_neg_edge_index
+            }
+
+            for edge_index_label, edge_index in edge_indices.items():
+                if "neg" in edge_index_label and task_type == LP_TASK_LINK_PRED:
+                    continue
+                edge_strs = graph.get_graph_edge_strs_from_node_strs(
+                    node_strs, 
+                    edge_index,
+                    use_edge_types=self.use_edge_types,
+                    neg_samples="neg" in edge_index_label
+                )
+                edge_strs = list(edge_strs.values())
+                data[f'{edge_index_label}_edges'] += edge_strs
 
             train_idx = graph.data.train_edge_idx
             test_idx = graph.data.test_edge_idx
-            train_edge_classes = getattr(graph.data, f'edge_{label}')[train_idx]
-            test_edge_classes = getattr(graph.data, f'edge_{label}')[test_idx]
+            data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_idx]
+            data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_idx]
 
-            if task_type == LP_TASK_EDGE_CLS:
-                data['train_edges'] += train_pos_edges
-                data['train_edge_classes'] += train_edge_classes
-                data['test_edges'] += test_pos_edges
-                data['test_edge_classes'] += test_edge_classes
-            elif task_type == LP_TASK_LINK_PRED:
-                data['train_pos_edges'] += train_pos_edges
-                data['train_neg_edges'] += train_neg_edges
-                data['test_pos_edges'] += test_pos_edges
-                data['test_neg_edges'] += test_neg_edges
-        
 
         print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
@@ -278,12 +278,12 @@ class GraphEdgeDataset(GraphDataset):
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
-                    data['train_edges'], 
+                    data['train_pos_edges'], 
                     data['train_edge_classes']
                 ),
                 'test': EncodingDataset(
                     tokenizer, 
-                    data['test_edges'], 
+                    data['test_pos_edges'], 
                     data['test_edge_classes']
                 )
             }

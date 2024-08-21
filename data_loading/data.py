@@ -81,8 +81,6 @@ class TorchGraph:
             use_edge_types=False,
             neg_samples=False
         ):
-        if neg_samples:
-            assert not use_edge_types, "Edge types are not supported for negative samples"
 
         edge_strs = dict()
         node_label = self.metadata.node_label
@@ -91,9 +89,15 @@ class TorchGraph:
             v_str = node_strs[v]
             u_label = self.graph.id_to_node_label[u]
             v_label = self.graph.id_to_node_label[v]
-            edge_data = self.graph.edges[u_label, v_label]
-            edge_label = edge_data.get(node_label, "")
-            edge_type = get_edge_data(edge_data, 'type', self.metadata.type)[1]
+
+            if not neg_samples:
+                edge_data = self.graph.edges[u_label, v_label]
+                edge_label = edge_data.get(node_label, "")
+                edge_type = get_edge_data(edge_data, 'type', self.metadata.type)
+            else:
+                edge_label = ""
+                edge_type = ""
+
             edge_str = f"{u_str} {edge_label} {v_str}" if not use_edge_types else f"{u_str} {edge_label} {edge_type} {v_str}"
             edge_strs[(u, v)] = edge_str
 

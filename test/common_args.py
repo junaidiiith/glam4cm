@@ -1,5 +1,3 @@
-
-
 from argparse import ArgumentParser
 
 
@@ -9,18 +7,32 @@ def get_common_args_parser():
     parser.add_argument('--seed', type=int, default=42)
 
     ### Models Dataset Creation
-    parser.add_argument('--dataset', type=str, default='ecore_555', choices=['modelset', 'ecore_555', 'mar-ecore-github', 'eamodelset'])
+    parser.add_argument(
+        '--dataset', 
+        type=str, 
+        default='ecore_555', 
+        choices=[
+            'modelset', 
+            'ecore_555', 
+            'mar-ecore-github', 
+            'eamodelset'
+        ]
+    )
     parser.add_argument('--remove_duplicates', action='store_true')
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--timeout', type=int, default=120)
     parser.add_argument('--min_enr', type=float, default=-1.0)
     parser.add_argument('--min_edges', type=int, default=10)
     
+    
+    parser.add_argument('--use_attributes', action='store_true')
+    parser.add_argument('--use_edge_types', action='store_true')
+
 
     ### Model Dataset Loading
     parser.add_argument('--distance', type=int, default=1)
     parser.add_argument('--use_embeddings', action='store_true')
-    parser.add_argument('--embed_model', type=str, default='bert-base-uncased')
+    parser.add_argument('--embed_model_name', type=str, default='bert-base-uncased')
     parser.add_argument('--ckpt', type=str, default=None)
     
 
@@ -53,4 +65,6 @@ def get_gnn_args_parser():
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--gnn_conv_model', type=str, default='SAGEConv')
+    
+    
     return parser

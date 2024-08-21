@@ -87,7 +87,7 @@ class Trainer:
         df.loc[df['phase'] == 'test'].plot(x='epoch', y=columns, kind='line')
 
 
-    def run_epochs(self):
+    def run(self):
         for _ in tqdm(range(self.num_epochs), desc="Running Epochs"):
             self.train()
             self.test()

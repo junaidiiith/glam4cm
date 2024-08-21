@@ -37,7 +37,7 @@ def run(args):
         neg_sampling_ratio=args.neg_sampling_ratio,
         distance=args.distance,
         use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model,
+        embed_model_name=args.embed_model_name,
         ckpt=args.ckpt
     )
 
@@ -102,4 +102,4 @@ def run(args):
     )
 
     print("Training GNN Edge Classification model")
-    trainer.run_epochs(num_epochs=args.num_epochs)
+    trainer.run()

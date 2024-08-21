@@ -6,7 +6,7 @@ from test.common_args import get_common_args_parser
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import BertForSequenceClassification
+from transformers import AutoModelForSequenceClassification
 
 from sklearn.metrics import (
     roc_auc_score, 
@@ -45,6 +45,13 @@ def get_parser():
 
     parser = get_common_args_parser()
     parser.add_argument('--model', type=str, default='bert-base-uncased')
+
+    parser.add_argument('--num_log_steps', type=int, default=200)
+    parser.add_argument('--num_eval_steps', type=int, default=200)
+    parser.add_argument('--num_save_steps', type=int, default=200)
+    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--eval_batch_size', type=int, default=128)
+
     return parser.parse_args()
 
 
@@ -65,12 +72,16 @@ def run(args):
     print("Loaded dataset")
 
     graph_data_params = dict(
-        distance=distance,
+        distance=args.distance,
         reload=args.reload,
         test_ratio=args.tr,
-        add_negative_train_samples=True,
-        neg_sampling_ratio=args.neg_sampling_ratio
+        use_attributes=args.use_attributes,
+        use_embeddings=args.use_embeddings,
+        add_neg_samples=args.add_neg_samples,
+        embed_model_name=args.embed_model_name,
+        ckpt=args.ckpt,
     )
+
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -87,9 +98,11 @@ def run(args):
         distance=distance,
     )
 
+    assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
 
     print("Training model")
-    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
     model.resize_token_embeddings(len(tokenizer))
 
     output_dir = os.path.join(

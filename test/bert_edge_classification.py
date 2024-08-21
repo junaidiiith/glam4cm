@@ -6,7 +6,7 @@ from settings import LP_TASK_EDGE_CLS
 from test.common_args import get_common_args_parser
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import BertForSequenceClassification
+from transformers import AutoModelForSequenceClassification
 from test.utils import get_models_dataset
 
 from sklearn.metrics import (
@@ -24,7 +24,7 @@ def compute_metrics(pred):
     preds = pred.predictions.argmax(-1)
     acc = (preds == labels).mean()
     f1_macro = f1_score(labels, preds, average='macro')
-    accuracy = accuracy_score(labels, preds, average='macro')
+    accuracy = accuracy_score(labels, preds)
     recall = recall_score(labels, preds, average='macro')
     balanced_acc = balanced_accuracy_score(labels, preds)
 
@@ -37,17 +37,19 @@ def compute_metrics(pred):
     }
 
 
-def get_num_labels(dataset):
-    train_labels = dataset['train'][:]['labels'].unique().tolist()
-    test_labels = dataset['test'][:]['labels'].unique().tolist()
-    return len(set(train_labels + test_labels))
-
-
 def get_parser():
     parser = get_common_args_parser()
     parser.add_argument('--model', type=str, default='bert-base-uncased')
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
     parser.add_argument('--cls_label', type=str, default='type')
+
+    parser.add_argument('--num_log_steps', type=int, default=200)
+    parser.add_argument('--num_eval_steps', type=int, default=200)
+    parser.add_argument('--num_save_steps', type=int, default=200)
+    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--eval_batch_size', type=int, default=128)
+
+
     return parser.parse_args()
 
 
@@ -68,16 +70,24 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = dict(
-        distance=distance,
+        distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr
+        test_ratio=args.tr,
+        use_attributes=args.use_attributes,
+        use_edge_types=args.use_edge_types,
+        use_embeddings=args.use_embeddings,
+        add_negative_train_samples=args.add_neg_samples,
+        embed_model_name=args.embed_model_name,
+        ckpt=args.ckpt,
     )
+
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
     assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
 
     model_name = args.model
     special_tokens = get_special_tokens()
@@ -97,9 +107,8 @@ def run(args):
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
     print("Training model")
-    num_labels = get_num_labels(bert_dataset)
     print(f'Number of labels: {num_labels}')
-    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
     model.resize_token_embeddings(len(tokenizer))
 
     output_dir = os.path.join(
@@ -122,10 +131,10 @@ def run(args):
         warmup_steps=500,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=200,
+        logging_steps=args.num_log_steps,
         eval_strategy='steps',
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=args.num_eval_steps,
+        save_steps=args.num_save_steps,
         save_total_limit=2,
         load_best_model_at_end=True,
         fp16=True,

@@ -35,7 +35,7 @@ def run(args):
         reload=args.reload,
         test_ratio=args.tr,
         use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model,
+        embed_model_name=args.embed_model_name,
         ckpt=args.ckpt
     )
 

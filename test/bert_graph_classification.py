@@ -6,6 +6,13 @@ from trainers.bert_classifier import train_hf
 def get_parser():
     parser = get_common_args_parser()
     parser.add_argument('--model', type=str, default='bert-base-uncased')
+    
+    parser.add_argument('--num_log_steps', type=int, default=200)
+    parser.add_argument('--num_eval_steps', type=int, default=200)
+    parser.add_argument('--num_save_steps', type=int, default=200)
+    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--eval_batch_size', type=int, default=128)
+
     return parser.parse_args()
 
 

@@ -6,7 +6,7 @@ from encoding.common import oversample_dataset
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import BertForSequenceClassification
+from transformers import AutoModelForSequenceClassification
 
 from sklearn.metrics import (
     accuracy_score, 
@@ -77,16 +77,25 @@ def run(args):
     print("Loaded dataset")
 
     graph_data_params = dict(
-        distance=distance,
+        distance=args.distance,
         reload=args.reload,
-        test_ratio=args.tr
+        test_ratio=args.tr,
+        use_attributes=args.use_attributes,
+        use_edge_types=args.use_edge_types,
+        add_neg_samples=args.add_neg_samples,
+        
+        use_embeddings=args.use_embeddings,
+        embed_model_name=args.embed_model_name,
+        ckpt=args.ckpt,
     )
+
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    assert hasattr(graph_dataset, f'num_nodes_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+    assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
 
     model_name = args.model
     special_tokens = get_special_tokens()
@@ -107,7 +116,7 @@ def run(args):
     print("Training model")
     num_labels = get_num_labels(bert_dataset)
     print(f'Number of labels: {num_labels}')
-    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
     model.resize_token_embeddings(len(tokenizer))
 
     output_dir = os.path.join(
