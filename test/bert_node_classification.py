@@ -59,7 +59,6 @@ def run(args):
     set_seed(args.seed)
 
     config_params = dict(
-        timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
@@ -77,7 +76,6 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
-        add_neg_samples=args.add_neg_samples,
         
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
@@ -89,8 +87,8 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
-    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
+    assert hasattr(graph_dataset, f'num_nodes_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
     model_name = args.model_name
     special_tokens = get_special_tokens()

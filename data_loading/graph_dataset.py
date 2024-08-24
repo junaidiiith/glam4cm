@@ -213,17 +213,15 @@ class GraphDataset(torch.utils.data.Dataset):
                 setattr(self, f"graph_label_map_{label}_inv", {v: k for k, v in self.graph_label_map.items()})
 
 
-
     def add_graph_text(self):
-        self.graph_texts = list()
         label = self.metadata.graph_label
         for torch_graph in self.graphs:
             if label and hasattr(torch_graph.graph, label):
-                self.graph_texts.append(getattr(torch_graph.graph, label))
+                setattr(torch_graph, 'text', getattr(torch_graph.graph, label))
             else:
                 node_label = self.metadata.node_label
                 node_names = [node_data.get(node_label, "") for _, node_data in torch_graph.graph.nodes(data=True)]
-                self.graph_texts.append(doc_tokenizer(" ".join(node_names)))
+                setattr(torch_graph, 'text', doc_tokenizer(" ".join(node_names)))
 
 
     def get_torch_geometric_data(self):
@@ -240,50 +238,52 @@ class GraphDataset(torch.utils.data.Dataset):
         }
 
 
-    def get_kfold_gnn_graph_classification_data(self, k=10):
-        for train_idx, test_idx in self.k_fold_split(k):
+    def get_kfold_gnn_graph_classification_data(self):
+        for train_idx, test_idx in self.k_fold_split():
             train_data = [self.graphs[i].data for i in train_idx]
             test_data = [self.graphs[i].data for i in test_idx]
             yield {
                 'train': train_data,
-                'test': test_data
+                'test': test_data,
             }
 
 
-    def __get_lm_data(self, indices, tokenizer=None):
+    def __get_lm_data(self, indices, tokenizer=None, remove_duplicates=False):
         graph_label_name = self.metadata.graph_cls
         assert graph_label_name is not None, "No Graph Label found in data. Please define graph label in metadata"
-        X = [self.graph_texts[i] for i in indices]
+        X = [getattr(self.graphs[i], 'text') for i in indices]
         y = [getattr(self.graphs[i].data, f'graph_{graph_label_name}')[0].item() for i in indices]
-        
 
         if tokenizer is None:
-            assert self.tokenizer is not None, "Tokenizer is not defined. Please define an tokenizer to tokenize data"
+            assert self.tokenizer is not None, "Tokenizer is not defined. Please define a tokenizer to tokenize data"
             tokenizer = self.tokenizer
 
-        dataset = EncodingDataset(tokenizer, X, y)
+        dataset = EncodingDataset(tokenizer, X, y, remove_duplicates=remove_duplicates)
         return dataset
 
 
     def get_lm_graph_classification_data(self, tokenizer=None):
+        assert self.metadata.graph_cls, "No Graph Label found in data. Please define graph label in metadata"
         train_idx, test_idx = self.get_train_test_split()
         train_dataset = self.__get_lm_data(train_idx, tokenizer)
         test_dataset = self.__get_lm_data(test_idx, tokenizer)
 
         return {
             'train': train_dataset,
-            'test': test_dataset
+            'test': test_dataset,
+            'num_classes': getattr(self, f'num_graph_{self.metadata.graph_cls}')
         }
         
     
-    def get_kfold_lm_graph_classification_data(self, tokenizer=None):
-        k = int(1 / self.test_ratio)
-        for train_idx, test_idx in self.k_fold_split(k):
-            train_dataset = self.__get_lm_data(train_idx, tokenizer)
-            test_dataset = self.__get_lm_data(test_idx, tokenizer)
+    def get_kfold_lm_graph_classification_data(self, tokenizer=None, remove_duplicates=True):
+        assert self.metadata.graph_cls, "No Graph Label found in data. Please define graph label in metadata"
+        for train_idx, test_idx in self.k_fold_split():
+            train_dataset = self.__get_lm_data(train_idx, tokenizer, remove_duplicates)
+            test_dataset = self.__get_lm_data(test_idx, tokenizer, remove_duplicates)
             yield {
                 'train': train_dataset,
-                'test': test_dataset
+                'test': test_dataset,
+                'num_classes': getattr(self, f'num_graph_{self.metadata.graph_cls}')
             }
 
 

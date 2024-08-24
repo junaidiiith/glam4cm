@@ -66,10 +66,13 @@ class Trainer:
         return h
     
 
-    def get_prediction_score(self, edge_index, h):
+    def get_prediction_score(self, h, edge_index=None):
         h = h.to(device)
-        edge_index = edge_index.to(device)
-        prediction_score = self.predictor(h, edge_index)
+        if edge_index is not None:
+            edge_index = edge_index.to(device)
+            prediction_score = self.predictor(h, edge_index)
+        else:
+            prediction_score = self.predictor(h)
         return prediction_score
     
 

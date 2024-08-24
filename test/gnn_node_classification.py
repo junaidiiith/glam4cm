@@ -20,7 +20,6 @@ def run(args):
     set_seed(args.seed)
     
     config_params = dict(
-        timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
@@ -94,8 +93,6 @@ def run(args):
         cls_label=args.cls_label,
         lr=args.lr,
         num_epochs=args.num_epochs,
-        batch_size=args.batch_size,
-        randomize_ne=randomize
     )
 
     print("Training GNN Node Classification model")

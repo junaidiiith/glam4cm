@@ -20,7 +20,6 @@ def run(args):
     set_seed(args.seed)
     
     config_params = dict(
-        timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,

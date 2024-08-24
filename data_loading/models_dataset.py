@@ -5,13 +5,16 @@ from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import json
 import os
+from data_loading.encoding import EncodingDataset
 from lang2graph.archimate import ArchiMateNxG
 from settings import (
     datasets_dir, 
     seed,
 )
 import numpy as np
-from lang2graph.uml import EcoreNxG
+from lang2graph.ecore import EcoreNxG
+
+from settings import logger
 
 
 class ModelDataset:
@@ -22,7 +25,8 @@ class ModelDataset:
         save_dir='datasets/pickles',
         min_edges: int = -1,
         min_enr: float = -1,
-        timeout=-1
+        timeout=-1,
+        preprocess_graph_text: callable = None
     ):
         self.name = dataset_name
         self.dataset_dir = dataset_dir
@@ -32,6 +36,7 @@ class ModelDataset:
         self.min_edges = min_edges
         self.min_enr = min_enr
         self.timeout = timeout
+        self.preprocess_graph_text = preprocess_graph_text
 
 
     def get_train_test_split(self, train_size=0.8):
@@ -61,7 +66,33 @@ class ModelDataset:
             X.append(g.text)
             y.append(g.label)
         
+        if self.preprocess_graph_text:
+            X = [self.preprocess_graph_text(x) for x in X]
         return X, y
+    
+    def __get_lm_data(self, train_idx, test_idx, tokenizer, remove_duplicates=False):
+        X, y = self.data
+        y_enc = {label: i for i, label in enumerate(set(y))}
+        y = [y_enc[label] for label in y]
+        X_train, y_train = [X[i] for i in train_idx], [y[i] for i in train_idx]
+        X_test, y_test = [X[i] for i in test_idx], [y[i] for i in test_idx]
+        train_dataset = EncodingDataset(tokenizer, X_train, y_train, remove_duplicates=remove_duplicates)
+        test_dataset = EncodingDataset(tokenizer, X_test, y_test, remove_duplicates=remove_duplicates)
+        num_classes = len(set(y))
+        return {
+            'train': train_dataset,
+            'test': test_dataset,
+            'num_classes': num_classes
+        }
+
+    def get_graph_classification_data(self, tokenizer, remove_duplicates=False):
+        train_idx, test_idx = self.get_train_test_split()
+        return self.__get_lm_data(train_idx, test_idx, tokenizer, remove_duplicates=remove_duplicates)
+    
+    def get_graph_classification_data_kfold(self, tokenizer, k=10, remove_duplicates=False):
+        for train_idx, test_idx in self.k_fold_split(k=k):
+            yield self.__get_lm_data(train_idx, test_idx, tokenizer, remove_duplicates=remove_duplicates)
+
 
     def __repr__(self):
         return f'Dataset({self.name}, graphs={len(self.graphs)})'
@@ -117,7 +148,7 @@ class EcoreModelDataset(ModelDataset):
             remove_duplicates=False,
             min_edges: int = -1,
             min_enr: float = -1,
-            timeout=-1
+            preprocess_graph_text: callable = None
         ):
         super().__init__(
             dataset_name, 
@@ -125,7 +156,7 @@ class EcoreModelDataset(ModelDataset):
             save_dir=save_dir, 
             min_edges=min_edges, 
             min_enr=min_enr,
-            timeout=timeout
+            preprocess_graph_text=preprocess_graph_text
         )
         os.makedirs(save_dir, exist_ok=True)
 
@@ -139,31 +170,29 @@ class EcoreModelDataset(ModelDataset):
                     for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
                         if remove_duplicates and g['is_duplicated']:
                             continue
-                        try:
-                            nxg = EcoreNxG(
-                                g, 
-                                timeout=timeout
-                            )
-                            self.graphs.append(nxg)
-                        except Exception as e:
-                            continue
-            self.filter_graphs()
+                        nxg = EcoreNxG(g)
+                        self.graphs.append(nxg)
+                        # except Exception as e:
+                        #     logger.debug(f'Error loading {file}: {e}')
+
+            print(f'Loaded Total {self.name} with {len(self.graphs)} graphs')
+            print("Filtering...")
             self.save()
+            self.filter_graphs()
         else:
             self.load()
         
-        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+        logger.info(f'Loaded {self.name} with {len(self.graphs)} graphs')
         
         if remove_duplicates:
-            self.remove_duplicates()
+            self.dedup()
 
-        print(f'Graphs: {len(self.graphs)}')
+        logger.info(f'Graphs: {len(self.graphs)}')
+        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
 
-
-    def remove_duplicates(self):
-        self.graphs = self.dedup()
 
     def dedup(self) -> List[EcoreNxG]:
+        logger.info(f'Deduplicating {self.name}')
         return [g for g in self.graphs if not g.is_duplicated]
 
 
@@ -179,6 +208,7 @@ class ArchiMateModelDataset(ModelDataset):
             min_edges: int = -1,
             min_enr: float = -1,
             timeout=-1,
+            preprocess_graph_text: callable = None
         ):
         super().__init__(
             dataset_name, 
@@ -186,7 +216,8 @@ class ArchiMateModelDataset(ModelDataset):
             save_dir=save_dir, 
             min_edges=min_edges, 
             min_enr=min_enr,
-            timeout=timeout
+            timeout=timeout,
+            preprocess_graph_text=preprocess_graph_text
         )
         os.makedirs(save_dir, exist_ok=True)
         
@@ -215,14 +246,11 @@ class ArchiMateModelDataset(ModelDataset):
             self.load()
         
         if remove_duplicates:
-            self.remove_duplicates()
+            self.dedup()
         
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
         print(f'Graphs: {len(self.graphs)}')
     
-
-    def remove_duplicates(self):
-        self.graphs = self.dedup()
 
     def dedup(self) -> List[ArchiMateNxG]:
         return list({str(g.edges(data=True)): g for g in self.graphs}.values())

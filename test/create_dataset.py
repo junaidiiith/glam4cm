@@ -25,7 +25,6 @@ def run(args):
 
     
     config_params = dict(
-        timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
     )

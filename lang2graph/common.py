@@ -37,6 +37,11 @@ class LangGraph(nx.DiGraph):
         self.edge_label_to_id = {label: i for i, label in enumerate(self.edges())}
         self.id_to_edge_label = {i: label for i, label in enumerate(self.edges())}
 
+        self.numbered_graph = self.get_numbered_graph()
+        self.edge_to_idx = {edge: idx for idx, edge in enumerate(self.numbered_graph.edges())}
+        self.idx_to_edge = {idx: edge for idx, edge in enumerate(self.numbered_graph.edges())}
+
+
 
     def get_numbered_graph(self) -> nx.DiGraph:
         nodes = [(self.node_label_to_id[i], data) for i, data in list(self.nodes(data=True))]

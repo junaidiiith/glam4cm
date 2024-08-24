@@ -20,9 +20,8 @@ def get_common_args_parser():
     )
     parser.add_argument('--remove_duplicates', action='store_true')
     parser.add_argument('--reload', action='store_true')
-    parser.add_argument('--timeout', type=int, default=120)
     parser.add_argument('--min_enr', type=float, default=-1.0)
-    parser.add_argument('--min_edges', type=int, default=10)
+    parser.add_argument('--min_edges', type=int, default=-1)
     
     
     parser.add_argument('--use_attributes', action='store_true')
@@ -84,6 +83,6 @@ def get_bert_args_parser():
     parser.add_argument('--num_log_steps', type=int, default=200)
     parser.add_argument('--num_eval_steps', type=int, default=200)
     parser.add_argument('--num_save_steps', type=int, default=200)
-    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
     return parser

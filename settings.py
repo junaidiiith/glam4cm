@@ -1,6 +1,12 @@
 import os
 import torch
 
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
 
 BERT_MODEL = 'bert-base-uncased'
 FAST_TEXT_MODEL = 'uml-fasttext.bin'

@@ -23,17 +23,21 @@ from test.bert_node_classification import get_parser as bert_nc_parse_args
 tasks_handler_map = {
     1: (create_dataset.run, create_dataset_parse_args),
     2: (bert_graph_classification.run, bert_parse_args),
-    3: (bert_edge_classification.run, bert_ec_parse_args),
-    4: (bert_link_prediction.run, bert_lp_parse_args),
-    5: (bert_node_classification.run, bert_nc_parse_args),
-    6: (gnn_graph_cls.run, gnn_parse_args),
+    3: (gnn_graph_cls.run, gnn_parse_args),
+
+    4: (bert_node_classification.run, bert_nc_parse_args),
+    5: (gnn_node_classification.run, gnn_nc_parse_args),
+    
+    6: (bert_edge_classification.run, bert_ec_parse_args),
     7: (gnn_edge_classification.run, gnn_ec_parse_args),
-    8: (gnn_link_prediction.run, gnn_lp_parse_args),
-    9: (gnn_node_classification.run, gnn_nc_parse_args)
+
+    8: (bert_link_prediction.run, bert_lp_parse_args),
+    9: (gnn_link_prediction.run, gnn_lp_parse_args),
+
 }
 
 
 if __name__ == '__main__':
-    task_id = 2
+    task_id = 3
     hander, task_args = tasks_handler_map[task_id]
     hander(task_args())

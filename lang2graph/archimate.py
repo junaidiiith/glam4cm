@@ -12,17 +12,17 @@ class ArchiMateNxG(LangGraph):
         self.timeout = timeout
         self.graph_id = json_obj['identifier'].split('/')[-1]
 
-        self.graph = self.__create_nx_from_file()
 
+        self.graph = self.__create_graph()
         self.set_numbered_labels()
-        self.numbered_graph = self.get_numbered_graph()
-        
-        self.edge_to_idx = {edge: idx for idx, edge in enumerate(self.numbered_graph.edges())}
-        self.idx_to_edge = {idx: edge for idx, edge in enumerate(self.numbered_graph.edges())}
+
+        self.text = " ".join([
+            self.nodes[node]['name'] if 'name' in self.nodes[node] else ''
+            for node in self.nodes
+        ])
 
 
-
-    def __create_nx_from_file(self):
+    def __create_graph(self):
         for node in self.json_obj['elements']:
             self.add_node(node['id'], **node)
         for edge in self.json_obj['relationships']:

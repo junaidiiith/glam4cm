@@ -14,8 +14,8 @@ from transformers import (
 from data_loading.graph_dataset import GraphNodeDataset
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
-from tokenization.utils import get_special_tokens
-from utils import merge_argument_parsers
+from tokenization.utils import get_special_tokens, get_tokenizer
+from utils import merge_argument_parsers, set_seed
 
 
 
@@ -37,101 +37,106 @@ def compute_metrics(pred):
     }
 
 
-
 def get_parser():
     common_parser = get_common_args_parser()
     bert_parser = get_bert_args_parser()
     parser = merge_argument_parsers(common_parser, bert_parser)
 
     parser.add_argument('--cls_label', type=str, default='label')
-
-
+    parser.add_argument('--remove_duplicate_graphs', action='store_true')
+    parser.add_argument('--use_special_tokens', action='store_true')
     return parser.parse_args()
 
 
 def run(args):
-
+    set_seed(args.seed)
+    
     config_params = dict(
-        timeout = args.timeout,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
-        reload=args.reload
+        reload = args.reload,
     )
     dataset_name = args.dataset
+
     dataset = get_models_dataset(dataset_name, **config_params)
-
-    model_name = args.model_name
-
-    print("Loaded dataset")
 
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
         test_ratio=args.test_ratio,
-        use_attributes=args.use_attributes,
-        use_edge_types=args.use_edge_types,
-
+        use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         ckpt=args.ckpt,
-        tokenizer_special_tokens=get_special_tokens(),
+        no_shuffle=args.no_shuffle,
+        randomize_ne=args.randomize,
+        random_ne_dim=args.random_ne_dim,
     )
-
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-
-
-    classification_dataset = graph_dataset.get_lm_graph_classification_data()
-
-    cls_label = f"num_graph_{args.cls_label}"
-    assert hasattr(graph_dataset, cls_label), f"Dataset does not have attribute {cls_label}"
-    num_classes = getattr(graph_dataset, cls_label)
-
-
-    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_classes)
-    model.resize_token_embeddings(len(graph_dataset.tokenizer))
+    model_name = args.model_name
+    special_tokens = get_special_tokens() if args.use_special_tokens else None
     
-    print("Training model")
-    output_dir = os.path.join(
-        'results',
-        dataset_name,
-        'node_cls',
-    )
+    tokenizer = get_tokenizer(model_name, special_tokens, args.max_length)
+    for classification_dataset in graph_dataset.get_kfold_lm_graph_classification_data(
+        tokenizer,
+        remove_duplicates=args.remove_duplicate_graphs
+    ):
+        train_dataset = classification_dataset['train']
+        test_dataset = classification_dataset['test']
+        num_classes = classification_dataset['num_classes']
 
-    logs_dir = os.path.join(
-        'logs',
-        dataset_name,
-        'node_cls',
-    )
+        print(len(train_dataset), len(test_dataset), num_classes)
 
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        num_train_epochs=args.num_epochs,
-        per_device_train_batch_size=args.train_batch_size,
-        per_device_eval_batch_size=args.eval_batch_size,
-        warmup_steps=args.warmup_steps,
-        weight_decay=0.01,
-        logging_dir=logs_dir,
-        logging_steps=args.num_log_steps,
-        eval_strategy='steps',
-        eval_steps=args.num_eval_steps,
-        save_steps=args.num_save_steps,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        fp16=True,
-    )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            args.ckpt if args.ckpt else model_name, 
+            num_labels=num_classes
+        )
+        model.resize_token_embeddings(len(tokenizer))
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=classification_dataset['train'],
-        eval_dataset=classification_dataset['test'],
-        compute_metrics=compute_metrics
-    )
+        print("Training model")
+        output_dir = os.path.join(
+            'results',
+            dataset_name,
+            f'graph_cls_{args.min_edges}',
+        )
 
-    trainer.train()
-    results = trainer.evaluate()
-    print(results)
+        logs_dir = os.path.join(
+            'logs',
+            dataset_name,
+            f'graph_cls_{args.min_edges}',
+        )
+
+        # Training arguments
+        training_args = TrainingArguments(
+            output_dir=output_dir,
+            num_train_epochs=10,
+            eval_strategy="steps",
+            per_device_train_batch_size=args.train_batch_size,
+            per_device_eval_batch_size=args.eval_batch_size,
+            warmup_steps=500,
+            weight_decay=0.01,
+            learning_rate=5e-5,
+            logging_dir=logs_dir,
+            logging_steps=50,
+            eval_steps=50,
+            fp16=True
+        )
+
+        # Trainer
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            compute_metrics=compute_metrics            
+        )
+
+        # Train the model
+        trainer.train()
+        results = trainer.evaluate()
+        print(results)
+        break

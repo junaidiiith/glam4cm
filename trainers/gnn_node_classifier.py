@@ -14,7 +14,7 @@ from models.gnn_layers import (
     GNNConv, 
     NodeClassifier
 )
-from utils import get_device, randomize_features
+from utils import get_device
 from trainers.gnn_trainer import Trainer
 
 device = get_device()

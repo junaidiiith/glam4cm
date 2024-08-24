@@ -9,7 +9,7 @@ from data_loading.metadata import (
 )
 from embeddings.common import Embedder
 from lang2graph.archimate import ArchiMateNxG
-from lang2graph.uml import EcoreNxG
+from lang2graph.ecore import EcoreNxG
 from lang2graph.common import (
     create_graph_from_edge_index, 
     get_node_texts,
@@ -253,11 +253,13 @@ class TorchEdgeGraph(TorchGraph):
             if embedder is not None and self.data.x is None:
                 print("Embeddings not found. Generating...")
                 node_embeddings = embedder.embed(list(self.node_texts.values()))
-                edge_embeddings = embedder.embed(list(self.edge_texts.values()))
                 self.data.x = node_embeddings
-                self.data.edge_attr = edge_embeddings
-                self.save()
 
+            if embedder is not None and self.data.edge_attr is None:
+                edge_embeddings = embedder.embed(list(self.edge_texts.values()))
+                self.data.edge_attr = edge_embeddings
+            
+            self.save()
             return True
 
         return False
