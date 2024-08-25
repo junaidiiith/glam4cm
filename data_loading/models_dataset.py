@@ -236,7 +236,10 @@ class ArchiMateModelDataset(ModelDataset):
                                 model, 
                                 timeout=timeout
                             )
+                            if nxg.number_of_edges() < 1:
+                                continue
                             self.graphs.append(nxg)
+                            
                         except Exception as e:
                             raise e
                 

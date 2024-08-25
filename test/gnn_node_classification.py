@@ -47,7 +47,6 @@ def run(args):
     num_classes = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
 
-    randomize = args.randomize or graph_dataset[0].data.x is None
     input_dim = args.input_dim
 
     model_name = args.gnn_conv_model
@@ -85,14 +84,15 @@ def run(args):
         bias=True,
     )
 
-
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
         graph_dataset.get_torch_geometric_data(),
         cls_label=args.cls_label,
+        exclude_labels=getattr(graph_dataset, f"node_exclude_{args.cls_label}"),
         lr=args.lr,
         num_epochs=args.num_epochs,
+        use_edge_attrs=args.use_edge_attrs
     )
 
     print("Training GNN Node Classification model")

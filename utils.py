@@ -38,13 +38,17 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-def randomize_features(dataset: List[Data], num_feats):
+def randomize_features(dataset: List[Data], num_feats, mode):
     for data in dataset:
         num_nodes = data.num_nodes
         num_edges = data.overall_edge_index.shape[1] if hasattr(data, 'overall_edge_index') else data.edge_index.shape[1]
-        data.x = torch.randn((num_nodes, num_feats))
-        data.edge_attr = torch.randn((num_edges, num_feats))
-
+        if mode == 'node':
+            data.x = torch.randn((num_nodes, num_feats))
+        elif mode == 'edge':
+            data.edge_attr = torch.randn((num_edges, num_feats))
+        else:
+            raise ValueError("Invalid mode. Choose 'node' or 'edge'.")
+        
 
 def merge_argument_parsers(p1: ArgumentParser, p2: ArgumentParser):
     merged_parser = ArgumentParser(description="Merged Parser")

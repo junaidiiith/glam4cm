@@ -1,3 +1,4 @@
+from sklearn.preprocessing import LabelEncoder
 from collections import Counter, defaultdict
 import os
 from random import shuffle
@@ -22,6 +23,11 @@ from tokenization.utils import doc_tokenizer
 from utils import randomize_features
 
 
+def exclude_labels_from_data(X, labels, exclude_labels):
+    X = [X[i] for i in range(len(X)) if labels[i] not in exclude_labels]
+    labels = [labels[i] for i in range(len(labels)) if labels[i] not in exclude_labels]
+    return X, labels
+
 
 class GraphDataset(torch.utils.data.Dataset):
     def __init__(
@@ -39,10 +45,11 @@ class GraphDataset(torch.utils.data.Dataset):
         ckpt=None,
 
         no_shuffle=False,
-        randomize_ne=False,
-        random_ne_dim=768,
-
-        tokenizer_special_tokens=None
+        random_embed_dim=768,
+        randomize_ne = False,
+        randomize_ee = False,
+        tokenizer_special_tokens=None,
+        exclude_labels: list = [None]
     ):
         if isinstance(models_dataset, EcoreModelDataset):
             self.metadata = EcoreMetaData()
@@ -69,8 +76,11 @@ class GraphDataset(torch.utils.data.Dataset):
         self.test_ratio = test_ratio
 
         self.no_shuffle = no_shuffle
+        self.random_embed_dim = random_embed_dim
+        self.exclude_labels = exclude_labels
+
         self.randomize_ne = randomize_ne
-        self.random_ne_dim = random_ne_dim
+        self.randomize_ee = randomize_ee
     
 
     def process_graphs(self):
@@ -81,8 +91,11 @@ class GraphDataset(torch.utils.data.Dataset):
         if not self.no_shuffle:
             shuffle(self.graphs)
         
-        if self.randomize_ne or self.graphs[0].data.x is None:
-            randomize_features([g.data for g in self.graphs], self.random_ne_dim)
+        if self.graphs[0].data.x is None or self.randomize_ne:
+            randomize_features([g.data for g in self.graphs], self.random_embed_dim, 'node')
+        
+        if self.graphs[0].data.edge_attr is None or self.randomize_ee:
+            randomize_features([g.data for g in self.graphs], self.random_embed_dim, 'edge')
 
 
     def __len__(self):
@@ -137,27 +150,30 @@ class GraphDataset(torch.utils.data.Dataset):
             label_values = list()
             for torch_graph in self.graphs:
                 values = list()
-                for _, node_data in torch_graph.graph.nodes(data=True):
-                    values.append(get_node_data(node_data, label, model_type))
+                for _, node in torch_graph.graph.nodes(data=True):
+                    node_data = get_node_data(node, label, model_type)
+                    values.append(node_data)
+                
                 label_values.append(values)
-        
-            node_label_map = {l: i for i, l in enumerate(list(set(node_label for node_labels in label_values for node_label in node_labels)))}
-            label_values = [
-                [
-                    node_label_map[node_label] 
-                    for node_label in node_labels
-                ]
-                for node_labels in label_values
-            ]
+            
+            node_label_map = LabelEncoder()
+            node_label_map.fit_transform([j for i in label_values for j in i])
+            label_values = [node_label_map.transform(i) for i in label_values]
+            print(node_label_map.classes_)
             
             for torch_graph, node_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"node_{label}", torch.tensor(node_classes))
             
-            setattr(self, f"num_nodes_{label}", len(node_label_map))
-
+            setattr(self, f"num_nodes_{label}", len(node_label_map.classes_))
             setattr(self, f"node_label_map_{label}", node_label_map)
-            setattr(self, f"node_label_map_{label}_inv", {v: k for k, v in node_label_map.items()})
-
+            
+            exclude_labels = [
+                node_label_map.transform([e])[0] 
+                for e in self.exclude_labels
+                if e in node_label_map.classes_
+            ]
+            setattr(self, f"node_exclude_{label}", exclude_labels)
+    
 
     def add_edge_labels(self):
         model_type = self.metadata.type
@@ -172,23 +188,25 @@ class GraphDataset(torch.utils.data.Dataset):
                 for _, _, edge_data in torch_graph.graph.edges(data=True):
                     values.append(get_edge_data(edge_data, label, model_type))
                 label_values.append(values)
-        
-            edge_label_map = {l: i for i, l in enumerate(list(set(edge_label for edge_labels in label_values for edge_label in edge_labels)))}
-            label_values = [
-                [
-                    edge_label_map[edge_label] 
-                    for edge_label in edge_labels
-                ]
-                for edge_labels in label_values
-            ]
-            
+
+            edge_label_map = LabelEncoder()
+            edge_label_map.fit_transform([j for i in label_values for j in i])
+            label_values = [edge_label_map.transform(i) for i in label_values]
+            print(edge_label_map.classes_)
+
             for torch_graph, edge_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"edge_{label}", torch.tensor(edge_classes))
             
-            setattr(self, f"num_edges_{label}", len(edge_label_map))
-
+            setattr(self, f"num_edges_{label}", len(edge_label_map.classes_))
             setattr(self, f"edge_label_map_{label}", edge_label_map)
-            setattr(self, f"edge_label_map_{label}_inv", {v: k for k, v in edge_label_map.items()})
+
+            exclude_labels = [
+                edge_label_map.transform([e])[0] 
+                for e in self.exclude_labels
+                if e in edge_label_map.classes_
+            ]
+            setattr(self, f"edge_exclude_{label}", edge_label_map.transform(exclude_labels))
+
 
 
     def add_graph_labels(self):
@@ -198,19 +216,15 @@ class GraphDataset(torch.utils.data.Dataset):
                 graph_labels = list()
                 for torch_graph in self.graphs:
                     graph_labels.append(getattr(torch_graph.graph, label))
-            
-                self.graph_label_map = {l: i for i, l in enumerate(list(set(graph_label for graph_label in graph_labels)))}
-                graph_labels = [
-                    self.graph_label_map[graph_label]
-                    for graph_label in graph_labels
-                ]
+
+                graph_label_map = LabelEncoder()
+                graph_labels = graph_label_map.fit_transform(graph_labels)
 
                 for torch_graph, graph_label in zip(self.graphs, graph_labels):
                     setattr(torch_graph.data, f"graph_{label}", torch.tensor([graph_label]))
-                setattr(self, f"num_graph_{label}", len(self.graph_label_map))
-
-                setattr(self, f"graph_label_map_{label}", self.graph_label_map)
-                setattr(self, f"graph_label_map_{label}_inv", {v: k for k, v in self.graph_label_map.items()})
+                setattr(self, f"num_graph_{label}", len(graph_label_map.classes_))
+                setattr(self, f"graph_label_map_{label}", graph_label_map)
+                
 
 
     def add_graph_text(self):
@@ -253,7 +267,6 @@ class GraphDataset(torch.utils.data.Dataset):
         assert graph_label_name is not None, "No Graph Label found in data. Please define graph label in metadata"
         X = [getattr(self.graphs[i], 'text') for i in indices]
         y = [getattr(self.graphs[i].data, f'graph_{graph_label_name}')[0].item() for i in indices]
-
         if tokenizer is None:
             assert self.tokenizer is not None, "Tokenizer is not defined. Please define a tokenizer to tokenize data"
             tokenizer = self.tokenizer
@@ -302,9 +315,11 @@ class GraphEdgeDataset(GraphDataset):
             use_edge_types=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
+            regen_embeddings=False,
             no_shuffle=False,
-            randomize_ne=False,
-            random_ne_dim=768,
+            randomize_ne = False,
+            randomize_ee = False,
+            random_embed_dim=768,
             tokenizer_special_tokens=None
         ):
         super().__init__(
@@ -319,7 +334,8 @@ class GraphEdgeDataset(GraphDataset):
             use_attributes=use_attributes,
             no_shuffle=no_shuffle,
             randomize_ne=randomize_ne,
-            random_ne_dim=random_ne_dim,
+            randomize_ee=randomize_ee,
+            random_embed_dim=random_embed_dim,
             tokenizer_special_tokens=tokenizer_special_tokens
         )
 
@@ -337,7 +353,8 @@ class GraphEdgeDataset(GraphDataset):
                 use_neg_samples=add_negative_train_samples,
                 neg_samples_ratio=neg_sampling_ratio,
                 use_edge_types=use_edge_types,
-                use_attributes=use_attributes
+                use_attributes=use_attributes,
+                regen_embeddings=regen_embeddings
             ) 
             for g in tqdm(models_dataset, desc='Creating graphs')
         ]
@@ -406,7 +423,6 @@ class GraphEdgeDataset(GraphDataset):
 
         print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
-            
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -453,10 +469,13 @@ class GraphNodeDataset(GraphDataset):
             use_embeddings=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
+            regen_embeddings=False,
 
             no_shuffle=False,
-            randomize_ne=False,
-            random_ne_dim=768,
+            randomize_ne = False,
+            randomize_ee = False,
+
+            random_embed_dim=768,
 
             tokenizer_special_tokens=None
         ):
@@ -471,7 +490,8 @@ class GraphNodeDataset(GraphDataset):
             ckpt=ckpt,
             no_shuffle=no_shuffle,
             randomize_ne=randomize_ne,
-            random_ne_dim=random_ne_dim,
+            randomize_ee=randomize_ee,
+            random_embed_dim=random_embed_dim,
             tokenizer_special_tokens=tokenizer_special_tokens
         )
 
@@ -484,7 +504,8 @@ class GraphNodeDataset(GraphDataset):
                 test_ratio=test_ratio,
                 reload=reload,
                 use_attributes=use_attributes,
-                use_edge_types=use_edge_types
+                use_edge_types=use_edge_types,
+                regen_embeddings=regen_embeddings
             ) 
             for g in tqdm(models_dataset, desc='Creating graphs')
         ]
@@ -512,7 +533,7 @@ class GraphNodeDataset(GraphDataset):
 
             print(f"Train Node classes: {train_count}")
             print(f"Test Node classes: {test_count}")
-
+            
 
     def get_node_classification_lm_data(
             self, 
@@ -528,14 +549,27 @@ class GraphNodeDataset(GraphDataset):
             
             train_node_classes = getattr(graph.data, f'node_{label}')[graph.data.train_node_idx]
             test_node_classes = getattr(graph.data, f'node_{label}')[graph.data.test_node_idx]
+
+            exclude_labels = getattr(self, f'node_exclude_{label}')
+            train_node_strs, train_node_classes = exclude_labels_from_data(train_node_strs, train_node_classes, exclude_labels)
+            test_node_strs, test_node_classes = exclude_labels_from_data(test_node_strs, test_node_classes, exclude_labels)
             
             data['train_nodes'] += train_node_strs
-            data['train_node_classes'] += train_node_classes.tolist()
+            data['train_node_classes'] += train_node_classes
             data['test_nodes'] += test_node_strs
-            data['test_node_classes'] += test_node_classes.tolist()
-                    
+            data['test_node_classes'] += test_node_classes
+            
 
         print("Tokenizing data")
+        print(data['train_nodes'][:10])
+        print(data['train_node_classes'][:10])
+        print(data['test_nodes'][:10])
+        print(data['test_node_classes'][:10])
+        print(len(data['train_nodes']))
+        print(len(data['train_node_classes']))
+        print(len(data['test_nodes']))
+        print(len(data['test_node_classes']))
+        # exit(0)
             
         dataset = {
             'train': EncodingDataset(

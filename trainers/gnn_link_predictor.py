@@ -37,6 +37,7 @@ class GNNLinkPredictionTrainer(Trainer):
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
+            use_edge_attrs=False
         ) -> None:
 
         super().__init__(
@@ -44,7 +45,8 @@ class GNNLinkPredictionTrainer(Trainer):
             predictor=predictor,
             lr=lr,
             cls_label=cls_label,
-            num_epochs=num_epochs
+            num_epochs=num_epochs,
+            use_edge_attrs=use_edge_attrs
         )        
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         self.results = list()
@@ -65,7 +67,11 @@ class GNNLinkPredictionTrainer(Trainer):
             self.model.zero_grad()
             self.predictor.zero_grad()
             
-            h = self.get_logits(data.x, data.train_pos_edge_label_index)
+            h = self.get_logits(
+                data.x, 
+                data.train_pos_edge_label_index,
+                data.edge_attr[data.train_edge_idx] if self.use_edge_attrs else None
+            )
 
             pos_score = self.get_prediction_score(data.train_pos_edge_label_index, h)
             neg_score = self.get_prediction_score(data.train_neg_edge_label_index, h)
@@ -94,7 +100,11 @@ class GNNLinkPredictionTrainer(Trainer):
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
             for data in self.dataloader:
-                h = self.get_logits(data.x, data.test_pos_edge_label_index)
+                h = self.get_logits(
+                    data.x, 
+                    data.test_pos_edge_label_index,
+                    data.edge_attr[data.test_edge_idx] if self.use_edge_attrs else None
+                )
                 pos_score = self.get_prediction_score(data.test_pos_edge_label_index, h)
                 neg_score = self.get_prediction_score(data.test_neg_edge_label_index, h)
                 loss = self.compute_loss(pos_score, neg_score)

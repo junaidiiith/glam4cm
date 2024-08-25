@@ -23,7 +23,6 @@ supported_conv_models = {
     'GATConv': True,
     'SAGEConv': False,
     'GINConv': False,
-    'GatedGraphConv': False,
     'GATv2Conv': True,
 }
 
@@ -61,6 +60,7 @@ class GNNConv(torch.nn.Module):
             l_norm=False, 
             dropout=0.1,
             aggregation='sum',
+            edge_dim=None
         ):
         super(GNNConv, self).__init__()
 
@@ -83,6 +83,8 @@ class GNNConv(torch.nn.Module):
         self.residual = residual
         self.l_norm = l_norm
         self.dropout = dropout
+        self.aggregation = aggregation
+        self.edge_dim = edge_dim
         
 
         gnn_model = getattr(torch_geometric.nn, model_name)
@@ -90,16 +92,39 @@ class GNNConv(torch.nn.Module):
         if num_heads is None:
             input_layer = gnn_model(input_dim, hidden_dim, aggr=aggregation)
         else:
-            input_layer = gnn_model(input_dim, hidden_dim, heads=num_heads, aggr=aggregation)
+            input_layer = gnn_model(
+                input_dim, 
+                hidden_dim, 
+                heads=num_heads, 
+                aggr=aggregation,
+                edge_dim=edge_dim
+            )
         self.conv_layers.append(input_layer)
 
         for _ in range(num_layers - 2):
             if num_heads is None:
-                self.conv_layers.append(gnn_model(hidden_dim, hidden_dim, aggr=aggregation))
+                conv = gnn_model(hidden_dim, hidden_dim, aggr=aggregation)
+                self.conv_layers.append(conv)
             else:
-                self.conv_layers.append(gnn_model(num_heads*hidden_dim, hidden_dim, heads=num_heads, aggr=aggregation))
+                conv = gnn_model(
+                    num_heads*hidden_dim, 
+                    hidden_dim, 
+                    heads=num_heads, 
+                    aggr=aggregation,
+                    edge_dim=edge_dim
+                )
+                self.conv_layers.append(conv)
 
-        self.conv_layers.append(gnn_model(hidden_dim if num_heads is None else num_heads*hidden_dim, out_dim, aggr=aggregation))
+        if num_heads is None:
+            self.conv_layers.append(gnn_model(hidden_dim, out_dim, aggr=aggregation))
+        else:
+            self.conv_layers.append(gnn_model(
+                num_heads*hidden_dim, 
+                out_dim, 
+                heads=num_heads, 
+                aggr=aggregation,
+                edge_dim=edge_dim
+            ))
             
         self.activation = nn.ReLU()
         self.layer_norm = nn.LayerNorm(hidden_dim if num_heads is None else num_heads*hidden_dim) if l_norm else None
@@ -107,22 +132,23 @@ class GNNConv(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
 
 
-    def forward(self, in_feat, edge_index):
+    def forward(self, in_feat, edge_index, edge_attr=None):
         h = in_feat
-        h = self.conv_layers[0](h, edge_index)
+        h = self.conv_layers[0](h, edge_index, edge_attr) if edge_attr is not None else self.conv_layers[0](h, edge_index)
         h = self.activation(h)
         if self.layer_norm is not None:
             h = self.layer_norm(h)
         h = self.dropout(h)
 
         for conv in self.conv_layers[1:-1]:
-            h = conv(h, edge_index) if not self.residual else conv(h, edge_index) + h
+            nh = conv(h, edge_index, edge_attr) if edge_attr is not None else conv(h, edge_index)
+            h = nh if not self.residual else nh + h
             h = self.activation(h)
             if self.layer_norm is not None:
                 h = self.layer_norm(h)
             h = self.dropout(h)
         
-        h = self.conv_layers[-1](h, edge_index)
+        h = self.conv_layers[-1](h, edge_index) if edge_attr is not None else self.conv_layers[-1](h, edge_index)
         return h
   
 
@@ -146,6 +172,7 @@ class EdgeClassifer(nn.Module):
             num_classes,
             num_layers=2, 
             dropout=0.3,
+            edge_dim=None,
             bias=True
         ):
         super().__init__()
@@ -156,6 +183,9 @@ class EdgeClassifer(nn.Module):
         self.num_classes = num_classes
 
         in_feats = input_dim * 2
+        if edge_dim is not None:
+            in_feats += edge_dim
+            
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(in_feats, hidden_dim, bias=bias))
             self.layers.append(nn.ReLU())
@@ -165,8 +195,11 @@ class EdgeClassifer(nn.Module):
         self.layers.append(nn.Linear(hidden_dim, num_classes, bias=bias))
 
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, edge_attr=None):
         h = torch.cat([x[edge_index[0]], x[edge_index[1]]], dim=-1)
+        if edge_attr is not None:
+            h = torch.cat([h, edge_attr], dim=-1)
+            
         for layer in self.layers:
             h = layer(h)
         

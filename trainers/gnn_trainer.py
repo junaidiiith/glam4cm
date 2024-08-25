@@ -31,6 +31,7 @@ class Trainer:
             cls_label,
             lr=1e-3,
             num_epochs=100,
+            use_edge_attrs=False
         ) -> None:
         self.model = model
         self.predictor = predictor
@@ -47,6 +48,8 @@ class Trainer:
         self.results = list()
         self.criterion = nn.CrossEntropyLoss()
 
+        self.use_edge_attrs = use_edge_attrs
+
         print("GNN Trainer initialized.")
 
 
@@ -59,16 +62,25 @@ class Trainer:
         pass
 
 
-    def get_logits(self, x, edge_index):
+    def get_logits(self, x, edge_index, edge_attr=None):
         edge_index = edge_index.to(device)
         x = x.to(device)
-        h = self.model(x, edge_index)
+
+        if edge_attr is not None:
+            edge_attr = edge_attr.to(device)
+            h = self.model(x, edge_index, edge_attr)
+        else:
+            h = self.model(x, edge_index)
         return h
     
 
-    def get_prediction_score(self, h, edge_index=None):
+    def get_prediction_score(self, h, edge_index=None, edge_attr=None):
         h = h.to(device)
-        if edge_index is not None:
+        if edge_attr is not None:
+            edge_attr = edge_attr.to(device)
+            edge_index = edge_index.to(device)
+            prediction_score = self.predictor(h, edge_index, edge_attr)
+        elif edge_index is not None:
             edge_index = edge_index.to(device)
             prediction_score = self.predictor(h, edge_index)
         else:

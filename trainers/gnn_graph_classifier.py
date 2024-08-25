@@ -35,6 +35,7 @@ class GNNGraphClassificationTrainer(Trainer):
             lr=1e-4,
             num_epochs=100,
             batch_size=32,
+            use_edge_attrs=False
         ) -> None:
 
         super().__init__(
@@ -42,7 +43,8 @@ class GNNGraphClassificationTrainer(Trainer):
             predictor=predictor,
             cls_label='type',
             lr=lr,
-            num_epochs=num_epochs
+            num_epochs=num_epochs,
+            use_edge_attrs=use_edge_attrs
         )
 
         self.cls_label = cls_label

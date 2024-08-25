@@ -31,13 +31,15 @@ def get_common_args_parser():
     ### Model Dataset Loading
     parser.add_argument('--distance', type=int, default=1)
     parser.add_argument('--use_embeddings', action='store_true')
+    parser.add_argument('--regen_embeddings', action='store_true')
     parser.add_argument('--embed_model_name', type=str, default='bert-base-uncased')
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--ckpt', type=str, default=None)
     
 
     parser.add_argument('--no_shuffle', action='store_true')
-    parser.add_argument('--randomize', action='store_true')
+    parser.add_argument('--randomize_ne', action='store_true')
+    parser.add_argument('--randomize_ee', action='store_true')
     parser.add_argument('--random_ne_dim', type=int, default=768)
 
 
@@ -56,7 +58,7 @@ def get_gnn_args_parser():
     parser = ArgumentParser()
     parser.add_argument('--num_conv_layers', type=int, default=3)
     parser.add_argument('--num_mlp_layers', type=int, default=3)
-    parser.add_argument('--num_heads', type=int, default=4)
+    parser.add_argument('--num_heads', type=int, default=None)
 
     parser.add_argument('--input_dim', type=int, default=768)
     parser.add_argument('--hidden_dim', type=int, default=128)
@@ -69,6 +71,8 @@ def get_gnn_args_parser():
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--gnn_conv_model', type=str, default='SAGEConv')
+
+    parser.add_argument('--use_edge_attrs', action='store_true')
     
     
     return parser

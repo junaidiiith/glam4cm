@@ -32,9 +32,11 @@ class GNNNodeClassificationTrainer(Trainer):
             predictor: NodeClassifier, 
             dataset: List[Data],
             cls_label,
+            exclude_labels=None,
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
+            use_edge_attrs=False
         ) -> None:
 
         super().__init__(
@@ -42,9 +44,11 @@ class GNNNodeClassificationTrainer(Trainer):
             predictor=predictor,
             cls_label=cls_label,
             lr=lr,
-            num_epochs=num_epochs
+            num_epochs=num_epochs,
+            use_edge_attrs=use_edge_attrs
         )
 
+        self.exclude_labels = torch.tensor(exclude_labels, dtype=torch.long)
         self.results = list()
         self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         print("GNN Trainer initialized.")
@@ -64,9 +68,18 @@ class GNNNodeClassificationTrainer(Trainer):
             self.model.zero_grad()
             self.predictor.zero_grad()
             
-            h = self.get_logits(data.x, data.edge_index)
+            h = self.get_logits(
+                data.x, 
+                data.edge_index,
+                data.edge_attr if self.use_edge_attrs else None
+            )
             scores = self.get_prediction_score(h)[data.train_node_idx]
             labels = getattr(data, f"node_{self.cls_label}")[data.train_node_idx]
+            
+            mask = ~torch.isin(labels, self.exclude_labels)
+            labels = labels[mask]
+            scores = scores[mask]
+
             loss = self.compute_loss(scores, labels)
             
             all_preds.append(scores.detach())
@@ -94,18 +107,23 @@ class GNNNodeClassificationTrainer(Trainer):
             epoch_metrics = defaultdict(float)
             # for _, data in tqdm(enumerate(self.dataloader), desc=f"Evaluating batches", total=len(self.dataloader)):
             for data in self.dataloader:
-                h = self.get_logits(data.x, data.edge_index)
+                h = self.get_logits(
+                    data.x, 
+                    data.edge_index,
+                    data.edge_attr if self.use_edge_attrs else None
+                )
                 scores = self.get_prediction_score(h)[data.test_node_idx]
                 labels = getattr(data, f"node_{self.cls_label}")[data.test_node_idx]
 
+                mask = ~torch.isin(labels, self.exclude_labels)
+                labels = labels[mask]
+                scores = scores[mask]
                 loss = self.compute_loss(scores, labels)
                 epoch_loss += loss.item()
 
 
                 all_preds.append(scores.detach())
                 all_labels.append(labels)
-                
-                
                 
 
             all_preds = torch.cat(all_preds, dim=0)

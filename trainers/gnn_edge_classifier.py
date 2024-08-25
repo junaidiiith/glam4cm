@@ -36,6 +36,7 @@ class GNNEdgeClassificationTrainer(Trainer):
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
+            use_edge_attrs=False
         ) -> None:
 
         super().__init__(
@@ -44,6 +45,7 @@ class GNNEdgeClassificationTrainer(Trainer):
             cls_label=cls_label,
             lr=lr,
             num_epochs=num_epochs,
+            use_edge_attrs=use_edge_attrs
         )
 
         self.dataloader = DataLoader(
@@ -66,11 +68,15 @@ class GNNEdgeClassificationTrainer(Trainer):
             self.optimizer.zero_grad()
             self.model.zero_grad()
             self.predictor.zero_grad()
+            x = data.x
+            edge_index =  data.train_pos_edge_label_index
+            train_idx = data.train_edge_idx
+            edge_attr = data.edge_attr[train_idx] if self.use_edge_attrs else None
             
-            h = self.get_logits(data.x, data.train_pos_edge_label_index)
+            h = self.get_logits(x, edge_index, edge_attr)
 
-            scores = self.get_prediction_score(data.train_pos_edge_label_index, h)
-            labels = getattr(data, f"edge_{self.cls_label}")[data.train_edge_idx]
+            scores = self.get_prediction_score(h, edge_index, edge_attr)
+            labels = getattr(data, f"edge_{self.cls_label}")[train_idx]
             loss = self.compute_loss(scores, labels)
             all_preds.append(scores.detach())
             all_labels.append(labels)
@@ -96,10 +102,15 @@ class GNNEdgeClassificationTrainer(Trainer):
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
             for data in self.dataloader:
-                h = self.get_logits(data.x, data.test_pos_edge_label_index)
+                x = data.x
+                edge_index =  data.test_pos_edge_label_index
+                test_idx = data.test_edge_idx
+                edge_attr = data.edge_attr[test_idx] if self.use_edge_attrs else None
+                
+                h = self.get_logits(x, edge_index, edge_attr)
 
-                scores = self.get_prediction_score(data.test_pos_edge_label_index, h)
-                labels = getattr(data, f"edge_{self.cls_label}")[data.test_edge_idx]
+                scores = self.get_prediction_score(h, edge_index, edge_attr)
+                labels = getattr(data, f"edge_{self.cls_label}")[test_idx]
                 all_preds.append(scores.detach())
                 all_labels.append(labels)
                 loss = self.compute_loss(scores, labels)

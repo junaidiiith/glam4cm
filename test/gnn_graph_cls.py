@@ -36,6 +36,7 @@ def run(args):
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         ckpt=args.ckpt,
+        regen_embeddings=args.regen_embeddings,
         no_shuffle=args.no_shuffle,
         randomize_ne=args.randomize,
         random_ne_dim=args.random_ne_dim,
@@ -90,6 +91,7 @@ def run(args):
             lr=args.lr,
             num_epochs=args.num_epochs,
             batch_size=args.batch_size,
+            use_edge_attrs=args.use_edge_attrs,
         )
 
         trainer.run()

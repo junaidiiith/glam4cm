@@ -95,7 +95,7 @@ def run(args):
     max_length = args.max_length
     tokenizer = get_tokenizer(model_name, special_tokens, max_length)
 
-    print("Getting link prediction data")
+    print("Getting node classification data")
     bert_dataset = graph_dataset.get_node_classification_lm_data(
         label=args.cls_label,
         tokenizer=tokenizer,
@@ -115,12 +115,14 @@ def run(args):
         'results',
         dataset_name,
         'node_cls',
+        args.cls_label
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'node_cls',
+        args.cls_label
     )
 
     training_args = TrainingArguments(

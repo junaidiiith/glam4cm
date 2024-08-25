@@ -87,7 +87,7 @@ def run(args):
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        randomize_ne=randomize
+        use_edge_attrs=args.use_edge_attrs
     )
 
     print("Training GNN Link Prediction model")

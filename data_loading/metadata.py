@@ -59,7 +59,6 @@ class ArchimateMetaData(GraphMetadata):
             "cls": ["type", "layer"],
         }
         self.edge = {
-            "label": "type",
             "cls": "type"
         }
 

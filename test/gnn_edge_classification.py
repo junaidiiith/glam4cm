@@ -44,8 +44,6 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-
-    randomize = args.randomize or graph_dataset[0].data.x is None
     input_dim = args.input_dim
 
 
@@ -65,6 +63,7 @@ def run(args):
     assert hasattr(graph_dataset, num_edges_label), f"Graph dataset does not have attribute {num_edges_label}"
     num_classes = getattr(graph_dataset, num_edges_label)
 
+    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.use_edge_attrs else None
 
     gnn_conv_model = GNNConv(
         model_name=model_name,
@@ -76,18 +75,19 @@ def run(args):
         residual=residual,
         l_norm=l_norm,
         dropout=dropout,
-        aggregation=aggregation
+        aggregation=aggregation,
+        edge_dim=edge_dim
     )
 
+    clf_input_dim = output_dim*num_heads if args.num_heads else output_dim
     mlp_predictor = EdgeClassifer(
-        input_dim=output_dim,
+        input_dim=clf_input_dim,
         hidden_dim=hidden_dim,
         num_layers=num_mlp_layers, 
         num_classes=num_classes,
+        edge_dim=edge_dim,
         bias=args.bias,
     )
-
-
 
     trainer = Trainer(
         gnn_conv_model, 
@@ -97,7 +97,7 @@ def run(args):
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        randomize_ne=randomize
+        use_edge_attrs=args.use_edge_attrs
     )
 
     print("Training GNN Edge Classification model")
