@@ -3,13 +3,6 @@ from torch_geometric.data import Data
 import torch
 from collections import defaultdict
 from typing import List
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    f1_score, 
-    recall_score, 
-    roc_auc_score,
-    accuracy_score
-)
 
 from models.gnn_layers import (
     GNNConv, 
@@ -66,18 +59,20 @@ class GNNLinkPredictionTrainer(Trainer):
             self.optimizer.zero_grad()
             self.model.zero_grad()
             self.predictor.zero_grad()
-            
-            h = self.get_logits(
-                data.x, 
-                data.train_pos_edge_label_index,
-                data.edge_attr[data.train_edge_idx] if self.use_edge_attrs else None
-            )
 
-            pos_score = self.get_prediction_score(data.train_pos_edge_label_index, h)
-            neg_score = self.get_prediction_score(data.train_neg_edge_label_index, h)
-            loss = self.compute_loss(pos_score, neg_score)
-            all_labels.append(torch.cat([torch.ones(pos_score.size(0)), torch.zeros(neg_score.size(0))]))
-            all_preds.append(torch.cat([pos_score, neg_score]))
+            x = data.x
+            pos_edge_index =  data.train_pos_edge_label_index
+            neg_edge_index = data.train_neg_edge_label_index
+            train_mask = data.train_edge_mask
+            edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
+            
+            h = self.get_logits(x, pos_edge_index, edge_attr)
+
+            pos_scores = self.get_prediction_score(h, pos_edge_index, edge_attr)
+            neg_scores = self.get_prediction_score(h, neg_edge_index, edge_attr)
+            loss = self.compute_loss(pos_scores, neg_scores)
+            all_labels.append(torch.cat([torch.ones(pos_scores.size(0)), torch.zeros(neg_scores.size(0))]))
+            all_preds.append(torch.cat([pos_scores.detach().cpu(), neg_scores.detach().cpu()]))
 
             loss.backward()
             self.optimizer.step()
@@ -87,7 +82,7 @@ class GNNLinkPredictionTrainer(Trainer):
         
         all_preds = torch.cat(all_preds, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
-        epoch_metrics = self.compute_metrics(all_preds, all_labels)
+        epoch_metrics = self.compute_metrics(all_preds, all_labels, multi_class=False)
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
 
@@ -100,22 +95,27 @@ class GNNLinkPredictionTrainer(Trainer):
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
             for data in self.dataloader:
-                h = self.get_logits(
-                    data.x, 
-                    data.test_pos_edge_label_index,
-                    data.edge_attr[data.test_edge_idx] if self.use_edge_attrs else None
-                )
-                pos_score = self.get_prediction_score(data.test_pos_edge_label_index, h)
-                neg_score = self.get_prediction_score(data.test_neg_edge_label_index, h)
+                
+                x = data.x
+                pos_edge_index =  data.test_pos_edge_label_index
+                neg_edge_index = data.test_neg_edge_label_index
+                test_mask = data.test_edge_mask
+                edge_attr = data.edge_attr[test_mask] if self.use_edge_attrs else None
+
+
+                h = self.get_logits(x, pos_edge_index, edge_attr)
+                pos_score = self.get_prediction_score(h, pos_edge_index, edge_attr)
+                neg_score = self.get_prediction_score(h, neg_edge_index, edge_attr)
+
                 loss = self.compute_loss(pos_score, neg_score)
                 all_labels.append(torch.cat([torch.ones(pos_score.size(0)), torch.zeros(neg_score.size(0))]))
-                all_preds.append(torch.cat([pos_score, neg_score]))
+                all_preds.append(torch.cat([pos_score.detach().cpu(), neg_score.detach().cpu()]))
 
                 epoch_loss += loss.item()
 
             all_preds = torch.cat(all_preds, dim=0)
             all_labels = torch.cat(all_labels, dim=0)
-            epoch_metrics = self.compute_metrics(all_preds, all_labels)
+            epoch_metrics = self.compute_metrics(all_preds, all_labels, multi_class=False)
 
             epoch_metrics['loss'] = epoch_loss
             epoch_metrics['phase'] = 'test'
@@ -134,28 +134,3 @@ class GNNLinkPredictionTrainer(Trainer):
 
         loss = self.criterion(scores, labels)
         return loss
-
-    
-    def compute_metrics(self, pos_score, neg_score):
-        pos_label = torch.ones(pos_score.size(0), dtype=torch.long).to(device)
-        neg_label = torch.zeros(neg_score.size(0), dtype=torch.long).to(device)
-
-        scores = torch.cat([pos_score, neg_score], dim=0)
-        labels = torch.cat([pos_label, neg_label], dim=0)
-
-        scores = torch.argmax(scores, dim=-1)
-
-        roc_auc = roc_auc_score(labels.cpu().numpy(), scores.cpu().numpy())
-        f1 = f1_score(labels.cpu().numpy(), scores.cpu().numpy())
-        recall = recall_score(labels.cpu().numpy(), scores.cpu().numpy())
-        accuracy = accuracy_score(labels.cpu().numpy(), scores.cpu().numpy())
-        balanced_accuracy = balanced_accuracy_score(labels.cpu().numpy(), scores.cpu().numpy())
-
-
-        return {
-            'roc_auc': roc_auc,
-            'f1-score': f1,
-            'accuracy': accuracy,
-            'recall': recall,
-            'balanced_accuracy': balanced_accuracy
-        }

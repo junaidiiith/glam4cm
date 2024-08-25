@@ -172,8 +172,6 @@ class EcoreModelDataset(ModelDataset):
                             continue
                         nxg = EcoreNxG(g)
                         self.graphs.append(nxg)
-                        # except Exception as e:
-                        #     logger.debug(f'Error loading {file}: {e}')
 
             print(f'Loaded Total {self.name} with {len(self.graphs)} graphs')
             print("Filtering...")

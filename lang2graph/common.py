@@ -5,6 +5,10 @@ import torch
 from tokenization.special_tokens import *
 
 SEP = ' '
+REFERENCE = 'reference'
+SUPERTYPE = 'supertype'
+CONTAINMENT = 'containment'
+
 
 class LangGraph(nx.DiGraph):
     def __init__(self):
@@ -229,11 +233,8 @@ def get_uml_edge_data(edge_data: dict, edge_label: str):
 
 def get_uml_edge_type(edge_data):
     edge_type = edge_data.get('type')
-    if edge_type == 'supertype':
-        return 'supertype'
-    
-    containment = edge_data.get('containment')
-    if containment:
-        return 'containment'
-
-    return 'reference'
+    if edge_type == SUPERTYPE:
+        return SUPERTYPE
+    if edge_type == CONTAINMENT:
+        return CONTAINMENT
+    return REFERENCE

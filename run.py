@@ -38,6 +38,6 @@ tasks_handler_map = {
 
 
 if __name__ == '__main__':
-    task_id = 7
+    task_id = 3
     hander, task_args = tasks_handler_map[task_id]
     hander(task_args())

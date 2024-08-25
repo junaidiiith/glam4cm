@@ -61,7 +61,7 @@ def run(args):
     dropout = args.dropout
     aggregation = args.aggregation
 
-
+    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
 
     gnn_conv_model = GNNConv(
         model_name=model_name,
@@ -73,11 +73,13 @@ def run(args):
         residual=residual,
         l_norm=l_norm,
         dropout=dropout,
-        aggregation=aggregation
+        aggregation=aggregation,
+        edge_dim=edge_dim,
     )
 
+    clf_input_dim = output_dim*num_heads if args.num_heads else output_dim
     mlp_predictor = NodeClassifier(
-        input_dim=output_dim,
+        input_dim=clf_input_dim,
         hidden_dim=hidden_dim,
         num_layers=num_mlp_layers, 
         num_classes=num_classes,

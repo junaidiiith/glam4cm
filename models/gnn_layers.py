@@ -248,7 +248,7 @@ class NodeClassifier(nn.Module):
         for layer in self.layers:
             h = layer(h)
         
-        return F.log_softmax(h, dim=-1)
+        return F.softmax(h, dim=-1)
     
 
 class GraphClassifer(nn.Module):
@@ -284,4 +284,4 @@ class GraphClassifer(nn.Module):
         for layer in self.layers:
             h = layer(h)
         
-        return h.log_softmax(dim=-1)
+        return h.softmax(dim=-1)

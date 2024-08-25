@@ -70,7 +70,7 @@ def run(args):
         ckpt=args.ckpt,
         no_shuffle=args.no_shuffle,
         randomize_ne=args.randomize,
-        random_ne_dim=args.random_ne_dim,
+        random_embed_dim=args.random_embed_dim,
     )
 
     print("Loading graph dataset")

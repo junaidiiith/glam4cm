@@ -2,6 +2,7 @@ from collections import Counter
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
+from settings import LP_TASK_LINK_PRED
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
@@ -71,7 +72,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_embeddings=args.use_embeddings,
-        add_neg_samples=args.add_neg_samples,
+        add_negative_train_samples=args.add_neg_samples,
         embed_model_name=args.embed_model_name,
         ckpt=args.ckpt,
     )
@@ -90,13 +91,11 @@ def run(args):
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
         distance=distance,
+        task_type=LP_TASK_LINK_PRED
     )
 
-    assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
-    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
-
     print("Training model")
-    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=2)
     model.resize_token_embeddings(len(tokenizer))
 
     output_dir = os.path.join(

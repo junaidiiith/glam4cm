@@ -90,9 +90,9 @@ def run(args):
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
-        args.cls_label,
         tokenizer=tokenizer,
         distance=distance,
+        label=args.cls_label,
         task_type=LP_TASK_EDGE_CLS
     )
 

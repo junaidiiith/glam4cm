@@ -6,7 +6,7 @@ from sklearn.metrics import (
     accuracy_score
 )
 import torch
-from collections import defaultdict
+from collections import Counter, defaultdict
 from torch_geometric.loader import DataLoader
 
 from torch_geometric.data import Data
@@ -51,6 +51,18 @@ class GNNGraphClassificationTrainer(Trainer):
         self.dataloaders = dict()
         self.dataloaders['train'] = DataLoader(dataset['train'], batch_size=batch_size, shuffle=True)
         self.dataloaders['test'] = DataLoader(dataset['test'], batch_size=batch_size, shuffle=False)
+        
+
+        # train_labels = torch.cat([getattr(data, f"graph_{self.cls_label}") for data in dataset['train']], dim=0).tolist()
+        # test_labels = torch.cat([getattr(data, f"graph_{self.cls_label}") for data in dataset['test']], dim=0).tolist()
+        # all_labels = train_labels + test_labels
+
+        # print("Train labels: ", Counter(train_labels))
+        # print("Test labels: ", Counter(test_labels))
+        # print("All labels: ", Counter(all_labels))
+ 
+        # assert len(train_labels) == len(test_labels), "Number of classes in train and test set do not match"
+
         self.results = list()
 
         print("GNN Trainer initialized.")
@@ -76,14 +88,14 @@ class GNNGraphClassificationTrainer(Trainer):
             labels = getattr(data, f"graph_{self.cls_label}")
             loss = self.criterion(g_pred, labels.to(device))
 
-            preds.append(g_pred.cpu().detach())
-            all_labels.append(labels.cpu())
+            preds.append(g_pred.detach().cpu())
+            all_labels.append(labels)
 
             loss.backward()
             self.optimizer.step()
             self.scheduler.step()
             epoch_loss += loss.item()
-                        
+
         
         preds = torch.cat(preds, dim=0)
         labels = torch.cat(all_labels, dim=0)
@@ -105,12 +117,11 @@ class GNNGraphClassificationTrainer(Trainer):
                 g_pred = self.predictor(h, data.batch.to(device))
                 labels = getattr(data, f"graph_{self.cls_label}")
 
-                preds.append(g_pred.cpu().detach())
-                all_labels.append(labels.cpu())
-            
-
                 loss = self.criterion(g_pred, labels.to(device))
                 epoch_loss += loss.item()
+
+                preds.append(g_pred.cpu().detach())
+                all_labels.append(labels.cpu())
 
             
             preds = torch.cat(preds, dim=0)
@@ -122,17 +133,3 @@ class GNNGraphClassificationTrainer(Trainer):
             self.results.append(epoch_metrics)
         
         print(f"Epoch: {len(self.results)//2} | Loss: {epoch_loss} | F1: {epoch_metrics['f1-score']} | Acc: {epoch_metrics['accuracy']} | Balanced Acc: {epoch_metrics['balanced_accuracy']}")
-            
-
-    def compute_metrics(self, scores, labels):
-        preds = scores.argmax(dim=-1).cpu().numpy()
-        labels = labels.cpu().numpy()
-        scores = scores.cpu().numpy()
-        metrics = {
-            'f1-score': f1_score(labels, preds, average='macro'),
-            'accuracy': accuracy_score(labels, preds),
-            'recall': recall_score(labels, preds, average='macro'),
-            'balanced_accuracy': balanced_accuracy_score(labels, preds)
-        }
-        
-        return metrics

@@ -15,6 +15,14 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import Adam
 
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    f1_score, 
+    roc_auc_score,
+    accuracy_score
+)
+
+
 device = get_device()
 
 
@@ -86,11 +94,28 @@ class Trainer:
         else:
             prediction_score = self.predictor(h)
         return prediction_score
-    
+        
 
-    def compute_loss(self, scores, labels):
-        loss = self.criterion(scores, labels.to(device))
-        return loss
+    def compute_metrics(self, predictions: torch.Tensor, labels: torch.Tensor, multi_class=True):
+        
+        scores = torch.argmax(predictions, dim=-1)
+        if multi_class:
+            f1 = f1_score(labels.numpy(), scores.numpy(), average='weighted')
+
+        else:
+            roc_auc = roc_auc_score(labels.numpy(), scores.numpy())
+            f1 = f1_score(labels.numpy(), scores.numpy())
+            
+        accuracy = accuracy_score(labels.numpy(), scores.numpy())
+        balanced_accuracy = balanced_accuracy_score(labels.numpy(), scores.numpy())
+
+
+        return {
+            'roc_auc': roc_auc,
+            'f1-score': f1,
+            'accuracy': accuracy,
+            'balanced_accuracy': balanced_accuracy
+        }
     
     
     def plot_metrics(self):

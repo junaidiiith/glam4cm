@@ -63,7 +63,7 @@ def run(args):
     assert hasattr(graph_dataset, num_edges_label), f"Graph dataset does not have attribute {num_edges_label}"
     num_classes = getattr(graph_dataset, num_edges_label)
 
-    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.use_edge_attrs else None
+    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
 
     gnn_conv_model = GNNConv(
         model_name=model_name,

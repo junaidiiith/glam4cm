@@ -2,13 +2,6 @@ from typing import List
 from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    f1_score, 
-    recall_score, 
-    accuracy_score
-)
-
 from torch_geometric.data import Data
 from models.gnn_layers import (
     GNNConv, 
@@ -73,16 +66,16 @@ class GNNNodeClassificationTrainer(Trainer):
                 data.edge_index,
                 data.edge_attr if self.use_edge_attrs else None
             )
-            scores = self.get_prediction_score(h)[data.train_node_idx]
-            labels = getattr(data, f"node_{self.cls_label}")[data.train_node_idx]
+            scores = self.get_prediction_score(h)[data.train_node_mask]
+            labels = getattr(data, f"node_{self.cls_label}")[data.train_node_mask]
             
             mask = ~torch.isin(labels, self.exclude_labels)
             labels = labels[mask]
             scores = scores[mask]
 
-            loss = self.compute_loss(scores, labels)
+            loss = self.criterion(scores, labels.to(device))
             
-            all_preds.append(scores.detach())
+            all_preds.append(scores.detach().cpu())
             all_labels.append(labels)
 
             loss.backward()
@@ -112,17 +105,17 @@ class GNNNodeClassificationTrainer(Trainer):
                     data.edge_index,
                     data.edge_attr if self.use_edge_attrs else None
                 )
-                scores = self.get_prediction_score(h)[data.test_node_idx]
-                labels = getattr(data, f"node_{self.cls_label}")[data.test_node_idx]
+                scores = self.get_prediction_score(h)[data.test_node_mask]
+                labels = getattr(data, f"node_{self.cls_label}")[data.test_node_mask]
 
                 mask = ~torch.isin(labels, self.exclude_labels)
                 labels = labels[mask]
                 scores = scores[mask]
-                loss = self.compute_loss(scores, labels)
+                loss = self.criterion(scores, labels.to(device))
                 epoch_loss += loss.item()
 
 
-                all_preds.append(scores.detach())
+                all_preds.append(scores.detach().cpu())
                 all_labels.append(labels)
                 
 
@@ -132,24 +125,6 @@ class GNNNodeClassificationTrainer(Trainer):
             
             epoch_metrics['loss'] = epoch_loss
             epoch_metrics['phase'] = 'test'
-            # print(f"Epoch Test Loss: {epoch_loss}\nTest Accuracy: {epoch_acc}\nTest F1: {epoch_f1}")
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
-
-    
-
-    def compute_metrics(self, scores, labels):
-        preds = torch.argmax(scores, dim=-1)
-        f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='weighted')
-        accuracy = accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
-        recall = recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average='weighted')
-
-        balanced_accuracy = balanced_accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
-
-        return {
-            'f1-score': f1,
-            'balanced_accuracy': balanced_accuracy,
-            'recall': recall,
-            'accuracy': accuracy,
-        }

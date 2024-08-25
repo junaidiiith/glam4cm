@@ -2,14 +2,6 @@ from typing import List
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    f1_score, 
-    recall_score, 
-    roc_auc_score,
-    accuracy_score
-)
-
 from models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
@@ -70,15 +62,15 @@ class GNNEdgeClassificationTrainer(Trainer):
             self.predictor.zero_grad()
             x = data.x
             edge_index =  data.train_pos_edge_label_index
-            train_idx = data.train_edge_idx
-            edge_attr = data.edge_attr[train_idx] if self.use_edge_attrs else None
+            train_mask = data.train_edge_mask
+            edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
             
             h = self.get_logits(x, edge_index, edge_attr)
 
             scores = self.get_prediction_score(h, edge_index, edge_attr)
-            labels = getattr(data, f"edge_{self.cls_label}")[train_idx]
-            loss = self.compute_loss(scores, labels)
-            all_preds.append(scores.detach())
+            labels = getattr(data, f"edge_{self.cls_label}")[train_mask]
+            loss = self.criterion(scores, labels.to(device))
+            all_preds.append(scores.detach().cpu())
             all_labels.append(labels)
 
             loss.backward()
@@ -104,16 +96,16 @@ class GNNEdgeClassificationTrainer(Trainer):
             for data in self.dataloader:
                 x = data.x
                 edge_index =  data.test_pos_edge_label_index
-                test_idx = data.test_edge_idx
-                edge_attr = data.edge_attr[test_idx] if self.use_edge_attrs else None
+                test_mask = data.test_edge_mask
+                edge_attr = data.edge_attr[test_mask] if self.use_edge_attrs else None
                 
                 h = self.get_logits(x, edge_index, edge_attr)
 
                 scores = self.get_prediction_score(h, edge_index, edge_attr)
-                labels = getattr(data, f"edge_{self.cls_label}")[test_idx]
-                all_preds.append(scores.detach())
+                labels = getattr(data, f"edge_{self.cls_label}")[test_mask]
+                all_preds.append(scores.detach().cpu())
                 all_labels.append(labels)
-                loss = self.compute_loss(scores, labels)
+                loss = self.criterion(scores, labels.to(device))
                 
                 epoch_loss += loss.item()
 
@@ -127,21 +119,3 @@ class GNNEdgeClassificationTrainer(Trainer):
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
-            
-
-    def compute_metrics(self, scores, labels):
-        preds = torch.argmax(scores, dim=-1)
-        roc_auc = roc_auc_score(labels.cpu().numpy(), scores.cpu().numpy(), multi_class='ovr')
-        f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='weighted')
-        accuracy = accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
-        recall = recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average='weighted')
-
-        balanced_accuracy = balanced_accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
-
-        return {
-            'roc_auc': roc_auc,
-            'f1-score': f1,
-            'balanced_accuracy': balanced_accuracy,
-            'recall': recall,
-            'accuracy': accuracy,
-        }

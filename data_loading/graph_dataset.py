@@ -29,6 +29,43 @@ def exclude_labels_from_data(X, labels, exclude_labels):
     return X, labels
 
 
+def validate_classes(graphs, label, exclude_labels, element):
+    
+
+    train_labels, test_labels = list(), list()
+    train_idx = f"train_{element}_mask"
+    test_idx = f"test_{element}_mask"
+
+    for torch_graph in graphs:
+        labels = getattr(torch_graph.data, f"{element}_{label}")
+        mask = ~torch.isin(labels, torch.tensor(exclude_labels))
+        train_mask = getattr(torch_graph.data, train_idx)
+        test_mask = getattr(torch_graph.data, test_idx)
+        merged_train_mask = mask & train_mask
+        merged_test_mask = mask & test_mask
+        train_labels.append(labels[merged_train_mask])
+        test_labels.append(labels[merged_test_mask])
+
+
+    train_classes = set(sum([
+        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, train_idx)].tolist() 
+        for torch_graph in graphs], []
+    ))
+    test_classes = set(sum([
+        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, test_idx)].tolist() 
+        for torch_graph in graphs], []
+    ))
+    num_train_classes = len(train_classes)
+    num_test_classes = len(test_classes)
+    print("Train classes:", train_classes)
+    print("Test classes:", test_classes)
+    print(f"Number of classes in training set: {num_train_classes}")
+    print(f"Number of classes in test set: {num_test_classes}")
+
+    assert num_train_classes == num_test_classes, f"Number of classes in training and test set should be the same for {label}"
+
+
+
 class GraphDataset(torch.utils.data.Dataset):
     def __init__(
         self,
@@ -164,7 +201,6 @@ class GraphDataset(torch.utils.data.Dataset):
             for torch_graph, node_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"node_{label}", torch.tensor(node_classes))
             
-            setattr(self, f"num_nodes_{label}", len(node_label_map.classes_))
             setattr(self, f"node_label_map_{label}", node_label_map)
             
             exclude_labels = [
@@ -173,7 +209,13 @@ class GraphDataset(torch.utils.data.Dataset):
                 if e in node_label_map.classes_
             ]
             setattr(self, f"node_exclude_{label}", exclude_labels)
-    
+            
+            num_labels = len(node_label_map.classes_) - len(exclude_labels)
+            setattr(self, f"num_nodes_{label}", num_labels)
+
+            if hasattr(self.graphs[0].data, 'train_node_mask'):
+                validate_classes(self.graphs, label, exclude_labels, 'node')
+
 
     def add_edge_labels(self):
         model_type = self.metadata.type
@@ -192,12 +234,11 @@ class GraphDataset(torch.utils.data.Dataset):
             edge_label_map = LabelEncoder()
             edge_label_map.fit_transform([j for i in label_values for j in i])
             label_values = [edge_label_map.transform(i) for i in label_values]
-            print(edge_label_map.classes_)
+            print("Edge Classes: ", edge_label_map.classes_)
 
             for torch_graph, edge_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"edge_{label}", torch.tensor(edge_classes))
             
-            setattr(self, f"num_edges_{label}", len(edge_label_map.classes_))
             setattr(self, f"edge_label_map_{label}", edge_label_map)
 
             exclude_labels = [
@@ -206,6 +247,12 @@ class GraphDataset(torch.utils.data.Dataset):
                 if e in edge_label_map.classes_
             ]
             setattr(self, f"edge_exclude_{label}", edge_label_map.transform(exclude_labels))
+
+            num_labels = len(edge_label_map.classes_) - len(exclude_labels)
+            setattr(self, f"num_edges_{label}", num_labels)
+
+            if hasattr(self.graphs[0].data, 'train_edge_mask'):
+                validate_classes(self.graphs, label, exclude_labels, 'edge')
 
 
 
@@ -222,7 +269,17 @@ class GraphDataset(torch.utils.data.Dataset):
 
                 for torch_graph, graph_label in zip(self.graphs, graph_labels):
                     setattr(torch_graph.data, f"graph_{label}", torch.tensor([graph_label]))
-                setattr(self, f"num_graph_{label}", len(graph_label_map.classes_))
+                
+                exclude_labels = [
+                    graph_label_map.transform([e])[0]
+                    for e in self.exclude_labels
+                    if e in graph_label_map.classes_
+                ]
+                setattr(self, f"graph_exclude_{label}", exclude_labels)
+                num_labels = len(graph_label_map.classes_) - len(exclude_labels)
+
+
+                setattr(self, f"num_graph_{label}", num_labels)
                 setattr(self, f"graph_label_map_{label}", graph_label_map)
                 
 
@@ -363,10 +420,10 @@ class GraphEdgeDataset(GraphDataset):
 
         train_count, test_count = dict(), dict()
         for g in self.graphs:
-            train_idx = g.data.train_edge_idx
-            test_idx = g.data.test_edge_idx
-            train_labels = getattr(g.data, f'edge_{self.metadata.edge_cls}')[train_idx]
-            test_labels = getattr(g.data, f'edge_{self.metadata.edge_cls}')[test_idx]
+            test_mask = g.data.train_edge_mask
+            test_mask = g.data.test_edge_mask
+            train_labels = getattr(g.data, f'edge_{self.metadata.edge_cls}')[test_mask]
+            test_labels = getattr(g.data, f'edge_{self.metadata.edge_cls}')[test_mask]
             t1 = dict(Counter(train_labels.tolist()))
             t2 = dict(Counter(test_labels.tolist()))
             for k in t1:
@@ -381,9 +438,9 @@ class GraphEdgeDataset(GraphDataset):
 
     def get_link_prediction_lm_data(
             self, 
-            label: str,
             tokenizer: AutoTokenizer,
             distance, 
+            label: str = None,
             task_type=LP_TASK_EDGE_CLS
         ):
         data = defaultdict(list)
@@ -415,10 +472,11 @@ class GraphEdgeDataset(GraphDataset):
                 edge_strs = list(edge_strs.values())
                 data[f'{edge_index_label}_edges'] += edge_strs
 
-            train_idx = graph.data.train_edge_idx
-            test_idx = graph.data.test_edge_idx
-            data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_idx]
-            data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_idx]
+            if task_type == LP_TASK_EDGE_CLS:
+                train_mask = graph.data.train_edge_mask
+                test_mask = graph.data.test_edge_mask
+                data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_mask]
+                data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_mask]
 
 
         print("Tokenizing data")
@@ -519,8 +577,8 @@ class GraphNodeDataset(GraphDataset):
             print(f"Node label: {node_label}")
             train_count, test_count = dict(), dict()
             for g in self.graphs:
-                train_idx = g.data.train_node_idx
-                test_idx = g.data.test_node_idx
+                train_idx = g.data.train_node_mask
+                test_idx = g.data.test_node_mask
                 train_labels = getattr(g.data, f'node_{node_label}')[train_idx]
                 test_labels = getattr(g.data, f'node_{node_label}')[test_idx]
                 t1 = dict(Counter(train_labels.tolist()))
@@ -544,11 +602,11 @@ class GraphNodeDataset(GraphDataset):
         data = {'train_nodes': [], 'train_node_classes': [], 'test_nodes': [], 'test_node_classes': []}
         for graph in tqdm(self.graphs, desc='Getting link prediction data'):
             node_strs = list(graph.get_graph_node_strs(graph.data.edge_index, distance).values())
-            train_node_strs = [node_strs[i.item()] for i in graph.data.train_node_idx]
-            test_node_strs = [node_strs[i.item()] for i in graph.data.test_node_idx]
+            train_node_strs = [node_strs[i.item()] for i in torch.where(graph.data.train_node_mask)[0]]
+            test_node_strs = [node_strs[i.item()] for i in torch.where(graph.data.test_node_mask)[0]]
             
-            train_node_classes = getattr(graph.data, f'node_{label}')[graph.data.train_node_idx]
-            test_node_classes = getattr(graph.data, f'node_{label}')[graph.data.test_node_idx]
+            train_node_classes = getattr(graph.data, f'node_{label}')[graph.data.train_node_mask]
+            test_node_classes = getattr(graph.data, f'node_{label}')[graph.data.test_node_mask]
 
             exclude_labels = getattr(self, f'node_exclude_{label}')
             train_node_strs, train_node_classes = exclude_labels_from_data(train_node_strs, train_node_classes, exclude_labels)

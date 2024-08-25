@@ -192,8 +192,13 @@ class TorchEdgeGraph(TorchGraph):
 
         train_idx = edge_index_to_idx(self.graph, train_data.edge_index)
         test_idx = edge_index_to_idx(self.graph, test_data.pos_edge_label_index)
-        setattr(d, 'train_edge_idx', train_idx)
-        setattr(d, 'test_edge_idx', test_idx)
+        train_mask = torch.zeros(self.graph.edge_index.size(1), dtype=torch.bool)
+        train_mask[train_idx] = True
+        test_mask = torch.zeros(self.graph.edge_index.size(1), dtype=torch.bool)
+        test_mask[test_idx] = True
+
+        setattr(d, 'train_edge_mask', train_mask)
+        setattr(d, 'test_edge_mask', test_mask)
 
 
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
@@ -326,8 +331,16 @@ class TorchNodeGraph(TorchGraph):
         train_idx = torch.tensor(train_nodes, dtype=torch.long)
         test_idx = torch.tensor(test_nodes, dtype=torch.long)
 
-        setattr(d, 'train_node_idx', train_idx)
-        setattr(d, 'test_node_idx', test_idx)
+        train_mask = torch.zeros(self.graph.number_of_nodes(), dtype=torch.bool)
+        train_mask[train_idx] = True
+        test_mask = torch.zeros(self.graph.number_of_nodes(), dtype=torch.bool)
+        test_mask[test_idx] = True
+
+
+        setattr(d, 'train_node_mask', train_mask)
+        setattr(d, 'test_node_mask', test_mask)
+
+
 
         assert all([self.graph.numbered_graph.has_node(n) for n in train_nodes])
         assert all([self.graph.numbered_graph.has_node(n) for n in test_nodes])
@@ -402,8 +415,8 @@ class LinkPredictionCollater:
         y = []
         overall_edge_index = []
         edge_classes = []
-        train_edge_idx = []
-        test_edge_idx = []
+        train_edge_mask = []
+        test_edge_mask = []
         train_pos_edge_label_index = []
         train_pos_edge_label = []
         train_neg_edge_label_index = []
@@ -425,8 +438,8 @@ class LinkPredictionCollater:
             overall_edge_index.append(data.overall_edge_index + edge_offset)
             edge_classes.append(data.edge_classes)
 
-            train_edge_idx.append(data.train_edge_idx + edge_offset)
-            test_edge_idx.append(data.test_edge_idx + edge_offset)
+            train_edge_mask.append(data.train_edge_mask)
+            test_edge_mask.append(data.test_edge_mask)
 
             train_pos_edge_label_index.append(data.train_pos_edge_label_index + node_offset)
             train_pos_edge_label.append(data.train_pos_edge_label)
@@ -448,8 +461,8 @@ class LinkPredictionCollater:
             y=torch.tensor(y),
             overall_edge_index=torch.cat(overall_edge_index, dim=1),
             edge_classes=torch.cat(edge_classes),
-            train_edge_idx=torch.cat(train_edge_idx),
-            test_edge_idx=torch.cat(test_edge_idx),
+            train_edge_mask=torch.cat(train_edge_mask),
+            test_edge_mask=torch.cat(test_edge_mask),
             train_pos_edge_label_index=torch.cat(train_pos_edge_label_index, dim=1),
             train_pos_edge_label=torch.cat(train_pos_edge_label),
             train_neg_edge_label_index=torch.cat(train_neg_edge_label_index, dim=1),

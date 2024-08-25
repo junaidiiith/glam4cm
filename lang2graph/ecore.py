@@ -34,8 +34,8 @@ class EcoreNxG(LangGraph):
         self.label = json_obj.get('labels')
         self.is_duplicated = json_obj.get('is_duplicated')
         self.directed = json.loads(json_obj.get('graph')).get('directed')
-        # self.text = doc_tokenizer(json_obj.get('txt'))
-        self.text = json_obj.get('txt')
+        self.text = doc_tokenizer(json_obj.get('txt'))
+        # self.text = json_obj.get('txt')
 
         self.__create_graph()
         self.set_numbered_labels()        
@@ -79,8 +79,16 @@ class EcoreNxG(LangGraph):
 
         logger.info(f'Graph {self.graph_id} created with {self.number_of_nodes()} nodes and {self.number_of_edges()} edges')
 
+    def __str__(self):
+        return self.__repr__()
+
+
+
     def __repr__(self):
-        return f'{self.json_obj}\nGraph({self.graph_id}, nodes={self.number_of_nodes()}, edges={self.number_of_edges()})'
+        reference_edges = [edge for edge in self.edges if self.edges[edge]['type'] == REFERENCE]
+        containment_edges = [edge for edge in self.edges if self.edges[edge]['type'] == CONTAINMENT]
+        supertype_edges = [edge for edge in self.edges if self.edges[edge]['type'] == SUPERTYPE]
+        return f'EcoreNxG({self.graph_id}, nodes={self.number_of_nodes()}, edges={self.number_of_edges()}, references={len(reference_edges)}, containment={len(containment_edges)}, supertypes={len(supertype_edges)})'
 
 
 

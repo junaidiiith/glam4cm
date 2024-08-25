@@ -38,8 +38,9 @@ def run(args):
         ckpt=args.ckpt,
         regen_embeddings=args.regen_embeddings,
         no_shuffle=args.no_shuffle,
-        randomize_ne=args.randomize,
-        random_ne_dim=args.random_ne_dim,
+        randomize_ne = args.randomize_ne,
+        randomize_ee = args.randomize_ne,
+        random_embed_dim=args.random_embed_dim,
     )
 
     print("Loading graph dataset")
@@ -51,7 +52,6 @@ def run(args):
     num_classes = getattr(graph_dataset, cls_label)
 
     print(f"Number of classes: {num_classes}")
-
     model_name = args.gnn_conv_model
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim
@@ -65,6 +65,9 @@ def run(args):
     input_dim = graph_dataset[0].data.x.shape[1]
 
     for datasets in graph_dataset.get_kfold_gnn_graph_classification_data():
+
+        edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
+
         gnn_conv_model = GNNConv(
             model_name=model_name,
             input_dim=input_dim,
@@ -75,11 +78,13 @@ def run(args):
             residual=residual,
             l_norm=l_norm,
             dropout=dropout,
-            aggregation=aggregation
+            aggregation=aggregation,
+            edge_dim=edge_dim,
         )
 
+        clf_input_dim = output_dim*num_heads if args.num_heads else output_dim
         classifier = GraphClassifer(
-            input_dim=gnn_conv_model.out_dim,
+            input_dim=clf_input_dim,
             num_classes=num_classes,
             global_pool=args.global_pool,
         )

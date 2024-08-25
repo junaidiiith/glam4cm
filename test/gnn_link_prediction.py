@@ -2,7 +2,7 @@ from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
+from trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
 from utils import merge_argument_parsers, set_seed
 from test.common_args import get_common_args_parser, get_gnn_args_parser
 
@@ -44,7 +44,6 @@ def run(args):
     print("Loaded graph dataset")
 
 
-    randomize = args.randomize or graph_dataset[0].data.x is None
     input_dim = args.input_dim
 
     model_name = args.gnn_conv_model
@@ -60,6 +59,7 @@ def run(args):
     aggregation = args.aggregation
 
 
+    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
     gnn_conv_model = GNNConv(
         model_name=model_name,
         input_dim=input_dim,
@@ -70,13 +70,17 @@ def run(args):
         residual=residual,
         l_norm=l_norm,
         dropout=dropout,
-        aggregation=aggregation
+        aggregation=aggregation,
+        edge_dim=edge_dim
     )
 
+    clf_input_dim = output_dim*num_heads if args.num_heads else output_dim
     mlp_predictor = EdgeClassifer(
-        h_feats=output_dim,
+        input_dim=clf_input_dim,
+        hidden_dim=hidden_dim,
         num_layers=num_mlp_layers, 
         num_classes=2,
+        edge_dim=edge_dim,
         bias=True,
     )
 

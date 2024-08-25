@@ -40,7 +40,7 @@ def get_common_args_parser():
     parser.add_argument('--no_shuffle', action='store_true')
     parser.add_argument('--randomize_ne', action='store_true')
     parser.add_argument('--randomize_ee', action='store_true')
-    parser.add_argument('--random_ne_dim', type=int, default=768)
+    parser.add_argument('--random_embed_dim', type=int, default=768)
 
 
     parser.add_argument('--test_ratio', type=float, default=0.2)
