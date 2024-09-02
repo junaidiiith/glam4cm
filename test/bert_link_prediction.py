@@ -6,13 +6,13 @@ from settings import LP_TASK_LINK_PRED
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from sklearn.metrics import (
     roc_auc_score, 
     f1_score, 
     precision_score, 
+    balanced_accuracy_score,
     recall_score
 )
 import torch.nn.functional as F
@@ -25,19 +25,20 @@ def compute_metrics(pred):
     preds = pred.predictions.argmax(-1)
     print(Counter(preds), Counter(labels))
     acc = (preds == labels).mean()
-    roc = roc_auc_score(labels, preds)
+    # roc = roc_auc_score(labels, preds)
     f1_macro = f1_score(labels, preds)
     f1_micro = f1_score(labels, preds, )
     precision = precision_score(labels, preds)
+    balanced_accuracy = balanced_accuracy_score(labels, preds)
     recall = recall_score(labels, preds)
 
     return {
         'accuracy': acc,
-        'roc_auc': roc,
         'f1_macro': f1_macro,
         'f1_micro': f1_micro,
         'precision': precision,
-        'recall': recall
+        'recall': recall,
+        'balanced_accuracy': balanced_accuracy
     }
 
 
@@ -48,7 +49,7 @@ def get_parser():
     bert_parser = get_bert_args_parser()
     parser = merge_argument_parsers(common_parser, bert_parser)
 
-    return parser.parse_args()
+    return parser
 
 
 def run(args):
@@ -71,10 +72,7 @@ def run(args):
         reload=args.reload,
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
-        use_embeddings=args.use_embeddings,
-        add_negative_train_samples=args.add_neg_samples,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt,
+        add_negative_train_samples=True,
     )
 
 
@@ -82,10 +80,10 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
+
+
     model_name = args.model_name
-    special_tokens = get_special_tokens()
-    max_length = args.max_length
-    tokenizer = get_tokenizer(model_name, special_tokens, max_length)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
@@ -102,12 +100,14 @@ def run(args):
         'results',
         dataset_name,
         'lp',
+        f"{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
-        'lp'
+        'lp',
+        f"{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     training_args = TrainingArguments(

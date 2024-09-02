@@ -6,6 +6,7 @@ from sklearn.metrics import (
     recall_score
 )
 from transformers import (
+    AutoTokenizer,
     AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments
@@ -14,7 +15,6 @@ from transformers import (
 from data_loading.graph_dataset import GraphNodeDataset
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
-from tokenization.utils import get_special_tokens, get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -45,7 +45,7 @@ def get_parser():
     parser.add_argument('--cls_label', type=str, default='label')
     parser.add_argument('--remove_duplicate_graphs', action='store_true')
     parser.add_argument('--use_special_tokens', action='store_true')
-    return parser.parse_args()
+    return parser
 
 
 def run(args):
@@ -65,12 +65,9 @@ def run(args):
         distance=args.distance,
         reload=args.reload,
         test_ratio=args.test_ratio,
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt,
         no_shuffle=args.no_shuffle,
-        randomize_ne=args.randomize,
-        random_embed_dim=args.random_embed_dim,
+        use_attributes=args.use_attributes,
+        use_edge_types=args.use_edge_types,
     )
 
     print("Loading graph dataset")
@@ -78,9 +75,8 @@ def run(args):
     print("Loaded graph dataset")
 
     model_name = args.model_name
-    special_tokens = get_special_tokens() if args.use_special_tokens else None
-    
-    tokenizer = get_tokenizer(model_name, special_tokens, args.max_length)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    fold_id = 0
     for classification_dataset in graph_dataset.get_kfold_lm_graph_classification_data(
         tokenizer,
         remove_duplicates=args.remove_duplicate_graphs
@@ -91,29 +87,28 @@ def run(args):
 
         print(len(train_dataset), len(test_dataset), num_classes)
 
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.ckpt if args.ckpt else model_name, 
-            num_labels=num_classes
-        )
-        model.resize_token_embeddings(len(tokenizer))
-
         print("Training model")
         output_dir = os.path.join(
             'results',
             dataset_name,
-            f'graph_cls_{args.min_edges}',
+            f'graph_cls_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
-            f'graph_cls_{args.min_edges}',
+            f'graph_cls_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}_fold_{fold_id}',
+        )
+
+        model = AutoModelForSequenceClassification.from_pretrained(
+            args.ckpt if args.ckpt else model_name, 
+            num_labels=num_classes
         )
 
         # Training arguments
         training_args = TrainingArguments(
             output_dir=output_dir,
-            num_train_epochs=10,
+            num_train_epochs=args.num_epochs,
             eval_strategy="steps",
             per_device_train_batch_size=args.train_batch_size,
             per_device_eval_batch_size=args.eval_batch_size,
@@ -121,8 +116,10 @@ def run(args):
             weight_decay=0.01,
             learning_rate=5e-5,
             logging_dir=logs_dir,
-            logging_steps=50,
-            eval_steps=50,
+            logging_steps=args.num_log_steps,
+            eval_steps=args.num_eval_steps,
+            save_total_limit=2,
+            load_best_model_at_end=True,
             fp16=True
         )
 
@@ -139,4 +136,5 @@ def run(args):
         trainer.train()
         results = trainer.evaluate()
         print(results)
-        break
+        
+        fold_id += 1

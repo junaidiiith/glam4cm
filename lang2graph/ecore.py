@@ -52,9 +52,9 @@ class EcoreNxG(LangGraph):
         references = get_connections(classifier_nodes)
         
         for classifier_name, classifier_info in classifier_nodes.items():
-            if classifier_info['type'] != 'class':
-                continue
-            structural_features = classifier_info['structural_features']
+            # if classifier_info['type'] != 'class':
+            #     continue
+            structural_features = classifier_info.get('structural_features', [])
             attributes = list()
             for f in structural_features:
                 if f['type'] == 'ecore:EAttribute':

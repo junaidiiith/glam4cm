@@ -5,8 +5,7 @@ from data_loading.graph_dataset import GraphNodeDataset
 from data_loading.utils import oversample_dataset
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from sklearn.metrics import (
     accuracy_score, 
@@ -51,7 +50,7 @@ def get_parser():
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
     parser.add_argument('--cls_label', type=str, required=True)
 
-    return parser.parse_args()
+    return parser
 
 
 
@@ -91,9 +90,7 @@ def run(args):
     num_labels = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
     model_name = args.model_name
-    special_tokens = get_special_tokens()
-    max_length = args.max_length
-    tokenizer = get_tokenizer(model_name, special_tokens, max_length)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     print("Getting node classification data")
     bert_dataset = graph_dataset.get_node_classification_lm_data(
@@ -106,23 +103,22 @@ def run(args):
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
-
     model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
-    model.resize_token_embeddings(len(tokenizer))
     
     print("Training model")
     output_dir = os.path.join(
         'results',
         dataset_name,
         'node_cls',
-        args.cls_label
+        args.cls_label,
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'node_cls',
-        args.cls_label
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     training_args = TrainingArguments(
@@ -152,3 +148,10 @@ def run(args):
     trainer.train()
     results = trainer.evaluate()
     print(results)
+
+    trainer.save_model()
+
+
+if __name__ == '__main__':
+    args = get_parser()
+    run(args)

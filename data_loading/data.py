@@ -99,8 +99,17 @@ class TorchGraph:
             else:
                 edge_label = ""
                 edge_type = ""
+            
+            # if use_edge_types:
+            #     edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {edge_type} {EDGE_END} {NODE_LABEL} {v_str}"
+            # else:
+            #     edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {EDGE_END} {NODE_LABEL} {v_str}"
 
-            edge_str = f"{u_str} {edge_label} {v_str}" if not use_edge_types else f"{u_str} {edge_label} {edge_type} {v_str}"
+            if use_edge_types:
+                edge_str = f"{u_str} {edge_label} {edge_type} {v_str}"
+            else:
+                edge_str = f"{u_str} {edge_label} {v_str}"
+
             edge_strs[(u, v)] = edge_str
 
         return edge_strs
@@ -181,6 +190,7 @@ class TorchEdgeGraph(TorchGraph):
             neg_sampling_ratio=self.neg_sampling_ratio,
             split_labels=True
         )
+
         try:
             train_data, _, test_data = transform(Data(
                 edge_index=self.graph.edge_index, 
@@ -209,6 +219,8 @@ class TorchEdgeGraph(TorchGraph):
         else:
             test_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
             test_data.neg_edge_label = torch.tensor([], dtype=torch.long)
+
+        # print(train_data.neg_edge_label_index.shape)
 
         if hasattr(train_data, 'neg_edge_label_index'):
             assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])

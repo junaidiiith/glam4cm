@@ -1,2 +1,27 @@
 python run.py --dataset=eamodelset --cls_label=layer --train_batch_size=32 --num_epochs=10
 python run.py --dataset=eamodelset --cls_label=type --train_batch_size=32 --num_epochs=15
+
+Graph Classification
+
+ECore
+Modelset
+
+Node Classification
+EAModelset
+Ecore
+Modelset
+MAR
+
+
+Edge Classification - type
+EAModelset
+Ecore
+Modelset
+MAR
+
+
+Link Prediction
+EAModelset
+Ecore
+Modelset
+MAR

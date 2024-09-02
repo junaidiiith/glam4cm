@@ -13,7 +13,7 @@ def get_parser():
 
     parser.add_argument('--cls_label', type=str, default='label')
     parser.add_argument('--global_pool', type=str, default='mean')
-    return parser.parse_args()
+    return parser
 
 
 def run(args):

@@ -1,12 +1,6 @@
 from typing import List, Tuple
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    f1_score, 
-    recall_score, 
-    accuracy_score
-)
 import torch
-from collections import Counter, defaultdict
+from collections import defaultdict
 from torch_geometric.loader import DataLoader
 
 from torch_geometric.data import Data
@@ -51,17 +45,6 @@ class GNNGraphClassificationTrainer(Trainer):
         self.dataloaders = dict()
         self.dataloaders['train'] = DataLoader(dataset['train'], batch_size=batch_size, shuffle=True)
         self.dataloaders['test'] = DataLoader(dataset['test'], batch_size=batch_size, shuffle=False)
-        
-
-        # train_labels = torch.cat([getattr(data, f"graph_{self.cls_label}") for data in dataset['train']], dim=0).tolist()
-        # test_labels = torch.cat([getattr(data, f"graph_{self.cls_label}") for data in dataset['test']], dim=0).tolist()
-        # all_labels = train_labels + test_labels
-
-        # print("Train labels: ", Counter(train_labels))
-        # print("Test labels: ", Counter(test_labels))
-        # print("All labels: ", Counter(all_labels))
- 
-        # assert len(train_labels) == len(test_labels), "Number of classes in train and test set do not match"
 
         self.results = list()
 
@@ -75,7 +58,6 @@ class GNNGraphClassificationTrainer(Trainer):
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
         preds, all_labels = list(), list()
-        # for i, data in tqdm(enumerate(self.dataloader), desc=f"Training batches", total=len(self.dataloader)):
         for data in self.dataloaders['train']:
             self.optimizer.zero_grad()
             self.model.train()
@@ -103,7 +85,10 @@ class GNNGraphClassificationTrainer(Trainer):
         epoch_metrics = self.compute_metrics(preds, labels)
         epoch_metrics['loss'] = epoch_loss
         epoch_metrics['phase'] = 'train'
+
         self.results.append(epoch_metrics)
+
+        return epoch_metrics
 
 
     def test(self):
@@ -133,3 +118,5 @@ class GNNGraphClassificationTrainer(Trainer):
             self.results.append(epoch_metrics)
         
         print(f"Epoch: {len(self.results)//2} | Loss: {epoch_loss} | F1: {epoch_metrics['f1-score']} | Acc: {epoch_metrics['accuracy']} | Balanced Acc: {epoch_metrics['balanced_accuracy']}")
+
+        return epoch_metrics

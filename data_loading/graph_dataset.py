@@ -211,6 +211,8 @@ class GraphDataset(torch.utils.data.Dataset):
             setattr(self, f"node_exclude_{label}", exclude_labels)
             
             num_labels = len(node_label_map.classes_) - len(exclude_labels)
+
+            print("Setting num_nodes_", label, num_labels)
             setattr(self, f"num_nodes_{label}", num_labels)
 
             if hasattr(self.graphs[0].data, 'train_node_mask'):
@@ -443,6 +445,7 @@ class GraphEdgeDataset(GraphDataset):
             label: str = None,
             task_type=LP_TASK_EDGE_CLS
         ):
+
         data = defaultdict(list)
         for graph in tqdm(self.graphs, desc='Getting link prediction data'):
             pos_edge_idx = graph.data.edge_index
@@ -453,6 +456,8 @@ class GraphEdgeDataset(GraphDataset):
             test_pos_edge_index = graph.data.test_pos_edge_label_index
             test_neg_edge_index = graph.data.test_neg_edge_label_index
 
+            # print(train_neg_edge_index.shape)
+
             edge_indices = {
                 'train_pos': train_pos_edge_index,
                 'train_neg': train_neg_edge_index,
@@ -461,14 +466,13 @@ class GraphEdgeDataset(GraphDataset):
             }
 
             for edge_index_label, edge_index in edge_indices.items():
-                if "neg" in edge_index_label and task_type == LP_TASK_LINK_PRED:
-                    continue
                 edge_strs = graph.get_graph_edge_strs_from_node_strs(
                     node_strs, 
                     edge_index,
                     use_edge_types=self.use_edge_types,
                     neg_samples="neg" in edge_index_label
                 )
+                
                 edge_strs = list(edge_strs.values())
                 data[f'{edge_index_label}_edges'] += edge_strs
 
@@ -478,6 +482,11 @@ class GraphEdgeDataset(GraphDataset):
                 data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_mask]
                 data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_mask]
 
+
+        # print(len(data['train_pos_edges']))
+        # print(len(data['train_neg_edges']))
+        # print(len(data['test_pos_edges']))
+        # print(len(data['test_neg_edges']))
 
         print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
@@ -627,7 +636,7 @@ class GraphNodeDataset(GraphDataset):
         print(len(data['train_node_classes']))
         print(len(data['test_nodes']))
         print(len(data['test_node_classes']))
-        # exit(0)
+
             
         dataset = {
             'train': EncodingDataset(

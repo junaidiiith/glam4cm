@@ -22,6 +22,8 @@ from sklearn.metrics import (
     accuracy_score
 )
 
+from tensorboardX import SummaryWriter
+
 
 device = get_device()
 
@@ -39,7 +41,9 @@ class Trainer:
             cls_label,
             lr=1e-3,
             num_epochs=100,
-            use_edge_attrs=False
+            use_edge_attrs=False,
+
+            log_dir='./logs'
         ) -> None:
         self.model = model
         self.predictor = predictor
@@ -57,6 +61,10 @@ class Trainer:
         self.criterion = nn.CrossEntropyLoss()
 
         self.use_edge_attrs = use_edge_attrs
+
+        self.log_dir = log_dir
+
+        self.writer = SummaryWriter(log_dir=self.log_dir)
 
         print("GNN Trainer initialized.")
 
@@ -109,7 +117,6 @@ class Trainer:
         accuracy = accuracy_score(labels.numpy(), scores.numpy())
         balanced_accuracy = balanced_accuracy_score(labels.numpy(), scores.numpy())
 
-
         return {
             'roc_auc': roc_auc,
             'f1-score': f1,
@@ -128,6 +135,12 @@ class Trainer:
 
 
     def run(self):
-        for _ in tqdm(range(self.num_epochs), desc="Running Epochs"):
-            self.train()
-            self.test()
+        for epoch in tqdm(range(self.num_epochs), desc="Running Epochs"):
+            train_metrics = self.train()
+            test_metrics = self.test()
+
+            for k, v in train_metrics.items():
+                self.writer.add_scalar(f"train/{k}", v, epoch)
+            
+            for k, v in test_metrics.items():
+                self.writer.add_scalar(f"test/{k}", v, epoch)

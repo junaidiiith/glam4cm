@@ -4,9 +4,7 @@ from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.utils import oversample_dataset
 from settings import LP_TASK_EDGE_CLS
 from test.common_args import get_bert_args_parser, get_common_args_parser
-from tokenization.special_tokens import *
-from tokenization.utils import get_special_tokens, get_tokenizer
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from test.utils import get_models_dataset
 
 from sklearn.metrics import (
@@ -45,7 +43,7 @@ def get_parser():
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
     parser.add_argument('--cls_label', type=str, default='type')
 
-    return parser.parse_args()
+    return parser
 
 
 def run(args):
@@ -68,11 +66,7 @@ def run(args):
         reload=args.reload,
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
-        use_edge_types=args.use_edge_types,
         use_embeddings=args.use_embeddings,
-        add_negative_train_samples=args.add_neg_samples,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt,
     )
 
 
@@ -83,10 +77,9 @@ def run(args):
     assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
     num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
 
+
     model_name = args.model_name
-    special_tokens = get_special_tokens()
-    max_length = args.max_length
-    tokenizer = get_tokenizer(model_name, special_tokens, max_length)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
@@ -109,19 +102,21 @@ def run(args):
         'results',
         dataset_name,
         'edge_cls',
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'edge_cls',
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.num_epochs,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=128,
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.eval_batch_size,
         weight_decay=0.01,
         logging_dir=logs_dir,
         logging_steps=args.num_log_steps,
@@ -142,3 +137,9 @@ def run(args):
     )
 
     trainer.train()
+    trainer.save_model()
+
+
+if __name__ == '__main__':
+    args = get_parser()
+    run(args)

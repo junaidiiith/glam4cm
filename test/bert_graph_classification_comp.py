@@ -53,21 +53,17 @@ def get_parser():
     parser.add_argument('--num_epochs', type=int, default=10)
 
     parser.add_argument('--warmup_steps', type=int, default=500)
-    parser.add_argument('--num_log_steps', type=int, default=20)
-    parser.add_argument('--num_eval_steps', type=int, default=20)
-    parser.add_argument('--num_save_steps', type=int, default=20)
-    parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--num_log_steps', type=int, default=50)
+    parser.add_argument('--num_eval_steps', type=int, default=50)
+    parser.add_argument('--num_save_steps', type=int, default=50)
+    parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=1e-5)
 
-    return parser.parse_args()
+    return parser
 
 
-
-if __name__ == '__main__':
-
-    args = get_parser()
-
+def run(args):
     dataset_name = args.dataset_name
     model_name = args.model_name
 
@@ -91,7 +87,6 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     k = args.k
     kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=args.seed)
-    all_idx = list(range(len(texts)))
 
     i = 0
     for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
@@ -109,13 +104,6 @@ if __name__ == '__main__':
         train_dataset = EncodingDataset(tokenizer, train_texts, train_y)
         test_dataset = EncodingDataset(tokenizer, test_texts, test_y)
 
-        import pickle
-        with open('train_dataset.pkl', 'wb') as f:
-            pickle.dump(train_dataset, f)
-        
-        with open('test_dataset.pkl', 'wb') as f:
-            pickle.dump(test_dataset, f)
-
         model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_classes)
         model.resize_token_embeddings(len(tokenizer))
 
@@ -123,27 +111,31 @@ if __name__ == '__main__':
         output_dir = os.path.join(
             'results',
             dataset_name,
-            'graph_cls',
+            'graph_cls_comp',
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
-            'graph_cls',
+            'graph_cls_comp',
         )
+
+        print("Running epochs: ", args.num_epochs)
 
         # Training arguments
         training_args = TrainingArguments(
             output_dir=output_dir,
             num_train_epochs=args.num_epochs,
             eval_strategy="steps",
-            per_device_train_batch_size=2,
-            per_device_eval_batch_size=128,
+            per_device_train_batch_size=args.train_batch_size,
+            per_device_eval_batch_size=args.eval_batch_size,
             warmup_steps=500,
             weight_decay=0.01,
             logging_dir=logs_dir,
             logging_steps=10,
             eval_steps=10,
+            save_total_limit=2,
+            load_best_model_at_end=True,
             fp16=True
         )
 
