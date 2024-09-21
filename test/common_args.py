@@ -22,7 +22,7 @@ def get_common_args_parser():
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--min_enr', type=float, default=-1.0)
     parser.add_argument('--min_edges', type=int, default=-1)
-    
+    parser.add_argument('--language', type=str, default='en')
     
     parser.add_argument('--use_attributes', action='store_true')
     parser.add_argument('--use_edge_types', action='store_true')
@@ -81,7 +81,7 @@ def get_gnn_args_parser():
 def get_bert_args_parser():
     parser = ArgumentParser()
     parser.add_argument('--model_name', type=str, default='bert-base-uncased')
-
+    parser.add_argument('--use_special_tokens', action='store_true')
 
     parser.add_argument('--warmup_steps', type=int, default=200)
     parser.add_argument('--num_log_steps', type=int, default=200)
@@ -89,4 +89,19 @@ def get_bert_args_parser():
     parser.add_argument('--num_save_steps', type=int, default=200)
     parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
+    return parser
+
+
+def get_gpt_args_parser():
+    parser = ArgumentParser()
+    parser.add_argument('--model_name', type=str, default='gpt2')
+    parser.add_argument('--use_special_tokens', action='store_true')
+
+    parser.add_argument('--warmup_steps', type=int, default=200)
+    parser.add_argument('--blocks', type=int, default=6)
+    parser.add_argument('--block_size', type=int, default=8)
+    parser.add_argument('--n_head', type=int, default=8)
+    parser.add_argument('--embed_dim', type=int, default=768)
+    parser.add_argument('--n_layer', type=int, default=6)
+    parser.add_argument('--lr', type=float, default=1e-5)
     return parser

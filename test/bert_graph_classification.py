@@ -15,6 +15,7 @@ from transformers import (
 from data_loading.graph_dataset import GraphNodeDataset
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
+from tokenization.utils import get_special_tokens, get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -44,7 +45,6 @@ def get_parser():
 
     parser.add_argument('--cls_label', type=str, default='label')
     parser.add_argument('--remove_duplicate_graphs', action='store_true')
-    parser.add_argument('--use_special_tokens', action='store_true')
     return parser
 
 
@@ -56,6 +56,7 @@ def run(args):
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
         reload = args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
 
@@ -68,6 +69,7 @@ def run(args):
         no_shuffle=args.no_shuffle,
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
+        use_special_tokens=args.use_special_tokens,
     )
 
     print("Loading graph dataset")
@@ -75,7 +77,8 @@ def run(args):
     print("Loaded graph dataset")
 
     model_name = args.model_name
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
+
     fold_id = 0
     for classification_dataset in graph_dataset.get_kfold_lm_graph_classification_data(
         tokenizer,
@@ -91,13 +94,15 @@ def run(args):
         output_dir = os.path.join(
             'results',
             dataset_name,
-            f'graph_cls_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+            f'graph_cls_',
+            f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
-            f'graph_cls_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}_fold_{fold_id}',
+            f'graph_cls_',
+            f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}_fold_{fold_id}'
         )
 
         model = AutoModelForSequenceClassification.from_pretrained(
@@ -138,3 +143,4 @@ def run(args):
         print(results)
         
         fold_id += 1
+        break

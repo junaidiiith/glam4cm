@@ -11,7 +11,10 @@ logger.setLevel(logging.DEBUG)
 BERT_MODEL = 'bert-base-uncased'
 FAST_TEXT_MODEL = 'uml-fasttext.bin'
 
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+torch.set_float32_matmul_precision('high')
+
 
 seed = 42
 datasets_dir = 'datasets'

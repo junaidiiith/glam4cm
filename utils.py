@@ -27,10 +27,6 @@ def xml_to_json(xml_string):
     return json_data
 
 
-def get_device():
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)

@@ -13,6 +13,7 @@ from test import (
     create_dataset,
 )
 
+from test import cm_gpt_training
 from test.bert_graph_classification_comp import get_parser as bert_comp_parse_args
 from test.bert_graph_classification import get_parser as bert_parse_args
 from test.gnn_graph_cls import get_parser as gnn_parse_args
@@ -23,6 +24,7 @@ from test.gnn_link_prediction import get_parser as gnn_lp_parse_args
 from test.bert_edge_classification import get_parser as bert_ec_parse_args
 from test.gnn_node_classification import get_parser as gnn_nc_parse_args
 from test.bert_node_classification import get_parser as bert_nc_parse_args
+from test.cm_gpt_training import get_parser as cm_gpt_parse_args
 
 
 tasks = {
@@ -39,6 +41,7 @@ tasks = {
     7: 'GNN Node Classification',
     8: 'GNN Edge Classification',
     9: 'GNN Link Prediction',
+    10: 'CM-GPT Causal Modeling'
 }
 
 
@@ -53,6 +56,7 @@ tasks_handler_map = {
     7: (gnn_node_classification.run, gnn_nc_parse_args),
     8: (gnn_edge_classification.run, gnn_ec_parse_args),
     9: (gnn_link_prediction.run, gnn_lp_parse_args),
+    10: (cm_gpt_training.run, cm_gpt_parse_args)
 }
 
 

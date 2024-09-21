@@ -8,7 +8,7 @@ from models.gnn_layers import (
     EdgeClassifer,
     NodeClassifier
 )
-from utils import get_device
+from settings import device
 from itertools import chain
 from tqdm.auto import tqdm
 import torch.nn as nn
@@ -18,14 +18,10 @@ from torch.optim import Adam
 from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score, 
-    roc_auc_score,
     accuracy_score
 )
 
 from tensorboardX import SummaryWriter
-
-
-device = get_device()
 
 
 class Trainer:
@@ -43,7 +39,7 @@ class Trainer:
             num_epochs=100,
             use_edge_attrs=False,
 
-            log_dir='./logs'
+            logs_dir='./logs'
         ) -> None:
         self.model = model
         self.predictor = predictor
@@ -62,9 +58,9 @@ class Trainer:
 
         self.use_edge_attrs = use_edge_attrs
 
-        self.log_dir = log_dir
+        self.logs_dir = logs_dir
 
-        self.writer = SummaryWriter(log_dir=self.log_dir)
+        self.writer = SummaryWriter(log_dir=self.logs_dir)
 
         print("GNN Trainer initialized.")
 
@@ -111,14 +107,12 @@ class Trainer:
             f1 = f1_score(labels.numpy(), scores.numpy(), average='weighted')
 
         else:
-            roc_auc = roc_auc_score(labels.numpy(), scores.numpy())
             f1 = f1_score(labels.numpy(), scores.numpy())
             
         accuracy = accuracy_score(labels.numpy(), scores.numpy())
         balanced_accuracy = balanced_accuracy_score(labels.numpy(), scores.numpy())
 
         return {
-            'roc_auc': roc_auc,
             'f1-score': f1,
             'accuracy': accuracy,
             'balanced_accuracy': balanced_accuracy
@@ -140,7 +134,9 @@ class Trainer:
             test_metrics = self.test()
 
             for k, v in train_metrics.items():
-                self.writer.add_scalar(f"train/{k}", v, epoch)
+                if k != 'phase':
+                    self.writer.add_scalar(f"train/{k}", v, epoch)
             
             for k, v in test_metrics.items():
-                self.writer.add_scalar(f"test/{k}", v, epoch)
+                if k != 'phase':
+                    self.writer.add_scalar(f"test/{k}", v, epoch)

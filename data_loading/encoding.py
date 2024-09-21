@@ -1,7 +1,8 @@
+from torch.utils.data import Dataset
 import torch
 
 # Create your dataset
-class EncodingDataset(torch.utils.data.Dataset):
+class EncodingDataset(Dataset):
     def __init__(
             self, 
             tokenizer, 
@@ -39,3 +40,34 @@ class EncodingDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         return {k: v[index] for k, v in self.inputs.items()}
+
+class GPTTextDataset(Dataset):
+    def __init__(self, texts, tokenizer, max_length=512):
+        self.texts = texts
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        
+        # Tokenize all the texts upon initialization
+        self.encodings = self.tokenizer(
+            texts,
+            truncation=True,
+            padding=True,  # Pads to the longest sequence in the batch
+            max_length=max_length,
+            return_tensors="pt"  # Return PyTorch tensors
+        )
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, idx):
+        input_ids = self.encodings["input_ids"][idx]
+        attention_mask = self.encodings["attention_mask"][idx]
+        
+        # Labels for language modeling are the same as input_ids
+        labels = input_ids.clone()
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }

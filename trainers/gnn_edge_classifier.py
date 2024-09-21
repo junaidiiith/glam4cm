@@ -9,8 +9,7 @@ from models.gnn_layers import (
 
 from torch_geometric.data import Data
 from trainers.gnn_trainer import Trainer
-from utils import get_device
-device = get_device()
+from settings import device
 
 
 class GNNEdgeClassificationTrainer(Trainer):
@@ -28,7 +27,8 @@ class GNNEdgeClassificationTrainer(Trainer):
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            use_edge_attrs=False
+            use_edge_attrs=False,
+            logs_dir='./logs'
         ) -> None:
 
         super().__init__(
@@ -37,7 +37,8 @@ class GNNEdgeClassificationTrainer(Trainer):
             cls_label=cls_label,
             lr=lr,
             num_epochs=num_epochs,
-            use_edge_attrs=use_edge_attrs
+            use_edge_attrs=use_edge_attrs,
+            logs_dir=logs_dir
         )
 
         self.dataloader = DataLoader(

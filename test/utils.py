@@ -28,5 +28,8 @@ def get_model_dataset_class(dataset_name):
 
 
 def get_models_dataset(dataset_name, **config_params):
+    dataset_type = get_metamodel_dataset_type(dataset_name)
+    if dataset_type != 'ea' and 'language' in config_params:
+        del config_params['language']
     dataset_class = get_model_dataset_class(dataset_name)
     return dataset_class(dataset_name, **config_params)

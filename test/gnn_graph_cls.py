@@ -1,3 +1,4 @@
+import os
 from data_loading.graph_dataset import GraphNodeDataset
 from models.gnn_layers import GNNConv, GraphClassifer
 from trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
@@ -24,6 +25,7 @@ def run(args):
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
         reload = args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
 
@@ -64,6 +66,13 @@ def run(args):
 
     input_dim = graph_dataset[0].data.x.shape[1]
 
+    logs_dir = os.path.join(
+        "logs",
+        dataset_name,
+        "gnn_graph_cls",
+        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+    )
+
     for datasets in graph_dataset.get_kfold_gnn_graph_classification_data():
 
         edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
@@ -97,6 +106,7 @@ def run(args):
             num_epochs=args.num_epochs,
             batch_size=args.batch_size,
             use_edge_attrs=args.use_edge_attrs,
+            logs_dir=logs_dir
         )
 
         trainer.run()

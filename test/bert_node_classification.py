@@ -14,6 +14,7 @@ from sklearn.metrics import (
     balanced_accuracy_score
 )
 
+from tokenization.utils import get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -61,7 +62,8 @@ def run(args):
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
-        reload=args.reload
+        reload=args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
     distance = args.distance
@@ -75,6 +77,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
+        use_special_tokens=args.use_special_tokens,
         
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
@@ -90,7 +93,7 @@ def run(args):
     num_labels = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
     model_name = args.model_name
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
 
     print("Getting node classification data")
     bert_dataset = graph_dataset.get_node_classification_lm_data(
@@ -111,7 +114,7 @@ def run(args):
         dataset_name,
         'node_cls',
         args.cls_label,
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
+        f"{args.cls_label}_me_{args.min_edges}_attr_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
 
     logs_dir = os.path.join(
@@ -120,6 +123,11 @@ def run(args):
         'node_cls',
         f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
+
+    print("Output Dir: ", output_dir)
+    print("Logs Dir: ", logs_dir)
+    print("Len Train Dataset: ", len(bert_dataset['train']))
+    print("Len Test Dataset: ", len(bert_dataset['test']))
 
     training_args = TrainingArguments(
         output_dir=output_dir,

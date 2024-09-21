@@ -7,10 +7,8 @@ from models.gnn_layers import (
     GNNConv, 
     NodeClassifier
 )
-from utils import get_device
 from trainers.gnn_trainer import Trainer
-
-device = get_device()
+from settings import device
 
 
 class GNNNodeClassificationTrainer(Trainer):
@@ -29,7 +27,8 @@ class GNNNodeClassificationTrainer(Trainer):
             lr=1e-3,
             num_epochs=100,
             batch_size=32,
-            use_edge_attrs=False
+            use_edge_attrs=False,
+            logs_dir='./logs'
         ) -> None:
 
         super().__init__(
@@ -38,7 +37,8 @@ class GNNNodeClassificationTrainer(Trainer):
             cls_label=cls_label,
             lr=lr,
             num_epochs=num_epochs,
-            use_edge_attrs=use_edge_attrs
+            use_edge_attrs=use_edge_attrs,
+            logs_dir=logs_dir
         )
 
         self.exclude_labels = torch.tensor(exclude_labels, dtype=torch.long)
@@ -90,6 +90,8 @@ class GNNNodeClassificationTrainer(Trainer):
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
 
+        return epoch_metrics
+
 
     def test(self):
         self.model.eval()
@@ -128,3 +130,5 @@ class GNNNodeClassificationTrainer(Trainer):
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
+
+        return epoch_metrics

@@ -8,10 +8,8 @@ from models.gnn_layers import (
     GNNConv,
     GraphClassifer
 )
-from utils import get_device
 from trainers.gnn_trainer import Trainer
-
-device = get_device()
+from settings import device
 
 
 class GNNGraphClassificationTrainer(Trainer):
@@ -29,7 +27,8 @@ class GNNGraphClassificationTrainer(Trainer):
             lr=1e-4,
             num_epochs=100,
             batch_size=32,
-            use_edge_attrs=False
+            use_edge_attrs=False,
+            logs_dir='./logs'
         ) -> None:
 
         super().__init__(
@@ -38,7 +37,8 @@ class GNNGraphClassificationTrainer(Trainer):
             cls_label='type',
             lr=lr,
             num_epochs=num_epochs,
-            use_edge_attrs=use_edge_attrs
+            use_edge_attrs=use_edge_attrs,
+            logs_dir=logs_dir
         )
 
         self.cls_label = cls_label

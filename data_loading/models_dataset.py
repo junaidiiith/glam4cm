@@ -1,4 +1,5 @@
 from typing import List
+import pandas as pd
 from tqdm.auto import tqdm
 import pickle
 from random import shuffle
@@ -206,6 +207,7 @@ class ArchiMateModelDataset(ModelDataset):
             min_edges: int = -1,
             min_enr: float = -1,
             timeout=-1,
+            language=None,
             preprocess_graph_text: callable = None
         ):
         super().__init__(
@@ -223,7 +225,13 @@ class ArchiMateModelDataset(ModelDataset):
         if reload or not dataset_exists:
             self.graphs: List[ArchiMateNxG] = []
             data_path = os.path.join(dataset_dir, dataset_name, 'processed-models')
-            for model_dir in tqdm(os.listdir(data_path), desc=f'Loading {dataset_name.title()}'):
+            if language:
+                df = pd.read_csv(os.path.join(dataset_dir, dataset_name, f'{language}-metadata.csv'))
+                model_dirs = df['ID'].to_list()
+            else:
+                model_dirs = os.listdir(data_path)
+
+            for model_dir in tqdm(model_dirs, desc=f'Loading {dataset_name.title()}'):
                 model_dir = os.path.join(data_path, model_dir)
                 if os.path.isdir(model_dir):
                     model_file = os.path.join(model_dir, 'model.json')

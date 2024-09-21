@@ -9,7 +9,6 @@ from tokenization.special_tokens import *
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from sklearn.metrics import (
-    roc_auc_score, 
     f1_score, 
     precision_score, 
     balanced_accuracy_score,
@@ -17,6 +16,7 @@ from sklearn.metrics import (
 )
 import torch.nn.functional as F
 
+from tokenization.utils import get_special_tokens, get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -59,7 +59,8 @@ def run(args):
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
-        reload = args.reload
+        reload = args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
     distance = args.distance
@@ -73,6 +74,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         add_negative_train_samples=True,
+        use_special_tokens=args.use_special_tokens,
     )
 
 
@@ -83,7 +85,8 @@ def run(args):
 
 
     model_name = args.model_name
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
+
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(

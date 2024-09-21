@@ -1,3 +1,4 @@
+import os
 from data_loading.graph_dataset import GraphNodeDataset
 from models.gnn_layers import GNNConv, NodeClassifier
 from test.utils import get_models_dataset
@@ -24,6 +25,7 @@ def run(args):
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
         reload = args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
 
@@ -35,6 +37,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
+        randomize_ne=args.randomize_ne,
         ckpt=args.ckpt
     )
 
@@ -86,6 +89,13 @@ def run(args):
         bias=True,
     )
 
+    logs_dir = os.path.join(
+        "logs",
+        dataset_name,
+        "gnn_node_cls",
+        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+    )
+
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
@@ -94,7 +104,8 @@ def run(args):
         exclude_labels=getattr(graph_dataset, f"node_exclude_{args.cls_label}"),
         lr=args.lr,
         num_epochs=args.num_epochs,
-        use_edge_attrs=args.use_edge_attrs
+        use_edge_attrs=args.use_edge_attrs,
+        logs_dir=logs_dir
     )
 
     print("Training GNN Node Classification model")

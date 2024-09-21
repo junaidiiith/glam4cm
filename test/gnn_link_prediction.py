@@ -1,3 +1,4 @@
+import os
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
 from test.utils import get_models_dataset
@@ -23,6 +24,7 @@ def run(args):
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
         reload = args.reload,
+        language = args.language
     )
     dataset_name = args.dataset
 
@@ -58,6 +60,13 @@ def run(args):
     dropout = args.dropout
     aggregation = args.aggregation
 
+    
+    logs_dir = os.path.join(
+        "logs",
+        dataset_name,
+        "gnn_lp",
+        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+    )
 
     edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
     gnn_conv_model = GNNConv(
@@ -91,7 +100,8 @@ def run(args):
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        use_edge_attrs=args.use_edge_attrs
+        use_edge_attrs=args.use_edge_attrs,
+        logs_dir=logs_dir
     )
 
     print("Training GNN Link Prediction model")

@@ -127,7 +127,8 @@ def get_node_texts(
         h: int, 
         label='name', 
         use_attributes=False, 
-        attribute_labels='attributes'
+        attribute_labels='attributes',
+        use_special_tokens=False,
     ):
     """
     Create node string for each node n in a graph using neighbors of n up to h hops.
@@ -140,6 +141,7 @@ def get_node_texts(
     dict: A dictionary where keys are nodes and values are node strings.
     """
     node_texts = {}
+    node_sep = f"{NODE_PATH_SEP} " if use_special_tokens else ''
 
     for node in graph.nodes():
         
@@ -162,7 +164,7 @@ def get_node_texts(
                         attribute_labels
                     ) for i in sorted(next_level_nodes)
                 ]
-                node_str += f" {NODE_PATH_SEP} {', '.join(node_strs)}"
+                node_str += f" {node_sep}{', '.join(node_strs)}"
             current_level_nodes = next_level_nodes
 
         node_texts[node] = node_str.strip()

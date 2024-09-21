@@ -1,4 +1,3 @@
-import pickle
 from sklearn.model_selection import train_test_split
 import torch
 import json
@@ -44,25 +43,48 @@ class TorchGraph:
             test_ratio=0.2,
             use_edge_types=False,
             use_attributes=False,
-            reload=False,
-            regen_embeddings=False,
+            use_special_tokens=False
         ):
 
         self.graph = graph
         self.metadata = metadata
         
         self.raw_data = graph.xmi if hasattr(graph, 'xmi') else graph.json_obj
-        self.reload = reload
         self.use_edge_types = use_edge_types
         self.use_attributes = use_attributes
-        self.regen_embeddings = regen_embeddings
+        self.use_special_tokens = use_special_tokens
         
         self.distance = distance
         self.test_ratio = test_ratio
         self.save_dir = save_dir
+
+    
+    def get_node_edge_strings(self, data: Data, edge_index, embedder: Embedder=None):
+        node_texts = self.get_graph_node_strs(
+            edge_index, 
+            self.distance, 
+            self.use_special_tokens
+        ) ### Considering nodes with edges only in the subgraph
+
+        edge_texts = self.get_graph_edge_strs_from_node_strs(
+            node_strs=node_texts, 
+            edge_index=self.graph.edge_index, 
+            use_edge_types=self.use_edge_types,
+            use_special_tokens=self.use_special_tokens
+        )
+
+        if embedder is not None:
+            node_embeddings = embedder.embed(list(node_texts.values()))
+            edge_embeddings = embedder.embed(list(edge_texts.values()))
+
+            setattr(data, 'x', node_embeddings)
+            setattr(data, 'edge_attr', edge_embeddings)
+        
+        return node_texts, edge_texts
+
     
 
-    def get_graph_node_strs(self, edge_index: torch.Tensor, distance = None):
+    def get_graph_node_strs(self, edge_index: torch.Tensor, distance = None, use_special_tokens=False):
         if distance is None:
             distance = self.distance
 
@@ -72,7 +94,8 @@ class TorchGraph:
             distance,
             label=self.metadata.node_label,
             use_attributes=self.use_attributes,
-            attribute_labels=self.metadata.node_attributes
+            attribute_labels=self.metadata.node_attributes,
+            use_special_tokens=use_special_tokens
         )
     
 
@@ -81,7 +104,8 @@ class TorchGraph:
             node_strs, 
             edge_index: torch.Tensor, 
             use_edge_types=False,
-            neg_samples=False
+            neg_samples=False,
+            use_special_tokens=False
         ):
 
         edge_strs = dict()
@@ -100,18 +124,21 @@ class TorchGraph:
                 edge_label = ""
                 edge_type = ""
             
-            # if use_edge_types:
-            #     edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {edge_type} {EDGE_END} {NODE_LABEL} {v_str}"
-            # else:
-            #     edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {EDGE_END} {NODE_LABEL} {v_str}"
-
-            if use_edge_types:
-                edge_str = f"{u_str} {edge_label} {edge_type} {v_str}"
+            if use_special_tokens:
+                if use_edge_types:
+                    edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {edge_type} {EDGE_END} {NODE_LABEL} {v_str}"
+                else:
+                    edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {EDGE_END} {NODE_LABEL} {v_str}"
             else:
-                edge_str = f"{u_str} {edge_label} {v_str}"
+                if use_edge_types:
+                    edge_str = f"{u_str} {edge_label} {edge_type} {v_str}"
+                else:
+                    edge_str = f"{u_str} {edge_label} {v_str}"
 
             edge_strs[(u, v)] = edge_str
 
+        # if len(edge_strs):
+        #     print(list(edge_strs.values())[-1])
         return edge_strs
     
 
@@ -145,12 +172,13 @@ class TorchEdgeGraph(TorchGraph):
             save_dir: str,
             distance = 1,
             test_ratio=0.2,
+
+            embedder: Embedder=None,
             use_neg_samples=False,
             neg_samples_ratio=1,
             use_edge_types=False,
             use_attributes=False,
-            regen_embeddings=False,
-            reload=False,
+            use_special_tokens=False,
         ):
 
         super().__init__(
@@ -161,23 +189,13 @@ class TorchEdgeGraph(TorchGraph):
             test_ratio, 
             use_edge_types, 
             use_attributes, 
-            reload,
-            regen_embeddings=regen_embeddings,
+            use_special_tokens=use_special_tokens,
         )
-        # print("Processing graph...")
-        # print(graph.graph_id)
         self.use_neg_samples = use_neg_samples
         self.neg_sampling_ratio = neg_samples_ratio
-        self.process_graph()
+        self.data, self.node_texts, self.edge_texts = self.get_pyg_data(embedder)
+        self.validate_data()
     
-
-    def process_graph(self, embedder=None):
-        if not self.load_pyg_data(embedder) or self.reload:
-            self.data, self.node_texts, self.edge_texts = self.get_pyg_data(embedder)
-            self.validate_data()
-                    
-        self.save()
-
     
     def get_pyg_data(self, embedder: Embedder):
         
@@ -220,7 +238,6 @@ class TorchEdgeGraph(TorchGraph):
             test_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
             test_data.neg_edge_label = torch.tensor([], dtype=torch.long)
 
-        # print(train_data.neg_edge_label_index.shape)
 
         if hasattr(train_data, 'neg_edge_label_index'):
             assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
@@ -242,19 +259,11 @@ class TorchEdgeGraph(TorchGraph):
         setattr(d, 'overall_edge_index', self.graph.edge_index)
         setattr(d, 'edge_index', edge_index)
 
-        node_texts = self.get_graph_node_strs(edge_index)
-        edge_texts = self.get_graph_edge_strs_from_node_strs(
-            node_strs=node_texts, 
-            edge_index=self.graph.edge_index, 
-            use_edge_types=self.use_edge_types
+        node_texts, edge_texts = self.get_node_edge_strings(
+            d,
+            edge_index=edge_index, 
+            embedder=embedder
         )
-
-        if embedder is not None:
-            node_embeddings = embedder.embed(list(node_texts.values()))
-            edge_embeddings = embedder.embed(list(edge_texts.values()))
-
-            setattr(d, 'x', node_embeddings)
-            setattr(d, 'edge_attr', edge_embeddings)
 
         setattr(d, 'num_nodes', self.graph.number_of_nodes())
         return d, node_texts, edge_texts
@@ -266,34 +275,34 @@ class TorchEdgeGraph(TorchGraph):
         return path
 
 
-    def load_pyg_data(self, embedder=None):
+    # def load_pyg_data(self, embedder: Embedder=None):
 
-        if os.path.exists(self.save_idx):
-            self.save_to_mapping()
-            self.data = torch.load(f"{self.save_idx}/data.pt")
-            self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
-            self.edge_texts = pickle.load(open(f"{self.save_idx}/edge_texts.pkl", 'rb'))
+    #     if os.path.exists(self.save_idx):
+    #         self.save_to_mapping()
+    #         self.data = torch.load(f"{self.save_idx}/data.pt")
+    #         self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
+    #         self.edge_texts = pickle.load(open(f"{self.save_idx}/edge_texts.pkl", 'rb'))
 
-            if embedder is not None and (self.data.x is None or self.regen_embeddings):
-                node_embeddings = embedder.embed(list(self.node_texts.values()))
-                self.data.x = node_embeddings
+    #         if embedder is not None and (self.data.x is None or self.regen_embeddings):
+    #             node_embeddings = embedder.embed(list(self.node_texts.values()))
+    #             self.data.x = node_embeddings
 
-            if embedder is not None and (self.data.edge_attr is None or self.regen_embeddings):
-                edge_embeddings = embedder.embed(list(self.edge_texts.values()))
-                self.data.edge_attr = edge_embeddings
+    #         if embedder is not None and (self.data.edge_attr is None or self.regen_embeddings):
+    #             edge_embeddings = embedder.embed(list(self.edge_texts.values()))
+    #             self.data.edge_attr = edge_embeddings
             
-            self.save()
-            return True
+    #         self.save()
+    #         return True
 
-        return False
+    #     return False
 
 
-    def save(self):
-        os.makedirs(self.save_idx, exist_ok=True)
-        torch.save(self.data, f"{self.save_idx}/data.pt")
-        pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
-        pickle.dump(self.edge_texts, open(f"{self.save_idx}/edge_texts.pkl", 'wb'))
-        self.save_to_mapping()
+    # def save(self):
+    #     os.makedirs(self.save_idx, exist_ok=True)
+    #     torch.save(self.data, f"{self.save_idx}/data.pt")
+    #     pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
+    #     pickle.dump(self.edge_texts, open(f"{self.save_idx}/edge_texts.pkl", 'wb'))
+    #     self.save_to_mapping()
 
 
 
@@ -305,10 +314,10 @@ class TorchNodeGraph(TorchGraph):
             save_dir: str,
             distance = 1,
             test_ratio=0.2,
-            reload=False,
+            embedder: Embedder=None,
             use_edge_types=False,
             use_attributes=False,
-            regen_embeddings=False,
+            use_special_tokens=False,
         ):
 
         super().__init__(
@@ -318,21 +327,13 @@ class TorchNodeGraph(TorchGraph):
             distance, 
             test_ratio, 
             use_edge_types, 
-            reload=reload,
             use_attributes=use_attributes,
-            regen_embeddings=regen_embeddings
+            use_special_tokens=use_special_tokens
         )
         
-        self.process_graph()
-    
-
-    def process_graph(self, embedder=None):
-        if not self.load_pyg_data(embedder) or self.reload:
-            self.data, self.node_texts = self.get_pyg_data(embedder)
-            self.validate_data()
-                    
-        self.save()
-
+        self.data, self.node_texts, self.edge_texts = self.get_pyg_data(embedder)
+        self.validate_data()
+            
     
     def get_pyg_data(self, embedder: Embedder):
         d = Data()
@@ -360,18 +361,14 @@ class TorchNodeGraph(TorchGraph):
         edge_index = self.graph.edge_index
         setattr(d, 'edge_index', edge_index)
 
+        node_texts, edge_texts = self.get_node_edge_strings(
+            d,
+            edge_index=edge_index, 
+            embedder=embedder
+        )
 
-        node_texts = self.get_graph_node_strs(
-            edge_index, self.distance
-        ) ### Considering nodes with edges only in the subgraph
-
-        node_embeddings= None
-        if embedder is not None:
-            node_embeddings = embedder.embed(list(node_texts.values()))
-            setattr(d, 'x', node_embeddings)
-        
         setattr(d, 'num_nodes', self.graph.number_of_nodes())
-        return d, node_texts
+        return d, node_texts, edge_texts
         
 
     @property
@@ -385,28 +382,28 @@ class TorchNodeGraph(TorchGraph):
         return path
 
 
-    def load_pyg_data(self, embedder=None):
+    # def load_pyg_data(self, embedder=None):
 
-        if os.path.exists(self.save_idx):
-            self.save_to_mapping()
-            self.data = torch.load(f"{self.save_idx}/data.pt")
-            self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
-            if embedder is not None and (self.data.x is None or self.regen_embeddings):
-                print("Embeddings not found. Generating...")
-                node_embeddings = embedder.embed(list(self.node_texts.values()))
-                self.data.x = node_embeddings
-                self.save()
+    #     if os.path.exists(self.save_idx):
+    #         self.save_to_mapping()
+    #         self.data = torch.load(f"{self.save_idx}/data.pt")
+    #         self.node_texts = pickle.load(open(f"{self.save_idx}/node_texts.pkl", 'rb'))
+    #         if embedder is not None and (self.data.x is None or self.regen_embeddings):
+    #             print("Embeddings not found. Generating...")
+    #             node_embeddings = embedder.embed(list(self.node_texts.values()))
+    #             self.data.x = node_embeddings
+    #             self.save()
 
-            return True
+    #         return True
 
-        return False
+    #     return False
 
 
-    def save(self):
-        os.makedirs(self.save_idx, exist_ok=True)
-        torch.save(self.data, f"{self.save_idx}/data.pt")
-        pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
-        self.save_to_mapping()
+    # def save(self):
+    #     os.makedirs(self.save_idx, exist_ok=True)
+    #     torch.save(self.data, f"{self.save_idx}/data.pt")
+    #     pickle.dump(self.node_texts, open(f"{self.save_idx}/node_texts.pkl", 'wb'))
+    #     self.save_to_mapping()
 
 
 

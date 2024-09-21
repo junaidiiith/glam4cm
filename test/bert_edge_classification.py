@@ -14,6 +14,7 @@ from sklearn.metrics import (
     balanced_accuracy_score
 )
 
+from tokenization.utils import get_special_tokens, get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -53,6 +54,7 @@ def run(args):
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
+        language = args.language,
         reload=args.reload
     )
     dataset_name = args.dataset
@@ -67,6 +69,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_embeddings=args.use_embeddings,
+        use_special_tokens=args.use_special_tokens,
     )
 
 
@@ -79,7 +82,7 @@ def run(args):
 
 
     model_name = args.model_name
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
 
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
