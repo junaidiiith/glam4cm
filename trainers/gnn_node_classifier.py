@@ -107,6 +107,7 @@ class GNNNodeClassificationTrainer(Trainer):
                     data.edge_index,
                     data.edge_attr if self.use_edge_attrs else None
                 )
+                
                 scores = self.get_prediction_score(h)[data.test_node_mask]
                 labels = getattr(data, f"node_{self.cls_label}")[data.test_node_mask]
 

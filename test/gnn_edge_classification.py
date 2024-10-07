@@ -46,7 +46,11 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    input_dim = args.input_dim
+    graph_torch_data = graph_dataset.get_torch_geometric_data(
+        use_node_types=args.use_node_types,
+    )
+
+    input_dim = graph_torch_data[0].x.shape[1]
 
 
     model_name = args.gnn_conv_model
@@ -65,13 +69,13 @@ def run(args):
     assert hasattr(graph_dataset, num_edges_label), f"Graph dataset does not have attribute {num_edges_label}"
     num_classes = getattr(graph_dataset, num_edges_label)
 
-    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
+    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.use_edge_attrs else None
 
     logs_dir = os.path.join(
         "logs",
         dataset_name,
         "gnn_edge_cls",
-        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+        f'{args.min_edges}_att_{int(args.use_attributes)}_et_{int(args.use_edge_types)}_nt_{int(args.use_node_types)}',
     )
 
     gnn_conv_model = GNNConv(
@@ -101,7 +105,7 @@ def run(args):
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
-        graph_dataset.get_torch_geometric_data(),
+        graph_torch_data,
         cls_label=args.cls_label,
         lr=args.lr,
         num_epochs=args.num_epochs,

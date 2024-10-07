@@ -83,9 +83,11 @@ class GNNLinkPredictionTrainer(Trainer):
         
         all_preds = torch.cat(all_preds, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
-        epoch_metrics = self.compute_metrics(all_preds, all_labels, multi_class=False)
+        epoch_metrics = self.compute_metrics(all_preds, all_labels)
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
+
+        return epoch_metrics
 
 
     def test(self):
@@ -116,7 +118,7 @@ class GNNLinkPredictionTrainer(Trainer):
 
             all_preds = torch.cat(all_preds, dim=0)
             all_labels = torch.cat(all_labels, dim=0)
-            epoch_metrics = self.compute_metrics(all_preds, all_labels, multi_class=False)
+            epoch_metrics = self.compute_metrics(all_preds, all_labels)
 
             epoch_metrics['loss'] = epoch_loss
             epoch_metrics['phase'] = 'test'
@@ -124,7 +126,8 @@ class GNNLinkPredictionTrainer(Trainer):
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
-            
+
+        return epoch_metrics        
 
     def compute_loss(self, pos_score, neg_score):
         pos_label = torch.ones(pos_score.size(0), dtype=torch.long).to(device)

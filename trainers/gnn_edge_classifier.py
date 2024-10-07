@@ -67,7 +67,7 @@ class GNNEdgeClassificationTrainer(Trainer):
             edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
             
             h = self.get_logits(x, edge_index, edge_attr)
-
+            # import code; code.interact(local=locals())
             scores = self.get_prediction_score(h, edge_index, edge_attr)
             labels = getattr(data, f"edge_{self.cls_label}")[train_mask]
             loss = self.criterion(scores, labels.to(device))
@@ -85,6 +85,8 @@ class GNNEdgeClassificationTrainer(Trainer):
         epoch_metrics = self.compute_metrics(all_preds, all_labels)
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
+
+        return epoch_metrics
 
 
     def test(self):
@@ -120,3 +122,5 @@ class GNNEdgeClassificationTrainer(Trainer):
             self.results.append(epoch_metrics)
 
             print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
+        
+        return epoch_metrics

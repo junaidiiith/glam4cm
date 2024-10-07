@@ -42,6 +42,7 @@ class TorchGraph:
             distance = 1,
             test_ratio=0.2,
             use_edge_types=False,
+            use_node_types=False,
             use_attributes=False,
             use_special_tokens=False
         ):
@@ -51,6 +52,7 @@ class TorchGraph:
         
         self.raw_data = graph.xmi if hasattr(graph, 'xmi') else graph.json_obj
         self.use_edge_types = use_edge_types
+        self.use_node_types = use_node_types
         self.use_attributes = use_attributes
         self.use_special_tokens = use_special_tokens
         
@@ -70,6 +72,7 @@ class TorchGraph:
             node_strs=node_texts, 
             edge_index=self.graph.edge_index, 
             use_edge_types=self.use_edge_types,
+            use_node_types=self.use_node_types,
             use_special_tokens=self.use_special_tokens
         )
 
@@ -104,15 +107,20 @@ class TorchGraph:
             node_strs, 
             edge_index: torch.Tensor, 
             use_edge_types=False,
+            use_node_types=False,
             neg_samples=False,
             use_special_tokens=False
         ):
+        if use_node_types:
+            assert hasattr(self.metadata, 'type'), "Metadata does not have type attribute but use_node_types is True"
 
         edge_strs = dict()
         label = self.metadata.edge_label
         for u, v in edge_index.t().tolist():
-            u_str = node_strs[u]
-            v_str = node_strs[v]
+            u_dict = self.graph.nodes[self.graph.id_to_node_label[u]]
+            v_dict = self.graph.nodes[self.graph.id_to_node_label[v]]
+            u_str = f"{u_dict['type']}: {node_strs[u]}" if node_strs[u] and 'type' in u_dict else node_strs[u]
+            v_str = f"{v_dict['type']}: {node_strs[v]}" if node_strs[v] and 'type' in v_dict else node_strs[v]
             u_label = self.graph.id_to_node_label[u]
             v_label = self.graph.id_to_node_label[v]
 
@@ -177,6 +185,7 @@ class TorchEdgeGraph(TorchGraph):
             use_neg_samples=False,
             neg_samples_ratio=1,
             use_edge_types=False,
+            use_node_types=False,
             use_attributes=False,
             use_special_tokens=False,
         ):
@@ -188,6 +197,7 @@ class TorchEdgeGraph(TorchGraph):
             distance, 
             test_ratio, 
             use_edge_types, 
+            use_node_types,
             use_attributes, 
             use_special_tokens=use_special_tokens,
         )

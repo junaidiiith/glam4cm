@@ -15,13 +15,8 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import Adam
 
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    f1_score, 
-    accuracy_score
-)
-
 from tensorboardX import SummaryWriter
+from metrics import compute_classification_metrics
 
 
 class Trainer:
@@ -99,25 +94,6 @@ class Trainer:
             prediction_score = self.predictor(h)
         return prediction_score
         
-
-    def compute_metrics(self, predictions: torch.Tensor, labels: torch.Tensor, multi_class=True):
-        
-        scores = torch.argmax(predictions, dim=-1)
-        if multi_class:
-            f1 = f1_score(labels.numpy(), scores.numpy(), average='weighted')
-
-        else:
-            f1 = f1_score(labels.numpy(), scores.numpy())
-            
-        accuracy = accuracy_score(labels.numpy(), scores.numpy())
-        balanced_accuracy = balanced_accuracy_score(labels.numpy(), scores.numpy())
-
-        return {
-            'f1-score': f1,
-            'accuracy': accuracy,
-            'balanced_accuracy': balanced_accuracy
-        }
-    
     
     def plot_metrics(self):
         results = pd.DataFrame(self.results)
@@ -140,3 +116,8 @@ class Trainer:
             for k, v in test_metrics.items():
                 if k != 'phase':
                     self.writer.add_scalar(f"test/{k}", v, epoch)
+    
+        self.writer.close()
+    
+    def compute_metrics(self, all_preds, all_labels):
+        return compute_classification_metrics(all_preds, all_labels)

@@ -30,7 +30,6 @@ def run(args):
     dataset_name = args.dataset
 
     dataset = get_models_dataset(dataset_name, **config_params)
-
     graph_data_params = dict(
         distance=args.distance,
         reload=args.reload,
@@ -45,12 +44,16 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
+    graph_torch_data = graph_dataset.get_torch_geometric_data(
+        use_edge_types=args.use_edge_types,
+    )
+
     num_nodes_label = f"num_nodes_{args.cls_label}"
     assert hasattr(graph_dataset, num_nodes_label), f"Graph dataset does not have attribute {num_nodes_label}"
     num_classes = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
 
 
-    input_dim = args.input_dim
+    input_dim = graph_torch_data[0].x.shape[1]
 
     model_name = args.gnn_conv_model
 
@@ -65,7 +68,6 @@ def run(args):
     aggregation = args.aggregation
 
     edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
-
     gnn_conv_model = GNNConv(
         model_name=model_name,
         input_dim=input_dim,
@@ -99,7 +101,7 @@ def run(args):
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
-        graph_dataset.get_torch_geometric_data(),
+        graph_torch_data,
         cls_label=args.cls_label,
         exclude_labels=getattr(graph_dataset, f"node_exclude_{args.cls_label}"),
         lr=args.lr,

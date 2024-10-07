@@ -1,3 +1,4 @@
+from sklearn.model_selection import train_test_split
 from test.common_args import (
     get_common_args_parser, 
     get_gpt_args_parser
@@ -39,6 +40,8 @@ def run(args):
         **graph_params
     )
 
+    train_dataset, test_dataset = train_test_split(graph_dataset, test_size=0.05)
+
     cmgpt = CMGPT(
         vocab_size=len(tokenizer),
         embed_dim=args.embed_dim,
@@ -49,7 +52,8 @@ def run(args):
 
     trainer = CMGPTTrainer(
         cmgpt, 
-        graph_dataset,
+        train_dataset=train_dataset,
+        test_dataset=test_dataset,
         test_ratio=0.05, 
         batch_size=args.batch_size, 
         num_epochs=args.num_epochs

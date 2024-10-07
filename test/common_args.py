@@ -26,6 +26,7 @@ def get_common_args_parser():
     
     parser.add_argument('--use_attributes', action='store_true')
     parser.add_argument('--use_edge_types', action='store_true')
+    parser.add_argument('--use_node_types', action='store_true')
 
 
     ### Model Dataset Loading

@@ -165,7 +165,7 @@ class CMGPT(nn.Module):
             self.apply(weights_init)
 
 
-    def forward(self, x, attention_mask):
+    def forward(self, x, attention_mask, labels=None):
         """
         x: [batch_size, seq_len]
         attention_mask: [batch_size, seq_len]
@@ -174,6 +174,9 @@ class CMGPT(nn.Module):
         """
         embeddings = self.get_embedding(x, attention_mask)
         logits = self.lm_head(embeddings)
+        if labels is not None:
+            loss = self.get_loss(logits, labels)
+            return logits, loss
         return logits
 
 
@@ -290,7 +293,7 @@ class CMGPTClassifier(nn.Module):
         self.classifier = FeedFoward(input_dim=embed_dim, num_classes=num_classes)
         self.apply(weights_init)
 
-    def forward(self, x, attention_mask, pool=None):
+    def forward(self, x, attention_mask, labels=None, pool=None):
         # x: [batch_size, seq_len]
         # attention_mask: [batch_size, seq_len]
         lm_logits = self.model.get_embedding(x, attention_mask)
@@ -302,6 +305,10 @@ class CMGPTClassifier(nn.Module):
             lm_logits = lm_logits[:, -1, :]
         
         logits = self.classifier(lm_logits)
+
+        if labels is not None:
+            loss = self.get_loss(logits, labels)
+            return logits, loss
         return logits
     
     def get_loss(self, logits, labels):

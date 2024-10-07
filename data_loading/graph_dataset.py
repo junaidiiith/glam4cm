@@ -76,6 +76,7 @@ class GraphDataset(torch.utils.data.Dataset):
         distance=1,
         use_attributes=False,
         use_edge_types=False,
+        use_node_types=False,
         
         test_ratio=0.2,
 
@@ -110,6 +111,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
         os.makedirs(self.save_dir, exist_ok=True)
         self.use_edge_types = use_edge_types
+        self.use_node_types = use_node_types
         self.use_attributes = use_attributes
         self.graphs: List[TorchNodeGraph, TorchEdgeGraph] = []
 
@@ -312,10 +314,29 @@ class GraphDataset(torch.utils.data.Dataset):
                 setattr(torch_graph, 'text', doc_tokenizer(" ".join(node_names)))
 
 
-    def get_torch_geometric_data(self):
-        # for g in self.graphs:
-        #     print(list(g.node_texts.values())[:10])
-        #     exit(0)
+    def get_torch_geometric_data(self, use_node_types=False, use_edge_types=False):
+        def set_types(prefix):
+            num_classes = max((max(getattr(g.data, f"{prefix}_type")) for g in self.graphs)) + 1
+            print(f"Number of {prefix} types: {num_classes}")
+            for g in self.graphs:
+                types = torch.nn.functional.one_hot(getattr(g.data, f"{prefix}_type"), num_classes).to(g.data.x.device)
+                if prefix == 'node':
+                    g.data.x = torch.cat([g.data.x, types], dim=1)
+                elif prefix == 'edge':
+                    g.data.edge_attr = torch.cat([g.data.edge_attr, types], dim=1)
+            
+            node_dim = self.graphs[0].data.x.shape[1]
+            assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
+            edge_dim = self.graphs[0].data.edge_attr.shape[1]
+            assert all(g.data.edge_attr.shape[1] == edge_dim for g in self.graphs), "Edge types not added correctly"
+
+        if use_node_types:
+            set_types('node')
+        
+        if use_edge_types:
+            set_types('edge')
+
+        
         return [g.data for g in self.graphs]
     
     
@@ -391,6 +412,7 @@ class GraphEdgeDataset(GraphDataset):
             use_special_tokens=False,
             use_attributes=False,
             use_edge_types=False,
+            use_node_types=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
             no_shuffle=False,
@@ -409,6 +431,7 @@ class GraphEdgeDataset(GraphDataset):
             embed_model_name=embed_model_name,
             ckpt=ckpt,
             use_edge_types=use_edge_types,
+            use_node_types=use_node_types,
             use_attributes=use_attributes,
             no_shuffle=no_shuffle,
             randomize_ne=randomize_ne,
@@ -425,6 +448,7 @@ class GraphEdgeDataset(GraphDataset):
         save_path += f'_nsr_{int(neg_sampling_ratio)}' if add_negative_train_samples else ''
         save_path += f'_et_{int(use_edge_types)}' if use_edge_types else ''
         save_path += f'_attr_{int(use_attributes)}' if use_attributes else ''
+        save_path += f'_nt_{int(use_node_types)}' if use_node_types else ''
         save_path += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
         save_path += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
         save_path += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
@@ -450,6 +474,7 @@ class GraphEdgeDataset(GraphDataset):
                     use_neg_samples=add_negative_train_samples,
                     neg_samples_ratio=neg_sampling_ratio,
                     use_edge_types=use_edge_types,
+                    use_node_types=use_node_types,
                     use_attributes=use_attributes,
                     use_special_tokens=use_special_tokens,
                 ) 
@@ -513,12 +538,21 @@ class GraphEdgeDataset(GraphDataset):
                 edge_strs = list(edge_strs.values())
                 data[f'{edge_index_label}_edges'] += edge_strs
 
+
             if task_type == LP_TASK_EDGE_CLS:
                 train_mask = graph.data.train_edge_mask
                 test_mask = graph.data.test_edge_mask
                 data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_mask]
                 data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_mask]
 
+
+        print(data[f'train_pos_edges'][:20])
+        print(data[f'test_pos_edges'][:20])
+
+        edge_label_map = getattr(self, f"edge_label_map_{label}")
+
+        print(edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
+        print(edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))
         return data
     
 
@@ -534,6 +568,7 @@ class GraphEdgeDataset(GraphDataset):
             label, 
             task_type
         )
+
 
         print("Tokenizing data")
         if task_type == LP_TASK_EDGE_CLS:
@@ -578,6 +613,7 @@ class GraphNodeDataset(GraphDataset):
             reload=False,
             
             use_attributes=False,
+
             use_edge_types=False,
             use_special_tokens=False,
 
@@ -705,9 +741,9 @@ class GraphNodeDataset(GraphDataset):
 
     def get_node_classification_lm_data(
         self, 
-        label,
+        label: str,
         tokenizer: AutoTokenizer,
-        distance, 
+        distance: int = 1, 
     ):
         data = self.get_node_classification_texts(distance, label)
         dataset = {

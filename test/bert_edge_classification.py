@@ -14,7 +14,7 @@ from sklearn.metrics import (
     balanced_accuracy_score
 )
 
-from tokenization.utils import get_special_tokens, get_tokenizer
+from tokenization.utils import get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -69,6 +69,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_embeddings=args.use_embeddings,
+        use_node_types=args.use_node_types,
         use_special_tokens=args.use_special_tokens,
     )
 
@@ -140,6 +141,7 @@ def run(args):
     )
 
     trainer.train()
+    print(trainer.evaluate())
     trainer.save_model()
 
 
