@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import Adam
 
 from tensorboardX import SummaryWriter
-from metrics import compute_classification_metrics
+from trainers.metrics import compute_classification_metrics
 
 
 class Trainer:

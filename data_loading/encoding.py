@@ -16,8 +16,7 @@ class EncodingDataset(Dataset):
             # print(f'Dataset with {len(texts)} samples before removing duplicates')
             texts_to_id = {text: i for i, text in enumerate(texts)}
             texts = list(texts_to_id.keys())
-            labels = [labels[i] for i in texts_to_id.values()] if labels else None
-            
+            labels = [labels[i] for i in texts_to_id.values()] if labels else None            
         
         # print(f'Created dataset with {len(texts)} samples')
 
@@ -28,6 +27,7 @@ class EncodingDataset(Dataset):
             padding='max_length', 
             max_length=max_length
         )
+        print("Number of Texts: ", len(texts))
         if labels:
             self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels else None
 

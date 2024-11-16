@@ -14,17 +14,18 @@ class BertEmbedder(Embedder):
         self.model.to(device)
         self.finetuned = bool(ckpt)
     
-    def embed(self, text: Union[str, List[str]], aggregate='mean'):
+    def embed(self, text: Union[str, List[str]], aggregate='cls'):
         dataset = EncodingDataset(self.tokenizer, texts=text, remove_duplicates=False)
         loader = DataLoader(dataset, batch_size=128)
 
         with torch.no_grad():
             embeddings = []
             for batch in loader:
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                outputs = self.model(input_ids, attention_mask)
-                embeddings.append(outputs.last_hidden_state)
+                outputs = self.model(
+                    batch['input_ids'].to(device), 
+                    batch['attention_mask'].to(device)
+                )
+                embeddings.append(outputs.last_hidden_state.cpu())
                 
             
             embeddings = torch.cat(embeddings, dim=0)

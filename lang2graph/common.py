@@ -3,6 +3,7 @@ import networkx as nx
 from uuid import uuid4
 import torch
 from tokenization.special_tokens import *
+from tokenization.utils import doc_tokenizer
 
 SEP = ' '
 REFERENCE = 'reference'
@@ -129,6 +130,7 @@ def get_node_texts(
         use_attributes=False, 
         attribute_labels='attributes',
         use_special_tokens=False,
+        preprocessor: callable = doc_tokenizer
     ):
     """
     Create node string for each node n in a graph using neighbors of n up to h hops.
@@ -164,6 +166,9 @@ def get_node_texts(
                         attribute_labels
                     ) for i in sorted(next_level_nodes)
                 ]
+                if preprocessor:
+                    node_strs = [preprocessor(node_str) for node_str in node_strs]
+                    
                 node_str += f" {node_sep}{', '.join(node_strs)}"
             current_level_nodes = next_level_nodes
 

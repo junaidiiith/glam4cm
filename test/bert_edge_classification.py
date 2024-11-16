@@ -4,7 +4,7 @@ from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.utils import oversample_dataset
 from settings import LP_TASK_EDGE_CLS
 from test.common_args import get_bert_args_parser, get_common_args_parser
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification
 from test.utils import get_models_dataset
 
 from sklearn.metrics import (
@@ -85,7 +85,7 @@ def run(args):
     model_name = args.model_name
     tokenizer = get_tokenizer(model_name, args.use_special_tokens)
 
-    print("Getting link prediction data")
+    print("Getting Edge Classification data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
         distance=distance,
@@ -102,18 +102,22 @@ def run(args):
     model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
     model.resize_token_embeddings(len(tokenizer))
 
+    if args.freeze_pretrained_weights:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+
     output_dir = os.path.join(
         'results',
         dataset_name,
         'edge_cls',
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_node_types)}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'edge_cls',
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
+        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_node_types)}",
     )
 
     training_args = TrainingArguments(

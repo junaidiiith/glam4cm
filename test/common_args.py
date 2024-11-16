@@ -27,6 +27,7 @@ def get_common_args_parser():
     parser.add_argument('--use_attributes', action='store_true')
     parser.add_argument('--use_edge_types', action='store_true')
     parser.add_argument('--use_node_types', action='store_true')
+    parser.add_argument('--use_special_tokens', action='store_true')
 
 
     ### Model Dataset Loading
@@ -81,8 +82,9 @@ def get_gnn_args_parser():
 
 def get_bert_args_parser():
     parser = ArgumentParser()
+
+    parser.add_argument('--freeze_pretrained_weights', action='store_true')
     parser.add_argument('--model_name', type=str, default='bert-base-uncased')
-    parser.add_argument('--use_special_tokens', action='store_true')
 
     parser.add_argument('--warmup_steps', type=int, default=200)
     parser.add_argument('--num_log_steps', type=int, default=200)

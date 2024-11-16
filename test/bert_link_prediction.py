@@ -6,7 +6,7 @@ from settings import LP_TASK_LINK_PRED
 from test.common_args import get_bert_args_parser, get_common_args_parser
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification
 
 from sklearn.metrics import (
     f1_score, 
@@ -14,9 +14,8 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     recall_score
 )
-import torch.nn.functional as F
 
-from tokenization.utils import get_special_tokens, get_tokenizer
+from tokenization.utils import get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -69,10 +68,11 @@ def run(args):
     print("Loaded dataset")
 
     graph_data_params = dict(
-        distance=args.distance,
+        distance=0,
         reload=args.reload,
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
+        use_node_types=args.use_node_types,
         add_negative_train_samples=True,
         use_special_tokens=args.use_special_tokens,
     )
@@ -99,6 +99,11 @@ def run(args):
     model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=2)
     model.resize_token_embeddings(len(tokenizer))
 
+    if args.freeze_pretrained_weights:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+
+
     output_dir = os.path.join(
         'results',
         dataset_name,
@@ -112,7 +117,7 @@ def run(args):
         'lp',
         f"{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
     )
-
+    
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.num_epochs,
@@ -120,10 +125,10 @@ def run(args):
         per_device_eval_batch_size=128,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=200,
+        logging_steps=20,
         eval_strategy='steps',
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=50,
+        save_steps=50,
         save_total_limit=2,
         load_best_model_at_end=True,
         fp16=True,
@@ -138,3 +143,5 @@ def run(args):
     )
 
     trainer.train()
+    print(trainer.evaluate())
+    trainer.save_model()

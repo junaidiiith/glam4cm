@@ -39,6 +39,9 @@ def run(args):
         distance=args.distance,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
+        use_node_types=args.use_node_types,
+        # use_edge_types=args.use_edge_types,
+        use_special_tokens=args.use_special_tokens,
         ckpt=args.ckpt
     )
 
@@ -52,7 +55,6 @@ def run(args):
 
     input_dim = graph_torch_data[0].x.shape[1]
 
-
     model_name = args.gnn_conv_model
 
     hidden_dim = args.hidden_dim
@@ -60,7 +62,7 @@ def run(args):
     num_conv_layers = args.num_conv_layers
     num_mlp_layers = args.num_mlp_layers
     num_heads = args.num_heads
-    residual = True
+    residual = False
     l_norm = args.l_norm
     dropout = args.dropout
     aggregation = args.aggregation

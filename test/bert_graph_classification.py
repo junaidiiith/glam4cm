@@ -6,7 +6,6 @@ from sklearn.metrics import (
     recall_score
 )
 from transformers import (
-    AutoTokenizer,
     AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments
@@ -109,6 +108,10 @@ def run(args):
             args.ckpt if args.ckpt else model_name, 
             num_labels=num_classes
         )
+
+        if args.freeze_pretrained_weights:
+            for param in model.base_model.parameters():
+                param.requires_grad = False
 
         # Training arguments
         training_args = TrainingArguments(

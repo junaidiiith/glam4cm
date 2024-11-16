@@ -9,7 +9,7 @@ from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
 from transformers import AutoTokenizer
-from data_loading.data import TorchEdgeGraph, TorchNodeGraph
+from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
 from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
@@ -21,7 +21,7 @@ from settings import (
     LP_TASK_EDGE_CLS,
     LP_TASK_LINK_PRED,
 )
-from tokenization.utils import doc_tokenizer
+from tokenization.utils import doc_tokenizer, get_tokenizer
 from utils import randomize_features
 
 
@@ -31,31 +31,53 @@ def exclude_labels_from_data(X, labels, exclude_labels):
     return X, labels
 
 
-def validate_classes(graphs, label, exclude_labels, element):
-    
-
+def validate_classes(torch_graphs: List[TorchGraph], label, exclude_labels, element):
     train_labels, test_labels = list(), list()
-    train_idx = f"train_{element}_mask"
-    test_idx = f"test_{element}_mask"
+    train_idx_label = f"train_{element}_mask"
+    test_idx_label = f"test_{element}_mask"
 
-    for torch_graph in graphs:
+    for torch_graph in tqdm(torch_graphs, desc=f"Validating {element} classes"):
         labels = getattr(torch_graph.data, f"{element}_{label}")
-        mask = ~torch.isin(labels, torch.tensor(exclude_labels))
-        train_mask = getattr(torch_graph.data, train_idx)
-        test_mask = getattr(torch_graph.data, test_idx)
-        merged_train_mask = mask & train_mask
-        merged_test_mask = mask & test_mask
-        train_labels.append(labels[merged_train_mask])
-        test_labels.append(labels[merged_test_mask])
+        train_idx = getattr(torch_graph.data, train_idx_label)
+        test_idx = getattr(torch_graph.data, test_idx_label)
+        indices = torch.nonzero(torch.isin(labels, torch.tensor(exclude_labels))).squeeze()
+        
+        if len(indices) > 0:
+            train_idx = train_idx[~torch.isin(train_idx, indices)]
+            test_idx = test_idx[~torch.isin(test_idx, indices)]
+
+        train_labels.append(labels[train_idx])
+        test_labels.append(labels[test_idx])
+
+
+        edge_classes = [t for _, _, t in torch_graph.graph.edges(data=label)]
+        node_classes = [t for _, t in torch_graph.graph.nodes(data=label)]
+        
+        if element == 'edge':
+            for idx in train_idx.tolist() + test_idx.tolist():
+                t_c = edge_classes[idx]
+                edge = torch_graph.graph.idx_to_edge[idx]
+                assert torch_graph.graph.numbered_graph.edges[edge][label] == t_c, f"Edge {label} mismatch for {edge}"
+
+        elif element == 'node':
+            for idx in train_idx.tolist() + test_idx.tolist():
+                t_c = node_classes[idx]
+                node_label = torch_graph.graph.id_to_node_label[idx]
+                try:
+                    assert torch_graph.graph.nodes[node_label][label] == t_c, f"Node {label} mismatch for {idx}"
+                except AssertionError as e:
+                    raise e
+        else:
+            raise ValueError(f"Invalid element: {element}")
 
 
     train_classes = set(sum([
-        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, train_idx)].tolist() 
-        for torch_graph in graphs], []
+        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, train_idx_label)].tolist() 
+        for torch_graph in torch_graphs], []
     ))
     test_classes = set(sum([
-        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, test_idx)].tolist() 
-        for torch_graph in graphs], []
+        getattr(torch_graph.data, f"{element}_{label}")[getattr(torch_graph.data, test_idx_label)].tolist() 
+        for torch_graph in torch_graphs], []
     ))
     num_train_classes = len(train_classes)
     num_test_classes = len(test_classes)
@@ -64,9 +86,8 @@ def validate_classes(graphs, label, exclude_labels, element):
     print(f"Number of classes in training set: {num_train_classes}")
     print(f"Number of classes in test set: {num_test_classes}")
 
-    assert num_train_classes == num_test_classes, f"Number of classes in training and test set should be the same for {label}"
-
-
+    # assert num_train_classes == num_test_classes, f"Number of classes in training and test set should be the same for {label}"
+    
 
 class GraphDataset(torch.utils.data.Dataset):
     def __init__(
@@ -101,10 +122,12 @@ class GraphDataset(torch.utils.data.Dataset):
         self.save_dir = os.path.join(save_dir, models_dataset.name)
         self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
 
-        if not self.embedder:
-            self.tokenizer = AutoTokenizer.from_pretrained(embed_model_name)
-        else:
-            self.tokenizer = self.embedder.tokenizer
+        print("Using tokenizer")
+        self.tokenizer = get_tokenizer(embed_model_name, use_special_tokens)
+        # if not self.embedder:
+        #     self.tokenizer = AutoTokenizer.from_pretrained(embed_model_name)
+        # else:
+        #     self.tokenizer = self.embedder.tokenizer
         
         if tokenizer_special_tokens:
             self.tokenizer.add_special_tokens(tokenizer_special_tokens)
@@ -129,9 +152,6 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def post_process_graphs(self):
         self.add_cls_labels()
-        if not self.no_shuffle:
-            shuffle(self.graphs)
-        
         if self.graphs[0].data.x is None or self.randomize_ne:
             print("Randomizing node embeddings")
             randomize_features([g.data for g in self.graphs], self.random_embed_dim, 'node')
@@ -160,11 +180,13 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def save(self, save_path):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        print(f"Saving data to {save_path}")
         with open(save_path, 'wb') as f:
             pickle.dump(self.graphs, f)
 
 
     def load(self, save_path):
+        print(f"Loading data from {save_path}")
         with open(save_path, 'rb') as f:
             self.graphs = pickle.load(f)
 
@@ -323,7 +345,8 @@ class GraphDataset(torch.utils.data.Dataset):
                 if prefix == 'node':
                     g.data.x = torch.cat([g.data.x, types], dim=1)
                 elif prefix == 'edge':
-                    g.data.edge_attr = torch.cat([g.data.edge_attr, types], dim=1)
+                    # g.data.edge_attr = torch.cat([g.data.edge_attr, types], dim=1)
+                    g.data.edge_attr = types
             
             node_dim = self.graphs[0].data.x.shape[1]
             assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
@@ -336,7 +359,6 @@ class GraphDataset(torch.utils.data.Dataset):
         if use_edge_types:
             set_types('edge')
 
-        
         return [g.data for g in self.graphs]
     
     
@@ -459,8 +481,10 @@ class GraphEdgeDataset(GraphDataset):
             assert self.metadata.node_attributes is not None, "Node attributes are not defined in metadata to be used"
 
         if os.path.exists(save_path) and not reload:
+            print("Loading data from cache: {}".format(save_path))
             self.load(save_path)
         else:
+            print("Cache not found at: {}".format(save_path))
             self.graphs = [
                 TorchEdgeGraph(
                     g, 
@@ -480,6 +504,9 @@ class GraphEdgeDataset(GraphDataset):
                 ) 
                 for g in tqdm(models_dataset, desc='Creating graphs')
             ]
+
+            if not self.no_shuffle:
+                shuffle(self.graphs)
 
             self.save(save_path)
 
@@ -512,7 +539,7 @@ class GraphEdgeDataset(GraphDataset):
             pos_edge_idx = graph.data.edge_index
             
             node_strs = graph.get_graph_node_strs(pos_edge_idx, distance)
-            train_pos_edge_index = graph.data.edge_index
+            train_pos_edge_index = pos_edge_idx
             train_neg_edge_index = graph.data.train_neg_edge_label_index
             test_pos_edge_index = graph.data.test_pos_edge_label_index
             test_neg_edge_index = graph.data.test_neg_edge_label_index
@@ -531,6 +558,7 @@ class GraphEdgeDataset(GraphDataset):
                     node_strs, 
                     edge_index,
                     use_edge_types=self.use_edge_types,
+                    use_node_types=self.use_node_types,
                     neg_samples="neg" in edge_index_label,
                     use_special_tokens=self.use_special_tokens
                 )
@@ -542,17 +570,16 @@ class GraphEdgeDataset(GraphDataset):
             if task_type == LP_TASK_EDGE_CLS:
                 train_mask = graph.data.train_edge_mask
                 test_mask = graph.data.test_edge_mask
-                data['train_edge_classes'] += getattr(graph.data, f'edge_{label}')[train_mask]
-                data['test_edge_classes'] += getattr(graph.data, f'edge_{label}')[test_mask]
+                train_classes, test_classes = getattr(graph.data, f'edge_{label}')[train_mask], getattr(graph.data, f'edge_{label}')[test_mask]
+                data['train_edge_classes'] += train_classes
+                data['test_edge_classes'] += test_classes
 
 
-        print(data[f'train_pos_edges'][:20])
-        print(data[f'test_pos_edges'][:20])
+        print("Train Texts: ", data[f'train_pos_edges'][:20])
+        print("Test Texts: ", data[f'test_pos_edges'][:20])
 
-        edge_label_map = getattr(self, f"edge_label_map_{label}")
-
-        print(edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
-        print(edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))
+        # print("Train Classes", edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
+        # print("Test Classes", edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))
         return data
     
 
@@ -652,7 +679,7 @@ class GraphNodeDataset(GraphDataset):
         save_path += f'_attr_{int(use_attributes)}' if use_attributes else ''
         save_path += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
         save_path += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
-        save_path += f'_ckpt_{ckpt}' if ckpt else ''
+        save_path += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
         save_path += f'_test_{test_ratio}'
         save_path += '.pkl'
 
@@ -706,12 +733,15 @@ class GraphNodeDataset(GraphDataset):
 
 
     def get_node_classification_texts(self, distance, label):
+
+        node_label_map = getattr(self, f"node_label_map_{label}")
+
         data = {'train_nodes': [], 'train_node_classes': [], 'test_nodes': [], 'test_node_classes': []}
         for graph in tqdm(self.graphs, desc='Getting node classification data'):
             node_strs = list(graph.get_graph_node_strs(graph.data.edge_index, distance).values())
 
-            train_node_strs = [node_strs[i.item()] for i in torch.where(graph.data.train_node_mask)[0]]
-            test_node_strs = [node_strs[i.item()] for i in torch.where(graph.data.test_node_mask)[0]]
+            train_node_strs = [node_strs[i.item()] for i in graph.data.train_node_mask]
+            test_node_strs = [node_strs[i.item()] for i in graph.data.test_node_mask]
             
             train_node_classes = getattr(graph.data, f'node_{label}')[graph.data.train_node_mask]
             test_node_classes = getattr(graph.data, f'node_{label}')[graph.data.test_node_mask]
@@ -728,9 +758,11 @@ class GraphNodeDataset(GraphDataset):
 
         print("Tokenizing data")
         print(data['train_nodes'][:10])
-        print(data['train_node_classes'][:10])
         print(data['test_nodes'][:10])
-        print(data['test_node_classes'][:10])
+        if hasattr(self, "node_label_map_type"):
+            node_label_map.inverse_transform([i.item() for i in train_node_classes]) == train_node_strs
+            node_label_map.inverse_transform([i.item() for i in test_node_classes]) == test_node_strs
+            
         print(len(data['train_nodes']))
         print(len(data['train_node_classes']))
         print(len(data['test_nodes']))

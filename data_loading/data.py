@@ -21,6 +21,7 @@ from torch_geometric.transforms import RandomLinkSplit
 import torch
 from torch_geometric.data import Data, Dataset
 from typing import List, Optional, Sequence, Union
+from tokenization.utils import doc_tokenizer
 
 
 def edge_index_to_idx(graph, edge_index):
@@ -31,6 +32,22 @@ def edge_index_to_idx(graph, edge_index):
         ], 
         dtype=torch.long
     )
+
+
+class GraphData(Data):    
+    def __inc__(self, key, value, *args, **kwargs):
+        if 'index' in key or 'node_mask' in key:
+            return self.num_nodes
+        elif 'edge_mask' in key:
+            return self.num_edges
+        else:
+            return 0
+
+    def __cat_dim__(self, key, value, *args, **kwargs):
+        if 'index' in key:
+            return 1
+        else:
+            return 0
 
 
 class TorchGraph:
@@ -77,6 +94,9 @@ class TorchGraph:
         )
 
         if embedder is not None:
+            # print("Embedding node and edge texts")
+            # print("Length of node texts: ", len(node_texts))
+            # print("Length of edge texts: ", len(edge_texts))
             node_embeddings = embedder.embed(list(node_texts.values()))
             edge_embeddings = embedder.embed(list(edge_texts.values()))
 
@@ -109,7 +129,8 @@ class TorchGraph:
             use_edge_types=False,
             use_node_types=False,
             neg_samples=False,
-            use_special_tokens=False
+            use_special_tokens=False, 
+            preprocessor: callable=doc_tokenizer
         ):
         if use_node_types:
             assert hasattr(self.metadata, 'type'), "Metadata does not have type attribute but use_node_types is True"
@@ -119,10 +140,15 @@ class TorchGraph:
         for u, v in edge_index.t().tolist():
             u_dict = self.graph.nodes[self.graph.id_to_node_label[u]]
             v_dict = self.graph.nodes[self.graph.id_to_node_label[v]]
-            u_str = f"{u_dict['type']}: {node_strs[u]}" if node_strs[u] and 'type' in u_dict else node_strs[u]
-            v_str = f"{v_dict['type']}: {node_strs[v]}" if node_strs[v] and 'type' in v_dict else node_strs[v]
+            u_str = f"{u_dict['type']}: {node_strs[u]}" if node_strs[u] and 'type' in u_dict and use_node_types else node_strs[u]
+            v_str = f"{v_dict['type']}: {node_strs[v]}" if node_strs[v] and 'type' in v_dict and use_node_types else node_strs[v]
+
             u_label = self.graph.id_to_node_label[u]
             v_label = self.graph.id_to_node_label[v]
+
+            if preprocessor is not None:
+                u_str = preprocessor(u_str)
+                v_str = preprocessor(v_str)
 
             if not neg_samples:
                 edge_data = self.graph.edges[u_label, v_label]
@@ -131,6 +157,9 @@ class TorchGraph:
             else:
                 edge_label = ""
                 edge_type = ""
+            
+            # if use_edge_types:
+            #     edge_str = f"{edge_type}"
             
             if use_special_tokens:
                 if use_edge_types:
@@ -142,11 +171,11 @@ class TorchGraph:
                     edge_str = f"{u_str} {edge_label} {edge_type} {v_str}"
                 else:
                     edge_str = f"{u_str} {edge_label} {v_str}"
+                
 
             edge_strs[(u, v)] = edge_str
 
-        # if len(edge_strs):
-        #     print(list(edge_strs.values())[-1])
+        # import code; code.interact(local=locals())
         return edge_strs
     
 
@@ -209,7 +238,7 @@ class TorchEdgeGraph(TorchGraph):
     
     def get_pyg_data(self, embedder: Embedder):
         
-        d = Data()
+        d = GraphData()
 
         transform = RandomLinkSplit(
             num_val=0, 
@@ -220,7 +249,7 @@ class TorchEdgeGraph(TorchGraph):
         )
 
         try:
-            train_data, _, test_data = transform(Data(
+            train_data, _, test_data = transform(GraphData(
                 edge_index=self.graph.edge_index, 
                 num_nodes=self.graph.number_of_nodes()
             ))
@@ -230,13 +259,9 @@ class TorchEdgeGraph(TorchGraph):
 
         train_idx = edge_index_to_idx(self.graph, train_data.edge_index)
         test_idx = edge_index_to_idx(self.graph, test_data.pos_edge_label_index)
-        train_mask = torch.zeros(self.graph.edge_index.size(1), dtype=torch.bool)
-        train_mask[train_idx] = True
-        test_mask = torch.zeros(self.graph.edge_index.size(1), dtype=torch.bool)
-        test_mask[test_idx] = True
 
-        setattr(d, 'train_edge_mask', train_mask)
-        setattr(d, 'test_edge_mask', test_mask)
+        setattr(d, 'train_edge_mask', train_idx)
+        setattr(d, 'test_edge_mask', test_idx)
 
 
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
@@ -266,6 +291,7 @@ class TorchEdgeGraph(TorchGraph):
 
 
         edge_index = train_data.edge_index
+        # import code; code.interact(local=locals())
         setattr(d, 'overall_edge_index', self.graph.edge_index)
         setattr(d, 'edge_index', edge_index)
 
@@ -276,6 +302,7 @@ class TorchEdgeGraph(TorchGraph):
         )
 
         setattr(d, 'num_nodes', self.graph.number_of_nodes())
+        setattr(d, 'num_edges', self.graph.number_of_edges())
         return d, node_texts, edge_texts
     
 
@@ -346,7 +373,7 @@ class TorchNodeGraph(TorchGraph):
             
     
     def get_pyg_data(self, embedder: Embedder):
-        d = Data()
+        d = GraphData()
         train_nodes, test_nodes = train_test_split(
             list(self.graph.numbered_graph.nodes), test_size=self.test_ratio, shuffle=True, random_state=42
         )
@@ -354,15 +381,9 @@ class TorchNodeGraph(TorchGraph):
         train_idx = torch.tensor(train_nodes, dtype=torch.long)
         test_idx = torch.tensor(test_nodes, dtype=torch.long)
 
-        train_mask = torch.zeros(self.graph.number_of_nodes(), dtype=torch.bool)
-        train_mask[train_idx] = True
-        test_mask = torch.zeros(self.graph.number_of_nodes(), dtype=torch.bool)
-        test_mask[test_idx] = True
 
-
-        setattr(d, 'train_node_mask', train_mask)
-        setattr(d, 'test_node_mask', test_mask)
-
+        setattr(d, 'train_node_mask', train_idx)
+        setattr(d, 'test_node_mask', test_idx)
 
 
         assert all([self.graph.numbered_graph.has_node(n) for n in train_nodes])
@@ -473,7 +494,7 @@ class LinkPredictionCollater:
             node_offset += data.num_nodes
             edge_offset += data.edge_attr.size(0)
 
-        return Data(
+        return GraphData(
             x=torch.cat(x, dim=0),
             edge_index=torch.cat(edge_index, dim=1),
             edge_attr=torch.cat(edge_attr, dim=0),

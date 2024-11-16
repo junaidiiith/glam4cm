@@ -5,7 +5,7 @@ from data_loading.graph_dataset import GraphNodeDataset
 from data_loading.utils import oversample_dataset
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification
 
 from sklearn.metrics import (
     accuracy_score, 
@@ -107,6 +107,11 @@ def run(args):
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
     model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
+
+    if args.freeze_pretrained_weights:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+
     
     print("Training model")
     output_dir = os.path.join(

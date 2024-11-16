@@ -59,7 +59,7 @@ class GNNConv(torch.nn.Module):
             residual=False, 
             l_norm=False, 
             dropout=0.1,
-            aggregation='sum',
+            aggregation='mean',
             edge_dim=None
         ):
         super(GNNConv, self).__init__()
@@ -135,21 +135,25 @@ class GNNConv(torch.nn.Module):
     def forward(self, in_feat, edge_index, edge_attr=None):
         
         h = in_feat
-        h = self.conv_layers[0](h, edge_index, edge_attr) if edge_attr is not None else self.conv_layers[0](h, edge_index)
+        h = self.conv_layers[0](h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else self.conv_layers[0](h, edge_index)
         h = self.activation(h)
         if self.layer_norm is not None:
             h = self.layer_norm(h)
         h = self.dropout(h)
 
         for conv in self.conv_layers[1:-1]:
-            nh = conv(h, edge_index, edge_attr) if edge_attr is not None else conv(h, edge_index)
+            nh = conv(h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else conv(h, edge_index)
             h = nh if not self.residual else nh + h
             h = self.activation(h)
             if self.layer_norm is not None:
                 h = self.layer_norm(h)
             h = self.dropout(h)
         
-        h = self.conv_layers[-1](h, edge_index) if edge_attr is not None else self.conv_layers[-1](h, edge_index)
+        h = self.conv_layers[-1](h, edge_index)
+        h = self.activation(h)
+        if self.layer_norm is not None:
+            h = self.layer_norm(h)
+        h = self.dropout(h)
         return h
   
 
@@ -186,8 +190,9 @@ class EdgeClassifer(nn.Module):
         in_feats = input_dim * 2
         if edge_dim is not None:
             in_feats += edge_dim
-            
-        for _ in range(num_layers - 1):
+        
+        
+        for _ in range(num_layers):
             self.layers.append(nn.Linear(in_feats, hidden_dim, bias=bias))
             self.layers.append(nn.ReLU())
             self.layers.append(nn.Dropout(dropout))
@@ -200,11 +205,11 @@ class EdgeClassifer(nn.Module):
         h = torch.cat([x[edge_index[0]], x[edge_index[1]]], dim=-1)
         if edge_attr is not None:
             h = torch.cat([h, edge_attr], dim=-1)
-            
+        
         for layer in self.layers:
             h = layer(h)
         
-        return F.softmax(h, dim=-1)
+        return h
     
 
 class NodeClassifier(nn.Module):
@@ -249,7 +254,7 @@ class NodeClassifier(nn.Module):
         for layer in self.layers:
             h = layer(h)
         
-        return F.softmax(h, dim=-1)
+        return h
     
 
 class GraphClassifer(nn.Module):
@@ -285,4 +290,4 @@ class GraphClassifer(nn.Module):
         for layer in self.layers:
             h = layer(h)
         
-        return h.softmax(dim=-1)
+        return h

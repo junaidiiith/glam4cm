@@ -36,6 +36,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
+        use_edge_types=args.use_edge_types,
         randomize_ne=args.randomize_ne,
         ckpt=args.ckpt
     )
