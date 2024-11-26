@@ -10,7 +10,7 @@ from models.gnn_layers import (
 )
 
 from trainers.gnn_trainer import Trainer
-
+from tqdm.auto import tqdm
 from settings import device
 
 
@@ -42,7 +42,9 @@ class GNNLinkPredictionTrainer(Trainer):
             use_edge_attrs=use_edge_attrs,
             logs_dir=logs_dir
         )        
-        self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        self.dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True
+        )
         self.results = list()
 
         print("GNN Trainer initialized.")
@@ -56,7 +58,7 @@ class GNNLinkPredictionTrainer(Trainer):
         all_preds, all_labels = list(), list()
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
-        for data in self.dataloader:
+        for data in tqdm(self.dataloader, desc='Training Batches'):
             self.optimizer.zero_grad()
             self.model.zero_grad()
             self.predictor.zero_grad()
@@ -68,6 +70,7 @@ class GNNLinkPredictionTrainer(Trainer):
             edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
             
             h = self.get_logits(x, pos_edge_index, edge_attr)
+            # h = x
 
             pos_scores = self.get_prediction_score(h, pos_edge_index, edge_attr)
             neg_scores = self.get_prediction_score(h, neg_edge_index, edge_attr)
@@ -97,7 +100,7 @@ class GNNLinkPredictionTrainer(Trainer):
         with torch.no_grad():
             epoch_loss = 0
             epoch_metrics = defaultdict(float)
-            for data in self.dataloader:
+            for data in tqdm(self.dataloader, desc='Testing Batches'):
                 
                 x = data.x
                 pos_edge_index =  data.test_pos_edge_label_index
@@ -107,6 +110,7 @@ class GNNLinkPredictionTrainer(Trainer):
 
 
                 h = self.get_logits(x, pos_edge_index, edge_attr)
+                # h = x
                 pos_score = self.get_prediction_score(h, pos_edge_index, edge_attr)
                 neg_score = self.get_prediction_score(h, neg_edge_index, edge_attr)
 
@@ -125,7 +129,7 @@ class GNNLinkPredictionTrainer(Trainer):
             # print(f"Epoch Test Loss: {epoch_loss}\nTest Accuracy: {epoch_acc}\nTest F1: {epoch_f1}")
             self.results.append(epoch_metrics)
 
-            print(f"Epoch: {len(self.results)}\n{epoch_metrics}")
+            print(f"Test Epoch: {len(self.results)}\n{epoch_metrics}")
 
         return epoch_metrics        
 

@@ -8,6 +8,8 @@ import json
 from typing import List
 import xmltodict
 from torch_geometric.data import Data
+import networkx as nx
+import hashlib
 
 
 def find_files_with_extension(root_dir, extension):
@@ -33,6 +35,49 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
+
+import torch, os
+from tqdm.auto import tqdm
+from torch_geometric.data import Data
+
+
+def get_size_format(sz):
+	for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+		if sz < 1024.0:
+			return "%3.1f %s" % (sz, x)
+		sz /= 1024.0
+	
+
+def get_file_size(file_path):
+	sz = os.path.getsize(file_path)
+	return get_size_format(sz)
+
+def get_directory_size(directory):
+    total_size = 0
+    for dirpath, _, filenames in os.walk(directory):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total_size += os.path.getsize(fp)
+    return get_size_format(total_size)
+
+def get_tensor_size(tensor: torch.Tensor):
+	return get_size_format(tensor.element_size() * tensor.nelement())
+
+def get_size_of_data(data: Data):
+	size = 0
+	for _, value in data:
+		if isinstance(value, torch.Tensor):
+			size += value.element_size() * value.nelement()
+		elif isinstance(value, int):
+			size += value.bit_length() // 8
+						
+	return get_size_format(size)
+
+
+def md5_hash(input_string):
+    md5_hash = hashlib.md5()
+    md5_hash.update(input_string.encode('utf-8'))
+    return md5_hash.hexdigest()
 
 def randomize_features(dataset: List[Data], num_feats, mode):
     for data in dataset:

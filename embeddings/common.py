@@ -14,6 +14,10 @@ class Embedder:
     def embed(self, text: Union[str, List[str]], aggregate='mean') -> torch.Tensor:
         pass
 
+    @property
+    def embedding_dim(self) -> int:
+        pass
+
 
 def get_embedding_model(
         model_name: str,

@@ -1,9 +1,11 @@
 from abc import abstractmethod
 import networkx as nx
 from uuid import uuid4
+import numpy as np
 import torch
 from tokenization.special_tokens import *
 from tokenization.utils import doc_tokenizer
+from utils import md5_hash
 
 SEP = ' '
 REFERENCE = 'reference'
@@ -67,8 +69,12 @@ class LangGraph(nx.DiGraph):
 
     @property
     def edge_index(self):
-        edge_index = torch.tensor(list(self.numbered_graph.edges)).t().contiguous()
+        edge_index = torch.tensor(list(self.numbered_graph.edges)).t().contiguous().numpy()
         return edge_index
+
+    @property
+    def hash(self):
+        return md5_hash(str(sorted(self.edges)))
     
     def get_edge_id(self, edge):
         return self.edge_label_to_id[edge]
@@ -85,22 +91,25 @@ class LangGraph(nx.DiGraph):
     
 
 
-def create_graph_from_edge_index(graph, edge_index: torch.Tensor):
+def create_graph_from_edge_index(graph, edge_index: np.ndarray):
     """
     Create a subgraph from G using only the edges specified in edge_index.
     
     Parameters:
     G (networkx.Graph): The original graph.
-    edge_index (torch.Tensor): A tensor containing edge indices.
+    edge_index (numpy.ndarray): A numpy containing edge indices.
     
     Returns:
     networkx.Graph: A subgraph of G containing only the edges in edge_index.
     """
 
+    if isinstance(edge_index, torch.Tensor):
+        edge_index = edge_index.cpu().numpy()
+
     # Add nodes and edges from the edge_index to the subgraph
     subgraph = nx.DiGraph()
     subgraph.add_nodes_from(list(graph.numbered_graph.nodes(data=True)))
-    subgraph.add_edges_from([(u, v, graph.numbered_graph.edges[u, v]) for u, v in edge_index.t().tolist()])
+    subgraph.add_edges_from([(u, v, graph.numbered_graph.edges[u, v]) for u, v in edge_index.T])
     for node, data in subgraph.nodes(data=True):
         data = graph.numbered_graph.nodes[node]
         subgraph.nodes[node].update(data)
@@ -112,7 +121,7 @@ def create_graph_from_edge_index(graph, edge_index: torch.Tensor):
     subgraph.edge_label_to_id = graph.edge_label_to_id
     subgraph.id_to_edge_label = graph.id_to_edge_label
     try:
-        assert subgraph.number_of_edges() == edge_index.size(1)
+        assert subgraph.number_of_edges() == edge_index.shape[1]
     except AssertionError as e:
         print(f"Number of edges mismatch {subgraph.number_of_edges()} != {edge_index.size(1)}")
         import pickle

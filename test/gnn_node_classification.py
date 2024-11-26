@@ -38,6 +38,7 @@ def run(args):
         embed_model_name=args.embed_model_name,
         use_edge_types=args.use_edge_types,
         randomize_ne=args.randomize_ne,
+        no_labels=args.no_labels,
         ckpt=args.ckpt
     )
 
@@ -45,9 +46,7 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    graph_torch_data = graph_dataset.get_torch_geometric_data(
-        use_edge_types=args.use_edge_types,
-    )
+    graph_torch_data = graph_dataset.get_torch_dataset()
 
     num_nodes_label = f"num_nodes_{args.cls_label}"
     assert hasattr(graph_dataset, num_nodes_label), f"Graph dataset does not have attribute {num_nodes_label}"

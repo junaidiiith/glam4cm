@@ -62,19 +62,18 @@ def run(args):
         language = args.language
     )
     dataset_name = args.dataset
-    distance = args.distance
     dataset = get_models_dataset(dataset_name, **config_params)
 
     print("Loaded dataset")
 
     graph_data_params = dict(
-        distance=0,
         reload=args.reload,
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_node_types=args.use_node_types,
         add_negative_train_samples=True,
         use_special_tokens=args.use_special_tokens,
+        no_labels=args.no_labels,
     )
 
 
@@ -91,7 +90,6 @@ def run(args):
     print("Getting link prediction data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
-        distance=distance,
         task_type=LP_TASK_LINK_PRED
     )
 
@@ -121,14 +119,14 @@ def run(args):
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.num_epochs,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=128,
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.eval_batch_size,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=20,
+        logging_steps=200,
         eval_strategy='steps',
-        eval_steps=50,
-        save_steps=50,
+        eval_steps=200,
+        save_steps=200,
         save_total_limit=2,
         load_best_model_at_end=True,
         fp16=True,

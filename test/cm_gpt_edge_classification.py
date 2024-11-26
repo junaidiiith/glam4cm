@@ -44,7 +44,6 @@ def run(args):
 
     node_label_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
-        distance=1,
         label=args.cls_label
     )
 

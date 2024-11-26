@@ -14,6 +14,7 @@ from tqdm.auto import tqdm
 import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import Adam
+from torch_geometric.loader import DataLoader
 
 from tensorboardX import SummaryWriter
 from trainers.metrics import compute_classification_metrics
@@ -59,6 +60,11 @@ class Trainer:
 
         print("GNN Trainer initialized.")
 
+
+    def set_dataloader(self, dataset, batch_size):
+        self.dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True
+        )
 
     @abstractmethod
     def train(self):

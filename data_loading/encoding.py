@@ -27,11 +27,11 @@ class EncodingDataset(Dataset):
             padding='max_length', 
             max_length=max_length
         )
-        print("Number of Texts: ", len(texts))
+        # print("Number of Texts: ", len(texts))
         if labels:
             self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels else None
 
-            print("Number of labels: ", len(set(labels)))
+            # print("Number of labels: ", len(set(labels)))
  
 
     def __len__(self):

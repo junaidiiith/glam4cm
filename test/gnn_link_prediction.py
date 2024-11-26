@@ -27,29 +27,9 @@ def run(args):
         language = args.language
     )
     dataset_name = args.dataset
-
     dataset = get_models_dataset(dataset_name, **config_params)
-
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        add_negative_train_samples=True,
-        neg_sampling_ratio=args.neg_sampling_ratio,
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt
-    )
-
-    print("Loading graph dataset")
-    graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
-    print("Loaded graph dataset")
-
-
-    input_dim = args.input_dim
-
+    
     model_name = args.gnn_conv_model
-
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim
     num_conv_layers = args.num_conv_layers
@@ -68,41 +48,75 @@ def run(args):
         f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
     )
 
-    edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
-    gnn_conv_model = GNNConv(
-        model_name=model_name,
-        input_dim=input_dim,
-        hidden_dim=hidden_dim,
-        out_dim=output_dim,
-        num_layers=num_conv_layers,
-        num_heads=num_heads,
-        residual=residual,
-        l_norm=l_norm,
-        dropout=dropout,
-        aggregation=aggregation,
-        edge_dim=edge_dim
+
+    gnn_conv_model, mlp_predictor, trainer = None, None, None
+
+    graph_data_params = dict(
+        reload=args.reload,
+        test_ratio=args.test_ratio,
+        random_embed_dim=args.random_embed_dim,
+        add_negative_train_samples=True,
+        neg_sampling_ratio=args.neg_sampling_ratio,
+        use_node_types=args.use_node_types,
+        use_special_tokens=args.use_special_tokens,
+        no_labels=args.no_labels,
+        
+        use_embeddings=args.use_embeddings,
+        embed_model_name=args.embed_model_name,
+        ckpt=args.ckpt
     )
 
-    clf_input_dim = output_dim*num_heads if args.num_heads else output_dim
-    mlp_predictor = EdgeClassifer(
-        input_dim=clf_input_dim,
-        hidden_dim=hidden_dim,
-        num_layers=num_mlp_layers, 
-        num_classes=2,
-        edge_dim=edge_dim,
-        bias=True,
-    )
+    print("Loading graph dataset")
+    graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
 
+    input_dim = graph_dataset[0].data.x.shape[1]
+
+    edge_dim = None
+    if args.use_edge_attrs:
+        if args.use_embeddings:
+            edge_dim = graph_dataset.embedder.embedding_dim
+        else:
+            edge_dim = graph_dataset[0].data.edge_attr.shape[1]
+    
+    if gnn_conv_model is None:
+        gnn_conv_model = GNNConv(
+            model_name=model_name,
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            out_dim=output_dim,
+            num_layers=num_conv_layers,
+            num_heads=num_heads,
+            residual=residual,
+            l_norm=l_norm,
+            dropout=dropout,
+            aggregation=aggregation,
+            edge_dim=edge_dim
+        )
+
+    clf_input_dim = gnn_conv_model.out_dim*num_heads if args.num_heads else output_dim
+    # clf_input_dim = input_dim
+    if mlp_predictor is None:
+        mlp_predictor = EdgeClassifer(
+            input_dim=clf_input_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_mlp_layers, 
+            num_classes=2,
+            edge_dim=edge_dim,
+            bias=False,
+        )
+
+    
     trainer = Trainer(
         gnn_conv_model, 
         mlp_predictor, 
-        graph_dataset.get_torch_geometric_data(),
+        graph_dataset.get_torch_dataset(),
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         use_edge_attrs=args.use_edge_attrs,
         logs_dir=logs_dir
     )
+
 
     print("Training GNN Link Prediction model")
     trainer.run()

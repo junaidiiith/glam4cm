@@ -9,7 +9,7 @@ from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
 from transformers import AutoTokenizer
-from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
+from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph, GraphData
 from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
@@ -22,7 +22,6 @@ from settings import (
     LP_TASK_LINK_PRED,
 )
 from tokenization.utils import doc_tokenizer, get_tokenizer
-from utils import randomize_features
 
 
 def exclude_labels_from_data(X, labels, exclude_labels):
@@ -40,11 +39,11 @@ def validate_classes(torch_graphs: List[TorchGraph], label, exclude_labels, elem
         labels = getattr(torch_graph.data, f"{element}_{label}")
         train_idx = getattr(torch_graph.data, train_idx_label)
         test_idx = getattr(torch_graph.data, test_idx_label)
-        indices = torch.nonzero(torch.isin(labels, torch.tensor(exclude_labels))).squeeze()
+        indices = np.nonzero(np.isin(labels, exclude_labels))[0]
         
         if len(indices) > 0:
-            train_idx = train_idx[~torch.isin(train_idx, indices)]
-            test_idx = test_idx[~torch.isin(test_idx, indices)]
+            train_idx = train_idx[~np.isin(train_idx, indices)]
+            test_idx = test_idx[~np.isin(test_idx, indices)]
 
         train_labels.append(labels[train_idx])
         test_labels.append(labels[test_idx])
@@ -85,8 +84,7 @@ def validate_classes(torch_graphs: List[TorchGraph], label, exclude_labels, elem
     print("Test classes:", test_classes)
     print(f"Number of classes in training set: {num_train_classes}")
     print(f"Number of classes in test set: {num_test_classes}")
-
-    # assert num_train_classes == num_test_classes, f"Number of classes in training and test set should be the same for {label}"
+    
     
 
 class GraphDataset(torch.utils.data.Dataset):
@@ -94,6 +92,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self,
         models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
         save_dir='datasets/graph_data',
+        config_str='dummy-config',
         distance=1,
         use_attributes=False,
         use_edge_types=False,
@@ -105,11 +104,8 @@ class GraphDataset(torch.utils.data.Dataset):
         use_special_tokens=False,
         embed_model_name='bert-base-uncased',
         ckpt=None,
-
+        reload=False,
         no_shuffle=False,
-        random_embed_dim=768,
-        randomize_ne = False,
-        randomize_ee = False,
         tokenizer_special_tokens=None,
         exclude_labels: list = [None]
     ):
@@ -119,46 +115,61 @@ class GraphDataset(torch.utils.data.Dataset):
             self.metadata = ArchimateMetaData()
 
         self.distance = distance
-        self.save_dir = os.path.join(save_dir, models_dataset.name)
+        self.save_dir = os.path.join(save_dir, models_dataset.name, config_str)
+        os.makedirs(self.save_dir, exist_ok=True)
+
         self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
 
         print("Using tokenizer")
         self.tokenizer = get_tokenizer(embed_model_name, use_special_tokens)
-        # if not self.embedder:
-        #     self.tokenizer = AutoTokenizer.from_pretrained(embed_model_name)
-        # else:
-        #     self.tokenizer = self.embedder.tokenizer
+        self.reload = reload
         
         if tokenizer_special_tokens:
             self.tokenizer.add_special_tokens(tokenizer_special_tokens)
 
-        os.makedirs(self.save_dir, exist_ok=True)
         self.use_edge_types = use_edge_types
         self.use_node_types = use_node_types
         self.use_attributes = use_attributes
-        self.graphs: List[TorchNodeGraph, TorchEdgeGraph] = []
+        self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
 
         self.test_ratio = test_ratio
 
         self.no_shuffle = no_shuffle
-        self.random_embed_dim = random_embed_dim
         self.exclude_labels = exclude_labels
 
-        self.randomize_ne = randomize_ne
-        self.randomize_ee = randomize_ee
-
         self.use_special_tokens = use_special_tokens
+
+        self.file_paths = {
+            graph.hash: os.path.join(self.save_dir, f'{graph.hash}', 'data.pkl') 
+            for graph in models_dataset
+        }
     
 
     def post_process_graphs(self):
         self.add_cls_labels()
-        if self.graphs[0].data.x is None or self.randomize_ne:
-            print("Randomizing node embeddings")
-            randomize_features([g.data for g in self.graphs], self.random_embed_dim, 'node')
         
-        if self.graphs[0].data.edge_attr is None or self.randomize_ee:
-            print("Randomizing edge embeddings")
-            randomize_features([g.data for g in self.graphs], self.random_embed_dim, 'edge')
+        def set_types(prefix):
+            num_classes = getattr(self, f"num_{prefix}s_type") + 1
+            # print(f"Number of {prefix} types: {num_classes}")
+            for g in self.graphs:
+                types = np.eye(num_classes)[getattr(g.data, f"{prefix}_type")]
+                
+                if prefix == 'node':
+                    g.data.x = np.concatenate([g.data.x, types], axis=1)
+                elif prefix == 'edge':
+                    g.data.edge_attr = np.concatenate([g.data.edge_attr, types], axis=1)
+                    
+            node_dim = self.graphs[0].data.x.shape[1]
+            assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
+            edge_dim = self.graphs[0].data.edge_attr.shape[1]
+            assert all(g.data.edge_attr.shape[1] == edge_dim for g in self.graphs), "Edge types not added correctly"
+
+
+        if self.use_node_types:
+            set_types('node')
+        
+        if self.use_edge_types:
+            set_types('edge')
 
 
     def __len__(self):
@@ -167,15 +178,10 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index: int):
         return self.graphs[index]
-    
 
-    def __add__(self, other):
-        self.graphs += other.graphs
-        self.labels = torch.cat([self.labels, other.labels])
-        self._c.update(other._c)
-        self.num_classes = len(self._c)
 
-        return self
+    def get_torch_dataset(self):
+        return [g.data.to_graph_data() for g in self.graphs]
 
 
     def save(self, save_path):
@@ -209,6 +215,11 @@ class GraphDataset(torch.utils.data.Dataset):
             yield train_idx, test_idx
     
 
+    def validate_graphs(self):
+        for torch_graph in self.graphs:
+            assert torch_graph.data.x.shape[0] == torch_graph.graph.number_of_nodes(), f"Number of nodes mismatch, {torch_graph.data.x.shape[0]} != {torch_graph.graph.number_of_nodes()}"
+            assert torch_graph.data.overall_edge_index.shape[1] == torch_graph.graph.number_of_edges(), f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
+
     def add_cls_labels(self):
         self.add_node_labels()
         self.add_edge_labels()
@@ -238,7 +249,7 @@ class GraphDataset(torch.utils.data.Dataset):
             print(node_label_map.classes_)
             
             for torch_graph, node_classes in zip(self.graphs, label_values):
-                setattr(torch_graph.data, f"node_{label}", torch.tensor(node_classes))
+                setattr(torch_graph.data, f"node_{label}", np.array(node_classes))
             
             setattr(self, f"node_label_map_{label}", node_label_map)
             
@@ -278,7 +289,7 @@ class GraphDataset(torch.utils.data.Dataset):
             print("Edge Classes: ", edge_label_map.classes_)
 
             for torch_graph, edge_classes in zip(self.graphs, label_values):
-                setattr(torch_graph.data, f"edge_{label}", torch.tensor(edge_classes))
+                setattr(torch_graph.data, f"edge_{label}", np.array(edge_classes))
             
             setattr(self, f"edge_label_map_{label}", edge_label_map)
 
@@ -296,7 +307,6 @@ class GraphDataset(torch.utils.data.Dataset):
                 validate_classes(self.graphs, label, exclude_labels, 'edge')
 
 
-
     def add_graph_labels(self):
         if hasattr(self.metadata, 'graph'):
             label = self.metadata.graph_cls
@@ -309,7 +319,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 graph_labels = graph_label_map.fit_transform(graph_labels)
 
                 for torch_graph, graph_label in zip(self.graphs, graph_labels):
-                    setattr(torch_graph.data, f"graph_{label}", torch.tensor([graph_label]))
+                    setattr(torch_graph.data, f"graph_{label}", np.array([graph_label]))
                 
                 exclude_labels = [
                     graph_label_map.transform([e])[0]
@@ -335,32 +345,6 @@ class GraphDataset(torch.utils.data.Dataset):
                 node_names = [node_data.get(node_label, "") for _, node_data in torch_graph.graph.nodes(data=True)]
                 setattr(torch_graph, 'text', doc_tokenizer(" ".join(node_names)))
 
-
-    def get_torch_geometric_data(self, use_node_types=False, use_edge_types=False):
-        def set_types(prefix):
-            num_classes = max((max(getattr(g.data, f"{prefix}_type")) for g in self.graphs)) + 1
-            print(f"Number of {prefix} types: {num_classes}")
-            for g in self.graphs:
-                types = torch.nn.functional.one_hot(getattr(g.data, f"{prefix}_type"), num_classes).to(g.data.x.device)
-                if prefix == 'node':
-                    g.data.x = torch.cat([g.data.x, types], dim=1)
-                elif prefix == 'edge':
-                    # g.data.edge_attr = torch.cat([g.data.edge_attr, types], dim=1)
-                    g.data.edge_attr = types
-            
-            node_dim = self.graphs[0].data.x.shape[1]
-            assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
-            edge_dim = self.graphs[0].data.edge_attr.shape[1]
-            assert all(g.data.edge_attr.shape[1] == edge_dim for g in self.graphs), "Edge types not added correctly"
-
-        if use_node_types:
-            set_types('node')
-        
-        if use_edge_types:
-            set_types('edge')
-
-        return [g.data for g in self.graphs]
-    
     
     def get_gnn_graph_classification_data(self):
         train_idx, test_idx = self.get_train_test_split()
@@ -425,7 +409,7 @@ class GraphEdgeDataset(GraphDataset):
             self, 
             models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
             save_dir='datasets/graph_data',
-            distance=1,
+            distance=0,
             reload=False,
             test_ratio=0.2,
             add_negative_train_samples=False,
@@ -440,77 +424,88 @@ class GraphEdgeDataset(GraphDataset):
             no_shuffle=False,
             randomize_ne = False,
             randomize_ee = False,
-            random_embed_dim=768,
-            tokenizer_special_tokens=None
+            random_embed_dim=128,
+            tokenizer_special_tokens=None,
+            limit: int = -1,
+            no_labels=False
         ):
+        config_str = 'edge_data'
+        config_str += f'_dist_{distance}'
+        config_str += '_neg' if add_negative_train_samples else ''
+        config_str += f'_nsr_{int(neg_sampling_ratio)}' if add_negative_train_samples else ''
+        config_str += f'_et_{int(use_edge_types)}' if use_edge_types else ''
+        config_str += f'_attr_{int(use_attributes)}' if use_attributes else ''
+        config_str += f'_nt_{int(use_node_types)}' if use_node_types else ''
+        config_str += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
+        config_str += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
+        config_str += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
+        config_str += f'_test_{test_ratio}'
+
         super().__init__(
             models_dataset=models_dataset,
             save_dir=save_dir,
+            config_str=config_str,
             distance=distance,
             test_ratio=test_ratio,
             use_embeddings=use_embeddings,
             use_special_tokens=use_special_tokens,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
+            reload=reload,
             use_edge_types=use_edge_types,
             use_node_types=use_node_types,
             use_attributes=use_attributes,
             no_shuffle=no_shuffle,
-            randomize_ne=randomize_ne,
-            randomize_ee=randomize_ee,
-            random_embed_dim=random_embed_dim,
             tokenizer_special_tokens=tokenizer_special_tokens
         )
 
-        save_path = os.path.join(self.save_dir, 'edge_data')
-        save_path += f'/{models_dataset.name}'
-
-        save_path += f'_dist_{distance}'
-        save_path += '_neg' if add_negative_train_samples else ''
-        save_path += f'_nsr_{int(neg_sampling_ratio)}' if add_negative_train_samples else ''
-        save_path += f'_et_{int(use_edge_types)}' if use_edge_types else ''
-        save_path += f'_attr_{int(use_attributes)}' if use_attributes else ''
-        save_path += f'_nt_{int(use_node_types)}' if use_node_types else ''
-        save_path += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
-        save_path += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
-        save_path += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
-        save_path += f'_test_{test_ratio}'
-        save_path += '.pkl'
 
         if use_attributes:
             assert self.metadata.node_attributes is not None, "Node attributes are not defined in metadata to be used"
 
-        if os.path.exists(save_path) and not reload:
-            print("Loading data from cache: {}".format(save_path))
-            self.load(save_path)
-        else:
-            print("Cache not found at: {}".format(save_path))
-            self.graphs = [
-                TorchEdgeGraph(
-                    g, 
-                    save_dir=self.save_dir,
-                    metadata=self.metadata,
-                    distance=distance,
-                    test_ratio=test_ratio,
+        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit + 1
+        models_dataset = models_dataset[:models_size]
+        # print(self.file_paths[models_dataset[0].hash])
+        # exit(0)
 
-                    embedder=self.embedder,
+        for graph in tqdm(models_dataset, desc='Embeddings graphs'):
+            fp = self.file_paths[graph.hash]
+            
+            torch_graph = TorchEdgeGraph(
+                graph, 
+                metadata=self.metadata,
+                distance=distance,
+                test_ratio=test_ratio,
+                use_neg_samples=add_negative_train_samples,
+                neg_samples_ratio=neg_sampling_ratio,
+                use_edge_types=use_edge_types,
+                use_node_types=use_node_types,
+                use_attributes=use_attributes,
+                use_special_tokens=use_special_tokens,
+                no_labels=no_labels
+            )
+            torch_graph.embed(
+                self.embedder, 
+                save_path=os.path.join(fp),
+                reload=self.reload,
+                randomize_ne=randomize_ne,
+                randomize_ee=randomize_ee,
+                random_embed_dim=random_embed_dim
+            )
 
-                    use_neg_samples=add_negative_train_samples,
-                    neg_samples_ratio=neg_sampling_ratio,
-                    use_edge_types=use_edge_types,
-                    use_node_types=use_node_types,
-                    use_attributes=use_attributes,
-                    use_special_tokens=use_special_tokens,
-                ) 
-                for g in tqdm(models_dataset, desc='Creating graphs')
-            ]
+        
+        for graph in tqdm(models_dataset, desc='Creating graphs'):
+            fp = self.file_paths[graph.hash]
+            tg = TorchGraph.load(fp)
+            self.graphs.append(tg)
 
-            if not self.no_shuffle:
-                shuffle(self.graphs)
 
-            self.save(save_path)
+        if not self.no_shuffle:
+            shuffle(self.graphs)
+
 
         self.post_process_graphs()
+        self.validate_graphs()
         train_count, test_count = dict(), dict()
         for g in self.graphs:
             train_mask = g.data.train_edge_mask
@@ -527,53 +522,18 @@ class GraphEdgeDataset(GraphDataset):
 
         print(f"Train edge classes: {train_count}")
         print(f"Test edge classes: {test_count}")
+    
 
     def get_link_prediction_texts(
         self, 
-        distance=1, 
         label: str = 'type',
         task_type=LP_TASK_EDGE_CLS
     ):
         data = defaultdict(list)
-        for graph in tqdm(self.graphs, desc='Getting link prediction data'):
-            pos_edge_idx = graph.data.edge_index
-            
-            node_strs = graph.get_graph_node_strs(pos_edge_idx, distance)
-            train_pos_edge_index = pos_edge_idx
-            train_neg_edge_index = graph.data.train_neg_edge_label_index
-            test_pos_edge_index = graph.data.test_pos_edge_label_index
-            test_neg_edge_index = graph.data.test_neg_edge_label_index
-
-            # print(train_neg_edge_index.shape)
-
-            edge_indices = {
-                'train_pos': train_pos_edge_index,
-                'train_neg': train_neg_edge_index,
-                'test_pos': test_pos_edge_index,
-                'test_neg': test_neg_edge_index
-            }
-
-            for edge_index_label, edge_index in edge_indices.items():
-                edge_strs = graph.get_graph_edge_strs_from_node_strs(
-                    node_strs, 
-                    edge_index,
-                    use_edge_types=self.use_edge_types,
-                    use_node_types=self.use_node_types,
-                    neg_samples="neg" in edge_index_label,
-                    use_special_tokens=self.use_special_tokens
-                )
-                
-                edge_strs = list(edge_strs.values())
-                data[f'{edge_index_label}_edges'] += edge_strs
-
-
-            if task_type == LP_TASK_EDGE_CLS:
-                train_mask = graph.data.train_edge_mask
-                test_mask = graph.data.test_edge_mask
-                train_classes, test_classes = getattr(graph.data, f'edge_{label}')[train_mask], getattr(graph.data, f'edge_{label}')[test_mask]
-                data['train_edge_classes'] += train_classes
-                data['test_edge_classes'] += test_classes
-
+        for graph in tqdm(self.graphs, desc=f'Getting {task_type} data'):
+            graph_data = graph.get_link_prediction_texts(label, task_type)
+            for k, v in graph_data.items():
+                data[k] += v
 
         print("Train Texts: ", data[f'train_pos_edges'][:20])
         print("Test Texts: ", data[f'test_pos_edges'][:20])
@@ -586,12 +546,10 @@ class GraphEdgeDataset(GraphDataset):
     def get_link_prediction_lm_data(
         self, 
         tokenizer: AutoTokenizer,
-        distance, 
         label: str = None,
         task_type=LP_TASK_EDGE_CLS
     ):
         data = self.get_link_prediction_texts(
-            distance, 
             label, 
             task_type
         )
@@ -649,12 +607,13 @@ class GraphNodeDataset(GraphDataset):
             ckpt=None,
 
             no_shuffle=False,
-            randomize_ne = False,
-            randomize_ee = False,
+            randomize_ne=False,
+            randomize_ee=False,
+            random_embed_dim=128,
 
-            random_embed_dim=768,
-
-            tokenizer_special_tokens=None
+            tokenizer_special_tokens=None,
+            limit: int = -1,
+            no_labels=False
         ):
         super().__init__(
             models_dataset=models_dataset,
@@ -666,10 +625,8 @@ class GraphNodeDataset(GraphDataset):
             use_edge_types=use_edge_types,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
+            reload=reload,
             no_shuffle=no_shuffle,
-            randomize_ne=randomize_ne,
-            randomize_ee=randomize_ee,
-            random_embed_dim=random_embed_dim,
             tokenizer_special_tokens=tokenizer_special_tokens
         )
 
@@ -678,6 +635,7 @@ class GraphNodeDataset(GraphDataset):
         save_path += f'_et_{int(use_edge_types)}' if use_edge_types else ''
         save_path += f'_attr_{int(use_attributes)}' if use_attributes else ''
         save_path += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
+        save_path += f'_nl_{int(no_labels)}' if no_labels else ''
         save_path += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
         save_path += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
         save_path += f'_test_{test_ratio}'
@@ -686,25 +644,40 @@ class GraphNodeDataset(GraphDataset):
         if use_attributes:
             assert self.metadata.node_attributes is not None, "Node attributes are not defined in metadata to be used"
 
-        if os.path.exists(save_path) and not reload:
-            self.load(save_path)
-        else:
-            self.graphs = [
-                TorchNodeGraph(
-                    g, 
-                    metadata=self.metadata,
-                    save_dir=self.save_dir,
-                    distance=distance,
-                    test_ratio=test_ratio,
-                    embedder=self.embedder,
-                    use_attributes=use_attributes,
-                    use_edge_types=use_edge_types,
-                    use_special_tokens=use_special_tokens,
-                ) 
-                for g in tqdm(models_dataset, desc='Creating graphs')
-            ]
+        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit + 1
+        models_dataset = models_dataset[:models_size]
 
-            self.save(save_path)
+        for graph in tqdm(models_dataset, desc='Creating graphs'):
+            
+            torch_graph = TorchNodeGraph(
+                graph, 
+                metadata=self.metadata,
+                save_dir=self.save_dir,
+                distance=distance,
+                test_ratio=test_ratio,
+                embedder=self.embedder,
+                use_attributes=use_attributes,
+                use_edge_types=use_edge_types,
+                use_special_tokens=use_special_tokens,
+                no_labels=no_labels
+            )
+            
+
+            torch_graph.embed(
+                self.embedder, 
+                save_path=os.path.join(fp),
+                reload=self.reload,
+                randomize_ne=randomize_ne,
+                randomize_ee=randomize_ee,
+                random_embed_dim=random_embed_dim
+            )
+
+            
+        for graph in tqdm(models_dataset, desc='Creating graphs'):
+            fp = self.file_paths[graph.hash]
+            tg = TorchGraph.load(fp)
+            self.graphs.append(tg)
+
         
         self.post_process_graphs()
 
@@ -767,7 +740,6 @@ class GraphNodeDataset(GraphDataset):
         print(len(data['train_node_classes']))
         print(len(data['test_nodes']))
         print(len(data['test_node_classes']))
-        # exit(0)
         return data
 
 

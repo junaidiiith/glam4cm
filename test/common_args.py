@@ -28,10 +28,13 @@ def get_common_args_parser():
     parser.add_argument('--use_edge_types', action='store_true')
     parser.add_argument('--use_node_types', action='store_true')
     parser.add_argument('--use_special_tokens', action='store_true')
+    parser.add_argument('--no_labels', action='store_true')
+
+    parser.add_argument('--limit', type=int, default=-1)
 
 
     ### Model Dataset Loading
-    parser.add_argument('--distance', type=int, default=1)
+    parser.add_argument('--distance', type=int, default=0)
     parser.add_argument('--use_embeddings', action='store_true')
     parser.add_argument('--regen_embeddings', action='store_true')
     parser.add_argument('--embed_model_name', type=str, default='bert-base-uncased')
@@ -71,7 +74,7 @@ def get_gnn_args_parser():
     parser.add_argument('--l_norm', action='store_true')
     parser.add_argument('--aggregation', type=str, default='sum')
     parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=1e-2)
     parser.add_argument('--gnn_conv_model', type=str, default='SAGEConv')
 
     parser.add_argument('--use_edge_attrs', action='store_true')

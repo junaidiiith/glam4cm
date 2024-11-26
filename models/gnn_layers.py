@@ -53,8 +53,8 @@ class GNNConv(torch.nn.Module):
             model_name, 
             input_dim, 
             hidden_dim, 
-            out_dim, 
-            num_layers, 
+            out_dim=None, 
+            num_layers=2, 
             num_heads=None, 
             residual=False, 
             l_norm=False, 
@@ -77,83 +77,63 @@ class GNNConv(torch.nn.Module):
 
         self.input_dim = input_dim
         self.embed_dim = hidden_dim
-        self.out_dim = out_dim
+        self.out_dim = out_dim if out_dim is not None else hidden_dim
         self.num_layers = num_layers
         self.num_heads = num_heads
-        self.residual = residual
-        self.l_norm = l_norm
-        self.dropout = dropout
         self.aggregation = aggregation
         self.edge_dim = edge_dim
         
 
         gnn_model = getattr(torch_geometric.nn, model_name)
         self.conv_layers = nn.ModuleList()
-        if num_heads is None:
-            input_layer = gnn_model(input_dim, hidden_dim, aggr=aggregation)
-        else:
-            input_layer = gnn_model(
-                input_dim, 
-                hidden_dim, 
-                heads=num_heads, 
-                aggr=aggregation,
-                edge_dim=edge_dim
-            )
-        self.conv_layers.append(input_layer)
 
-        for _ in range(num_layers - 2):
+        for i in range(num_layers):
             if num_heads is None:
-                conv = gnn_model(hidden_dim, hidden_dim, aggr=aggregation)
-                self.conv_layers.append(conv)
+                conv = gnn_model(
+                    input_dim, 
+                    hidden_dim if i != num_layers - 1 else self.out_dim, 
+                    aggr=aggregation
+                )
             else:
                 conv = gnn_model(
-                    num_heads*hidden_dim, 
-                    hidden_dim, 
+                    input_dim if i == 0 else num_heads*input_dim, 
+                    hidden_dim if i != num_layers - 1 else self.out_dim, 
                     heads=num_heads, 
                     aggr=aggregation,
                     edge_dim=edge_dim
                 )
-                self.conv_layers.append(conv)
-
-        if num_heads is None:
-            self.conv_layers.append(gnn_model(hidden_dim, out_dim, aggr=aggregation))
-        else:
-            self.conv_layers.append(gnn_model(
-                num_heads*hidden_dim, 
-                out_dim, 
-                heads=num_heads, 
-                aggr=aggregation,
-                edge_dim=edge_dim
-            ))
+            self.conv_layers.append(conv)
+            input_dim = hidden_dim
             
         self.activation = nn.ReLU()
         self.layer_norm = nn.LayerNorm(hidden_dim if num_heads is None else num_heads*hidden_dim) if l_norm else None
         self.residual = residual
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else None
 
 
     def forward(self, in_feat, edge_index, edge_attr=None):
         
+        def activate(h):
+            h = self.activation(h)
+            
+            if self.layer_norm is not None:
+                h = self.layer_norm(h)
+            
+            if self.dropout is not None:
+                h = self.dropout(h)
+            return h
+
         h = in_feat
         h = self.conv_layers[0](h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else self.conv_layers[0](h, edge_index)
-        h = self.activation(h)
-        if self.layer_norm is not None:
-            h = self.layer_norm(h)
-        h = self.dropout(h)
+        activate(h)
 
         for conv in self.conv_layers[1:-1]:
             nh = conv(h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else conv(h, edge_index)
             h = nh if not self.residual else nh + h
-            h = self.activation(h)
-            if self.layer_norm is not None:
-                h = self.layer_norm(h)
-            h = self.dropout(h)
+            activate(h)
         
         h = self.conv_layers[-1](h, edge_index)
-        h = self.activation(h)
-        if self.layer_norm is not None:
-            h = self.layer_norm(h)
-        h = self.dropout(h)
+        activate(h)
         return h
   
 
@@ -178,7 +158,7 @@ class EdgeClassifer(nn.Module):
             num_layers=2, 
             dropout=0.3,
             edge_dim=None,
-            bias=True
+            bias=False
         ):
         super().__init__()
         self.layers = nn.ModuleList()

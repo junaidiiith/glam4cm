@@ -58,7 +58,6 @@ def run(args):
         reload=args.reload
     )
     dataset_name = args.dataset
-    distance = args.distance
     
     print("Loaded dataset")
     dataset = get_models_dataset(dataset_name, **config_params)
@@ -71,6 +70,7 @@ def run(args):
         use_embeddings=args.use_embeddings,
         use_node_types=args.use_node_types,
         use_special_tokens=args.use_special_tokens,
+        no_labels=args.no_labels,
     )
 
 
@@ -88,7 +88,6 @@ def run(args):
     print("Getting Edge Classification data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
-        distance=distance,
         label=args.cls_label,
         task_type=LP_TASK_EDGE_CLS
     )

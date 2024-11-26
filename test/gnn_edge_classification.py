@@ -40,8 +40,8 @@ def run(args):
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         use_node_types=args.use_node_types,
-        # use_edge_types=args.use_edge_types,
         use_special_tokens=args.use_special_tokens,
+        no_labels=args.no_labels,
         ckpt=args.ckpt
     )
 
@@ -49,14 +49,11 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    graph_torch_data = graph_dataset.get_torch_geometric_data(
-        use_node_types=args.use_node_types,
-    )
+    graph_torch_data = graph_dataset.get_torch_dataset()
 
     input_dim = graph_torch_data[0].x.shape[1]
 
     model_name = args.gnn_conv_model
-
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim
     num_conv_layers = args.num_conv_layers

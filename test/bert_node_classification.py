@@ -78,6 +78,7 @@ def run(args):
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
         use_special_tokens=args.use_special_tokens,
+        no_labels=args.no_labels,
         
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
