@@ -412,10 +412,8 @@ class TorchNodeGraph(TorchGraph):
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: dict,
-            save_dir: str,
             distance = 1,
             test_ratio=0.2,
-            embedder: Embedder=None,
             use_edge_types=False,
             use_attributes=False,
             use_special_tokens=False,
@@ -424,17 +422,16 @@ class TorchNodeGraph(TorchGraph):
 
         super().__init__(
             graph, 
-            metadata, 
-            save_dir, 
-            distance, 
-            test_ratio, 
-            use_edge_types, 
+            metadata=metadata, 
+            distance=distance, 
+            test_ratio=test_ratio, 
+            use_edge_types=use_edge_types, 
             use_attributes=use_attributes,
             use_special_tokens=use_special_tokens,
             no_labels=no_labels
         )
         
-        self.data, self.node_texts, self.edge_texts = self.get_pyg_data(embedder)
+        self.data, self.node_texts, self.edge_texts = self.get_pyg_data()
         self.validate_data()
             
     
@@ -459,7 +456,7 @@ class TorchNodeGraph(TorchGraph):
         setattr(d, 'edge_index', edge_index)
 
         node_texts, edge_texts = self.get_node_edge_strings(
-            edge_index=edge_index.numpy(),
+            edge_index=edge_index,
         )
 
         setattr(d, 'num_nodes', self.graph.number_of_nodes())

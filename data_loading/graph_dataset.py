@@ -647,22 +647,19 @@ class GraphNodeDataset(GraphDataset):
         models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit + 1
         models_dataset = models_dataset[:models_size]
 
-        for graph in tqdm(models_dataset, desc='Creating graphs'):
-            
+        for graph in tqdm(models_dataset, desc='Creating Embeddings'):
+            fp = self.file_paths[graph.hash]
             torch_graph = TorchNodeGraph(
                 graph, 
                 metadata=self.metadata,
-                save_dir=self.save_dir,
                 distance=distance,
                 test_ratio=test_ratio,
-                embedder=self.embedder,
                 use_attributes=use_attributes,
                 use_edge_types=use_edge_types,
                 use_special_tokens=use_special_tokens,
                 no_labels=no_labels
             )
             
-
             torch_graph.embed(
                 self.embedder, 
                 save_path=os.path.join(fp),

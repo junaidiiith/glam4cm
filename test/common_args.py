@@ -52,7 +52,6 @@ def get_common_args_parser():
     parser.add_argument('--add_neg_samples', action='store_true')
     parser.add_argument('--neg_sampling_ratio', type=int, default=1)
 
-
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=32)
 
