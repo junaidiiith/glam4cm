@@ -98,7 +98,9 @@ class TorchGraph:
             use_attributes=False,
             use_edge_label=False,
             use_special_tokens=False,
-            no_labels=False
+            no_labels=False,
+            node_cls_label=None,
+            edge_cls_label='type'
         ):
 
         self.graph = graph
@@ -111,6 +113,9 @@ class TorchGraph:
         self.use_edge_label = use_edge_label
         self.use_special_tokens = use_special_tokens
         self.no_labels = no_labels
+
+        self.node_cls_label = node_cls_label
+        self.edge_cls_label = edge_cls_label
         
         self.distance = distance
         self.test_ratio = test_ratio
@@ -186,6 +191,8 @@ class TorchGraph:
             use_node_types=self.use_node_types,
             use_edge_types=self.use_edge_types,
             use_edge_label=self.use_edge_label,
+            node_cls_label=self.node_cls_label,
+            edge_cls_label=self.edge_cls_label,
             use_special_tokens=self.use_special_tokens,
             no_labels=self.no_labels,
             preprocessor=preprocessor
@@ -247,6 +254,8 @@ class TorchEdgeGraph(TorchGraph):
             use_edge_label=False,
             use_attributes=False,
             use_special_tokens=False,
+            node_cls_label=None,
+            edge_cls_label='type',
             no_labels=False
         ):
 
@@ -260,7 +269,9 @@ class TorchEdgeGraph(TorchGraph):
             use_attributes=use_attributes, 
             use_edge_label=use_edge_label,
             use_special_tokens=use_special_tokens,
-            no_labels=no_labels
+            no_labels=no_labels,
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label
         )
         self.use_neg_samples = use_neg_samples
         self.neg_sampling_ratio = neg_samples_ratio
@@ -400,7 +411,9 @@ class TorchNodeGraph(TorchGraph):
             use_edge_label=False,
             use_attributes=False,
             use_special_tokens=False,
-            no_labels=False
+            no_labels=False,
+            node_cls_label=None,
+            edge_cls_label='type'
         ):
 
         super().__init__(
@@ -413,7 +426,9 @@ class TorchNodeGraph(TorchGraph):
             use_edge_label=use_edge_label, 
             use_attributes=use_attributes,
             use_special_tokens=use_special_tokens,
-            no_labels=no_labels
+            no_labels=no_labels,
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label
         )
         
         self.data, self.node_texts, self.edge_texts = self.get_pyg_data()

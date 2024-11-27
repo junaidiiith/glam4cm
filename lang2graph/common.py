@@ -136,19 +136,21 @@ def format_path(
     graph: LangGraph, 
     path: List, 
     metadata: GraphMetadata, 
-    use_node_attributes, 
-    use_node_types, 
-    use_edge_label, 
-    use_edge_types, 
-    use_special_tokens, 
-    no_labels,
-    preprocessor,
+    use_node_attributes = False, 
+    use_node_types = False, 
+    use_edge_label = False, 
+    use_edge_types = False, 
+    node_cls_label=None,
+    edge_cls_label='type',
+    use_special_tokens = False, 
+    no_labels = False,
+    preprocessor=doc_tokenizer,
     neg_sample=False
 ):
     """Format a path into a string representation."""
     def get_node_label(node):
         masked = graph.nodes[node].get('masked')
-        node_type = graph.nodes[node].get('type', '') if use_node_types and not masked else ''
+        node_type = graph.nodes[node].get(f'{node_cls_label}', '') if use_node_types and not masked and node_cls_label else ''
         node_label = get_node_name(
             graph.nodes[node], 
             metadata.node_label, 
@@ -157,21 +159,27 @@ def format_path(
         ) if not no_labels else ''
         if preprocessor:
             node_label = preprocessor(node_label)
+        
+        node_label = f"{node_type} {node_label}".strip()
         if use_special_tokens:
             node_label = f"{NODE_LABEL}{node_label}"
         
-        return f"{node_label} {node_type}".strip()
+        return node_label.strip()
 
     def get_edge_label(n1, n2):
         edge_data = graph.get_edge_data(n1, n2)
         masked = edge_data.get('masked')
         edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
-        edge_label += f" {get_edge_data(edge_data, 'type', metadata.type)}" if use_edge_types and not masked else ''
+        edge_type = f" {get_edge_data(edge_data, f'{edge_cls_label}', metadata.type)}" if use_edge_types and not masked  and edge_cls_label else ''
         
         if preprocessor:
             edge_label = preprocessor(edge_label)
+        
+        edge_label = f"{edge_type} {edge_label}".strip()
+        
         if use_special_tokens:
             edge_label = f"{EDGE_START}{edge_label}{EDGE_END}"
+        
         return edge_label.strip()
 
     assert len(path) > 0, "Path must contain at least one node."
@@ -195,6 +203,8 @@ def get_edge_texts(
     use_node_types=False, 
     use_edge_types=False,
     use_edge_label=False,
+    node_cls_label=None,
+    edge_cls_label='type',
     use_special_tokens=False, 
     no_labels=False,
     preprocessor: callable = doc_tokenizer,
@@ -214,6 +224,8 @@ def get_edge_texts(
         use_node_types=use_node_types,
         use_edge_types=use_edge_types,
         use_edge_label=use_edge_label,
+        node_cls_label=node_cls_label,
+        edge_cls_label=edge_cls_label,
         use_special_tokens=use_special_tokens,
         no_labels=no_labels,
         preprocessor=preprocessor,
@@ -228,6 +240,8 @@ def get_edge_texts(
         use_node_types=use_node_types,
         use_edge_types=use_edge_types,
         use_edge_label=use_edge_label,
+        node_cls_label=node_cls_label,
+        edge_cls_label=edge_cls_label,
         use_special_tokens=use_special_tokens,
         no_labels=no_labels,
         preprocessor=preprocessor,
@@ -248,6 +262,8 @@ def get_node_text(
     use_node_types=False, 
     use_edge_types=False,
     use_edge_label=False,
+    node_cls_label=None,
+    edge_cls_label='type',
     use_special_tokens=False, 
     no_labels=False,
     preprocessor: callable = doc_tokenizer,
@@ -266,6 +282,8 @@ def get_node_text(
             use_node_types=use_node_types, 
             use_edge_types=use_edge_types, 
             use_edge_label=use_edge_label,
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label,
             use_special_tokens=use_special_tokens,
             no_labels=no_labels,
             preprocessor=preprocessor, 
@@ -285,6 +303,8 @@ def get_node_texts(
         use_node_types=False, 
         use_edge_types=False,
         use_edge_label=False,
+        node_cls_label=None,
+        edge_cls_label='type',
         use_special_tokens=False, 
         no_labels=False,
         preprocessor: callable = doc_tokenizer
@@ -300,6 +320,8 @@ def get_node_texts(
             use_node_types=use_node_types,
             use_edge_types=use_edge_types,
             use_edge_label=use_edge_label,
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label,
             use_special_tokens=use_special_tokens,
             no_labels=no_labels,
             preprocessor=preprocessor

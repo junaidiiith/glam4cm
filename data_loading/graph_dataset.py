@@ -98,6 +98,9 @@ class GraphDataset(torch.utils.data.Dataset):
         use_edge_types=False,
         use_node_types=False,
         use_edge_label=False,
+
+        node_cls_label=None,
+        edge_cls_label='type',
         
         test_ratio=0.2,
 
@@ -140,6 +143,8 @@ class GraphDataset(torch.utils.data.Dataset):
         self.exclude_labels = exclude_labels
 
         self.use_special_tokens = use_special_tokens
+        self.node_cls_label = node_cls_label
+        self.edge_cls_label = edge_cls_label
 
         self.file_paths = {
             graph.hash: os.path.join(self.save_dir, f'{graph.hash}', 'data.pkl') 
@@ -151,7 +156,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self.add_cls_labels()
 
         def set_types(prefix):
-            prefix_cls = getattr(self.metadata, f"{prefix}_cls")
+            prefix_cls = getattr(self, f"{prefix}_cls_label")
             num_classes = getattr(self, f"num_{prefix}s_{prefix_cls}") + 1
             # print(f"Number of {prefix} types: {num_classes}")
             for g in self.graphs:
@@ -168,10 +173,10 @@ class GraphDataset(torch.utils.data.Dataset):
             assert all(g.data.edge_attr.shape[1] == edge_dim for g in self.graphs), "Edge types not added correctly"
 
 
-        if self.use_node_types:
+        if self.use_node_types and self.node_cls_label:
             set_types('node')
         
-        if self.use_edge_types:
+        if self.use_edge_types and self.edge_cls_label:
             set_types('edge')
 
 
@@ -431,7 +436,9 @@ class GraphEdgeDataset(GraphDataset):
             random_embed_dim=128,
             tokenizer_special_tokens=None,
             limit: int = -1,
-            no_labels=False
+            no_labels=False,
+            node_cls_label: str = None,
+            edge_cls_label: str = 'type'
         ):
         config_str = 'edge_data'
         config_str += f'_dist_{distance}'
@@ -453,6 +460,10 @@ class GraphEdgeDataset(GraphDataset):
             test_ratio=test_ratio,
             use_embeddings=use_embeddings,
             use_special_tokens=use_special_tokens,
+
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label,
+
             embed_model_name=embed_model_name,
             ckpt=ckpt,
             reload=reload,
@@ -484,7 +495,9 @@ class GraphEdgeDataset(GraphDataset):
                 use_edge_label=use_edge_label,
                 use_attributes=use_attributes,
                 use_special_tokens=use_special_tokens,
-                no_labels=no_labels
+                no_labels=no_labels,
+                edge_cls_label=edge_cls_label,
+                node_cls_label=node_cls_label
             )
             torch_graph.embed(
                 self.embedder, 
@@ -595,7 +608,7 @@ class GraphNodeDataset(GraphDataset):
             self, 
             models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
             save_dir='datasets/graph_data',
-            distance=1,
+            distance=0,
             test_ratio=0.2,
             reload=False,
             
@@ -616,7 +629,9 @@ class GraphNodeDataset(GraphDataset):
 
             tokenizer_special_tokens=None,
             limit: int = -1,
-            no_labels=False
+            no_labels=False,
+            node_cls_label: str = None,
+            edge_cls_label: str = 'type'
         ):
         super().__init__(
             models_dataset=models_dataset,
@@ -628,6 +643,10 @@ class GraphNodeDataset(GraphDataset):
             use_node_types=use_node_types,
             use_edge_types=use_edge_types,
             use_edge_label=use_edge_label,
+
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label,
+
             embed_model_name=embed_model_name,
             ckpt=ckpt,
             reload=reload,
@@ -661,7 +680,9 @@ class GraphNodeDataset(GraphDataset):
                 use_edge_types=use_edge_types,
                 use_edge_label=use_edge_label,
                 use_special_tokens=use_special_tokens,
-                no_labels=no_labels
+                no_labels=no_labels,
+                node_cls_label=node_cls_label,
+                edge_cls_label=edge_cls_label
             )
             
             torch_graph.embed(
