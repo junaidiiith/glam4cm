@@ -150,7 +150,7 @@ def format_path(
     """Format a path into a string representation."""
     def get_node_label(node):
         masked = graph.nodes[node].get('masked')
-        node_type = graph.nodes[node].get(f'{node_cls_label}', '') if use_node_types and not masked and node_cls_label else ''
+        node_type = f"{node_cls_label}:{graph.nodes[node].get(f'{node_cls_label}', '')}" if use_node_types and not masked and node_cls_label else ''
         node_label = get_node_name(
             graph.nodes[node], 
             metadata.node_label, 
@@ -170,7 +170,7 @@ def format_path(
         edge_data = graph.get_edge_data(n1, n2)
         masked = edge_data.get('masked')
         edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
-        edge_type = f" {get_edge_data(edge_data, f'{edge_cls_label}', metadata.type)}" if use_edge_types and not masked  and edge_cls_label else ''
+        edge_type = f"{edge_cls_label}:{get_edge_data(edge_data, f'{edge_cls_label}', metadata.type)}" if use_edge_types and not masked  and edge_cls_label else ''
         
         if preprocessor:
             edge_label = preprocessor(edge_label)
