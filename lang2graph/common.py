@@ -1,11 +1,13 @@
 from abc import abstractmethod
+from typing import List
 import networkx as nx
 from uuid import uuid4
 import numpy as np
 import torch
+from data_loading.metadata import GraphMetadata
 from tokenization.special_tokens import *
 from tokenization.utils import doc_tokenizer
-from utils import md5_hash
+import utils
 
 SEP = ' '
 REFERENCE = 'reference'
@@ -74,7 +76,7 @@ class LangGraph(nx.DiGraph):
 
     @property
     def hash(self):
-        return md5_hash(str(sorted(self.edges)))
+        return utils.md5_hash(str(sorted(self.edges)))
     
     def get_edge_id(self, edge):
         return self.edge_label_to_id[edge]
@@ -88,7 +90,6 @@ class LangGraph(nx.DiGraph):
     
     def get_node_label(self, node_id):
         return self.node_label_to_id[node_id]
-    
 
 
 def create_graph_from_edge_index(graph, edge_index: np.ndarray):
@@ -131,59 +132,180 @@ def create_graph_from_edge_index(graph, edge_index: np.ndarray):
     return subgraph
 
 
+def format_path(
+    graph: LangGraph, 
+    path: List, 
+    metadata: GraphMetadata, 
+    use_node_attributes, 
+    use_node_types, 
+    use_edge_label, 
+    use_edge_types, 
+    use_special_tokens, 
+    no_labels,
+    preprocessor,
+    neg_sample=False
+):
+    """Format a path into a string representation."""
+    def get_node_label(node):
+        masked = graph.nodes[node].get('masked')
+        node_type = graph.nodes[node].get('type', '') if use_node_types and not masked else ''
+        node_label = get_node_name(
+            graph.nodes[node], 
+            metadata.node_label, 
+            use_node_attributes and metadata.node_attributes, 
+            metadata.node_attributes
+        ) if not no_labels else ''
+        if preprocessor:
+            node_label = preprocessor(node_label)
+        if use_special_tokens:
+            node_label = f"{NODE_LABEL}{node_label}"
+        
+        return f"{node_label} {node_type}".strip()
+
+    def get_edge_label(n1, n2):
+        edge_data = graph.get_edge_data(n1, n2)
+        masked = edge_data.get('masked')
+        edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
+        edge_label += f" {get_edge_data(edge_data, 'type', metadata.type)}" if use_edge_types and not masked else ''
+        
+        if preprocessor:
+            edge_label = preprocessor(edge_label)
+        if use_special_tokens:
+            edge_label = f"{EDGE_START}{edge_label}{EDGE_END}"
+        return edge_label.strip()
+
+    assert len(path) > 0, "Path must contain at least one node."
+    formatted = [get_node_label(path[0])]
+    for i in range(1, len(path)):
+        n1 = path[i - 1]
+        n2 = path[i]
+
+        if not neg_sample:
+            formatted.append(get_edge_label(n1, n2))
+        formatted.append(get_node_label(n2))
+
+    return " ".join(formatted).strip()
+
+def get_edge_texts(
+    graph: LangGraph, 
+    edge: tuple, 
+    d: int, 
+    metadata: GraphMetadata, 
+    use_node_attributes=False, 
+    use_node_types=False, 
+    use_edge_types=False,
+    use_edge_label=False,
+    use_special_tokens=False, 
+    no_labels=False,
+    preprocessor: callable = doc_tokenizer,
+    neg_samples=False
+):
+    n1, n2 = edge
+    if not neg_samples:
+        masked = graph.edges[n1, n2].get('masked')
+        graph.edges[n1, n2]['masked'] = True
+
+    n1_text = get_node_text(
+        graph=graph,
+        node=n1,
+        d=d,
+        metadata=metadata,
+        use_node_attributes=use_node_attributes,
+        use_node_types=use_node_types,
+        use_edge_types=use_edge_types,
+        use_edge_label=use_edge_label,
+        use_special_tokens=use_special_tokens,
+        no_labels=no_labels,
+        preprocessor=preprocessor,
+        exclude_edges=[edge]
+    )
+    n2_text = get_node_text(
+        graph=graph,
+        node=n2,
+        d=d,
+        metadata=metadata,
+        use_node_attributes=use_node_attributes,
+        use_node_types=use_node_types,
+        use_edge_types=use_edge_types,
+        use_edge_label=use_edge_label,
+        use_special_tokens=use_special_tokens,
+        no_labels=no_labels,
+        preprocessor=preprocessor,
+        exclude_edges=[edge]
+    )
+    if not neg_samples:
+        graph.edges[n1, n2]['masked'] = masked or False
+
+    return n1_text + EDGE_START + EDGE_END + n2_text
+
+
+def get_node_text(
+    graph: LangGraph, 
+    node, 
+    d: int, 
+    metadata: GraphMetadata, 
+    use_node_attributes=False, 
+    use_node_types=False, 
+    use_edge_types=False,
+    use_edge_label=False,
+    use_special_tokens=False, 
+    no_labels=False,
+    preprocessor: callable = doc_tokenizer,
+    exclude_edges=None
+):
+    masked = graph.nodes[node].get('masked')
+    graph.nodes[node]['masked'] = True
+    raw_paths = utils.bfs(graph=graph, start_node=node, d=d, exclude_edges=exclude_edges)
+    unique_paths = utils.remove_subsets(list_of_lists=raw_paths)
+    text = "\n".join([
+        format_path(
+            graph=graph, 
+            path=path, 
+            metadata=metadata, 
+            use_node_attributes=use_node_attributes, 
+            use_node_types=use_node_types, 
+            use_edge_types=use_edge_types, 
+            use_edge_label=use_edge_label,
+            use_special_tokens=use_special_tokens,
+            no_labels=no_labels,
+            preprocessor=preprocessor, 
+            neg_sample=False
+        )
+        for path in unique_paths
+    ])
+    graph.nodes[node]['masked'] = masked or False
+    return text
+
 
 def get_node_texts(
         graph: LangGraph, 
-        h: int, 
-        label='name', 
-        use_attributes=False, 
-        attribute_labels='attributes',
-        use_special_tokens=False,
+        d: int, 
+        metadata: GraphMetadata, 
+        use_node_attributes=False, 
+        use_node_types=False, 
+        use_edge_types=False,
+        use_edge_label=False,
+        use_special_tokens=False, 
+        no_labels=False,
         preprocessor: callable = doc_tokenizer
     ):
-    """
-    Create node string for each node n in a graph using neighbors of n up to h hops.
-    
-    Parameters:
-    G (networkx.Graph): The graph.
-    h (int): The number of hops.
-    
-    Returns:
-    dict: A dictionary where keys are nodes and values are node strings.
-    """
-    node_texts = {}
-    node_sep = f"{NODE_PATH_SEP} " if use_special_tokens else ''
+    paths_dict = {}
+    for node in graph.nodes:
+        paths_dict[node] = get_node_text(
+            graph=graph,
+            node=node,
+            d=d,
+            metadata=metadata,
+            use_node_attributes=use_node_attributes,
+            use_node_types=use_node_types,
+            use_edge_types=use_edge_types,
+            use_edge_label=use_edge_label,
+            use_special_tokens=use_special_tokens,
+            no_labels=no_labels,
+            preprocessor=preprocessor
+        )
 
-    for node in graph.nodes():
-        
-        node_str = graph.nodes[node][label] if label in graph.nodes[node] else ''
-        current_level_nodes = {node}
-        all_visited_nodes = {node}
-
-        for _ in range(1, h + 1):
-            next_level_nodes = set()
-            for n in current_level_nodes:
-                neighbors = set(graph.neighbors(n))
-                next_level_nodes.update(neighbors - all_visited_nodes)
-            all_visited_nodes.update(next_level_nodes)
-            if next_level_nodes:
-                node_strs = [
-                    get_node_name(
-                        graph.nodes[i], 
-                        label, 
-                        use_attributes, 
-                        attribute_labels
-                    ) for i in sorted(next_level_nodes)
-                ]
-                if preprocessor:
-                    node_strs = [preprocessor(node_str) for node_str in node_strs]
-                    
-                node_str += f" {node_sep}{', '.join(node_strs)}"
-            current_level_nodes = next_level_nodes
-
-        node_texts[node] = node_str.strip()
-
-    return node_texts
+    return paths_dict
 
 
 def get_node_name(
@@ -196,8 +318,8 @@ def get_node_name(
         attributes_str = "(" + ', '.join([k for k, _ in node_data[attribute_labels]]) + ")"
     else:
         attributes_str = ''
-    node_label = node_data.get(label)
-    return f"{node_label} {attributes_str}".strip()
+    node_label = node_data.get(label, '')
+    return f"{node_label}{attributes_str}".strip()
 
 
 def get_node_data(

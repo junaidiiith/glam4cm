@@ -36,7 +36,6 @@ def run(args):
         test_ratio=args.test_ratio,
         add_negative_train_samples=True,
         neg_sampling_ratio=args.neg_sampling_ratio,
-        distance=args.distance,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         use_node_types=args.use_node_types,

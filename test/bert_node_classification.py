@@ -77,6 +77,7 @@ def run(args):
         test_ratio=args.test_ratio,
         use_attributes=args.use_attributes,
         use_edge_types=args.use_edge_types,
+        use_edge_label=args.use_edge_label,
         use_special_tokens=args.use_special_tokens,
         no_labels=args.no_labels,
         

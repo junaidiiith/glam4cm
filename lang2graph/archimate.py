@@ -5,11 +5,13 @@ class ArchiMateNxG(LangGraph):
     def __init__(
         self, 
         json_obj: dict, 
+        path: str,
         timeout = -1
     ):
         super().__init__()
         self.json_obj = json_obj
         self.timeout = timeout
+        self.path = path
         self.graph_id = json_obj['identifier'].split('/')[-1]
 
 

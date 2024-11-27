@@ -240,6 +240,7 @@ class ArchiMateModelDataset(ModelDataset):
                         try:
                             nxg = ArchiMateNxG(
                                 model, 
+                                path=model_file,
                                 timeout=timeout
                             )
                             if nxg.number_of_edges() < 1:

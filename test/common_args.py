@@ -25,6 +25,7 @@ def get_common_args_parser():
     parser.add_argument('--language', type=str, default='en')
     
     parser.add_argument('--use_attributes', action='store_true')
+    parser.add_argument('--use_edge_label', action='store_true')
     parser.add_argument('--use_edge_types', action='store_true')
     parser.add_argument('--use_node_types', action='store_true')
     parser.add_argument('--use_special_tokens', action='store_true')

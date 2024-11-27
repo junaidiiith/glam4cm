@@ -97,6 +97,7 @@ class GraphDataset(torch.utils.data.Dataset):
         use_attributes=False,
         use_edge_types=False,
         use_node_types=False,
+        use_edge_label=False,
         
         test_ratio=0.2,
 
@@ -130,6 +131,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self.use_edge_types = use_edge_types
         self.use_node_types = use_node_types
         self.use_attributes = use_attributes
+        self.use_edge_label = use_edge_label
         self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
 
         self.test_ratio = test_ratio
@@ -147,12 +149,13 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def post_process_graphs(self):
         self.add_cls_labels()
-        
+
         def set_types(prefix):
-            num_classes = getattr(self, f"num_{prefix}s_type") + 1
+            prefix_cls = getattr(self.metadata, f"{prefix}_cls")
+            num_classes = getattr(self, f"num_{prefix}s_{prefix_cls}") + 1
             # print(f"Number of {prefix} types: {num_classes}")
             for g in self.graphs:
-                types = np.eye(num_classes)[getattr(g.data, f"{prefix}_type")]
+                types = np.eye(num_classes)[getattr(g.data, f"{prefix}_{prefix_cls}")]
                 
                 if prefix == 'node':
                     g.data.x = np.concatenate([g.data.x, types], axis=1)
@@ -418,6 +421,7 @@ class GraphEdgeDataset(GraphDataset):
             use_special_tokens=False,
             use_attributes=False,
             use_edge_types=False,
+            use_edge_label=False,
             use_node_types=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
@@ -455,15 +459,12 @@ class GraphEdgeDataset(GraphDataset):
             use_edge_types=use_edge_types,
             use_node_types=use_node_types,
             use_attributes=use_attributes,
+            use_edge_label=use_edge_label,
             no_shuffle=no_shuffle,
             tokenizer_special_tokens=tokenizer_special_tokens
         )
 
-
-        if use_attributes:
-            assert self.metadata.node_attributes is not None, "Node attributes are not defined in metadata to be used"
-
-        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit + 1
+        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit
         models_dataset = models_dataset[:models_size]
         # print(self.file_paths[models_dataset[0].hash])
         # exit(0)
@@ -478,8 +479,9 @@ class GraphEdgeDataset(GraphDataset):
                 test_ratio=test_ratio,
                 use_neg_samples=add_negative_train_samples,
                 neg_samples_ratio=neg_sampling_ratio,
-                use_edge_types=use_edge_types,
                 use_node_types=use_node_types,
+                use_edge_types=use_edge_types,
+                use_edge_label=use_edge_label,
                 use_attributes=use_attributes,
                 use_special_tokens=use_special_tokens,
                 no_labels=no_labels
@@ -598,8 +600,9 @@ class GraphNodeDataset(GraphDataset):
             reload=False,
             
             use_attributes=False,
-
             use_edge_types=False,
+            use_node_types=False,
+            use_edge_label=False,
             use_special_tokens=False,
 
             use_embeddings=False,
@@ -622,7 +625,9 @@ class GraphNodeDataset(GraphDataset):
             test_ratio=test_ratio,
             use_embeddings=use_embeddings,
             use_special_tokens=use_special_tokens,
+            use_node_types=use_node_types,
             use_edge_types=use_edge_types,
+            use_edge_label=use_edge_label,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
             reload=reload,
@@ -641,10 +646,7 @@ class GraphNodeDataset(GraphDataset):
         save_path += f'_test_{test_ratio}'
         save_path += '.pkl'
 
-        if use_attributes:
-            assert self.metadata.node_attributes is not None, "Node attributes are not defined in metadata to be used"
-
-        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit + 1
+        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit
         models_dataset = models_dataset[:models_size]
 
         for graph in tqdm(models_dataset, desc='Creating Embeddings'):
@@ -655,7 +657,9 @@ class GraphNodeDataset(GraphDataset):
                 distance=distance,
                 test_ratio=test_ratio,
                 use_attributes=use_attributes,
+                use_node_types=use_node_types,
                 use_edge_types=use_edge_types,
+                use_edge_label=use_edge_label,
                 use_special_tokens=use_special_tokens,
                 no_labels=no_labels
             )
@@ -702,7 +706,13 @@ class GraphNodeDataset(GraphDataset):
             print(f"Test Node classes: {test_count}")
 
 
-    def get_node_classification_texts(self, distance, label):
+    def get_node_classification_texts(self, distance=None, label=None):
+        if distance is None:
+            distance = self.distance
+
+        label = self.metadata.node_cls if label is None else label
+        if isinstance(label, list):
+            label = label[0]
 
         node_label_map = getattr(self, f"node_label_map_{label}")
 

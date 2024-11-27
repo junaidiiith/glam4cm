@@ -8,8 +8,10 @@ import json
 from typing import List
 import xmltodict
 from torch_geometric.data import Data
-import networkx as nx
 import hashlib
+import networkx as nx
+from collections import deque
+
 
 
 def find_files_with_extension(root_dir, extension):
@@ -36,9 +38,67 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-import torch, os
-from tqdm.auto import tqdm
-from torch_geometric.data import Data
+def create_dummy_graph(num_nodes, num_edges):
+    # Node and edge attribute types
+    node_types = ['nt1', 'nt2', 'nt3', 'nt4', 'nt5', 'nt6', 'nt7']
+    edge_types = ['et1', 'et2', 'et3', 'et4']
+
+    # Create a graph
+    G = nx.Graph()
+
+    # Add nodes with attributes
+    for i in range(1, num_nodes + 1):
+        G.add_node(i, name=f'node_{i}', type=random.choice(node_types))
+
+    # Add edges with attributes
+    edges_added = 0
+    while edges_added < num_edges:
+        u = random.randint(1, num_nodes)
+        v = random.randint(1, num_nodes)
+        if u != v and not G.has_edge(u, v):  # Ensure no self-loops and no duplicate edges
+            G.add_edge(u, v, name=f'edge_{edges_added + 1}', type=random.choice(edge_types))
+            edges_added += 1
+
+    return G
+
+
+def bfs(graph: nx.Graph, start_node, d, exclude_edges: List[str] = None):
+        """Perform BFS to get all paths up to a given depth."""
+        if exclude_edges is None:
+            exclude_edges = []
+            
+        queue = deque([(start_node, [start_node])])
+        paths = []
+
+        while queue:
+            current_node, path = queue.popleft()
+
+            # Stop if the path length exceeds the maximum depth
+            if len(path) - 1 > d:
+                continue
+
+            # Store the path
+            if len(path) >= 1:  # Exclude single-node paths
+                paths.append(path)
+
+            # Add neighbors to the queue
+            for neighbor in graph.neighbors(current_node):
+                edge = (current_node, neighbor)
+                if neighbor not in path and edge not in exclude_edges:
+                    queue.append((neighbor, path + [neighbor]))
+        
+        return paths
+
+
+def remove_subsets(list_of_lists):
+        sorted_lists = sorted(list_of_lists, key=len, reverse=True)
+        unique_lists = []
+        for lst in sorted_lists:
+            current_set = set(lst)
+            if not any(current_set <= set(ul) for ul in unique_lists):
+                unique_lists.append(lst)
+        
+        return unique_lists
 
 
 def get_size_format(sz):

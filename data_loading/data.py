@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
-import json
+import networkx as nx
 import os
 from data_loading.metadata import (
     ArchimateMetaData, 
@@ -12,9 +12,10 @@ from embeddings.common import Embedder
 from lang2graph.archimate import ArchiMateNxG
 from lang2graph.ecore import EcoreNxG
 from lang2graph.common import (
-    create_graph_from_edge_index, 
+    create_graph_from_edge_index,
+    format_path, 
     get_node_texts,
-    get_edge_data
+    get_edge_texts
 )
 
 from settings import LP_TASK_EDGE_CLS
@@ -51,6 +52,7 @@ class GraphData(Data):
             return 1
         else:
             return 0
+
 
 class NumpyData:
     def __init__(self, data: dict = {}):
@@ -94,6 +96,7 @@ class TorchGraph:
             use_edge_types=False,
             use_node_types=False,
             use_attributes=False,
+            use_edge_label=False,
             use_special_tokens=False,
             no_labels=False
         ):
@@ -105,6 +108,7 @@ class TorchGraph:
         self.use_edge_types = use_edge_types
         self.use_node_types = use_node_types
         self.use_attributes = use_attributes
+        self.use_edge_label = use_edge_label
         self.use_special_tokens = use_special_tokens
         self.no_labels = no_labels
         
@@ -124,20 +128,11 @@ class TorchGraph:
     
     def get_node_edge_strings(self, edge_index):
         node_texts = self.get_graph_node_strs(
-            edge_index, 
-            self.distance, 
-            self.use_special_tokens
-        ) ### Considering nodes with edges only in the subgraph
-
-        edge_texts = self.get_graph_edge_strs_from_node_strs(
-            node_strs=node_texts, 
-            edge_index=self.graph.edge_index, 
-            use_edge_types=self.use_edge_types,
-            use_node_types=self.use_node_types,
-            use_special_tokens=self.use_special_tokens,
-            no_labels=self.no_labels
+            edge_index=edge_index, 
+            distance=self.distance
         )
-        
+
+        edge_texts = self.get_graph_edge_strs()
         return node_texts, edge_texts
     
 
@@ -173,7 +168,12 @@ class TorchGraph:
             self.save(save_path)
     
 
-    def get_graph_node_strs(self, edge_index: np.ndarray, distance = None, use_special_tokens=False):
+    def get_graph_node_strs(
+            self, 
+            edge_index: np.ndarray, 
+            distance = None, 
+            preprocessor: callable = doc_tokenizer
+        ):
         if distance is None:
             distance = self.distance
 
@@ -181,67 +181,42 @@ class TorchGraph:
         return get_node_texts(
             subgraph, 
             distance,
-            label=self.metadata.node_label,
-            use_attributes=self.use_attributes,
-            attribute_labels=self.metadata.node_attributes,
-            use_special_tokens=use_special_tokens
+            metadata=self.metadata,
+            use_node_attributes=self.use_attributes,
+            use_node_types=self.use_node_types,
+            use_edge_types=self.use_edge_types,
+            use_edge_label=self.use_edge_label,
+            use_special_tokens=self.use_special_tokens,
+            no_labels=self.no_labels,
+            preprocessor=preprocessor
         )
     
 
-    def get_graph_edge_strs_from_node_strs(
+    def get_graph_edge_strs(
             self, 
-            node_strs, 
-            edge_index: np.ndarray, 
-            use_edge_types=False,
-            use_node_types=False,
+            edge_index: np.ndarray = None, 
             neg_samples=False,
-            use_special_tokens=False, 
-            no_labels=False,
-            preprocessor: callable=doc_tokenizer
+            preprocessor: callable = doc_tokenizer
         ):
-        if use_node_types:
-            assert hasattr(self.metadata, 'type'), "Metadata does not have type attribute but use_node_types is True"
+        if edge_index is None:
+            edge_index = self.graph.edge_index
 
         edge_strs = dict()
-        label = self.metadata.edge_label
         for u, v in edge_index.T:
-            u_dict = self.graph.nodes[self.graph.id_to_node_label[u]]
-            v_dict = self.graph.nodes[self.graph.id_to_node_label[v]]
-
-            if no_labels:
-                u_str = f"{u_dict['type']}" if node_strs[u] and 'type' in u_dict and use_node_types else ""
-                v_str = f"{v_dict['type']}" if node_strs[v] and 'type' in v_dict and use_node_types else ""
-            else:
-                u_str = f"{u_dict['type']}: {node_strs[u]}" if node_strs[u] and 'type' in u_dict and use_node_types else node_strs[u]
-                v_str = f"{v_dict['type']}: {node_strs[v]}" if node_strs[v] and 'type' in v_dict and use_node_types else node_strs[v]
-                
-            u_label = self.graph.id_to_node_label[u]
-            v_label = self.graph.id_to_node_label[v]
-
-            if preprocessor is not None:
-                u_str = preprocessor(u_str)
-                v_str = preprocessor(v_str)
-
-            if not neg_samples:
-                edge_data = self.graph.edges[u_label, v_label]
-                edge_label = edge_data.get(label, "")
-                edge_type = get_edge_data(edge_data, 'type', self.metadata.type)
-            else:
-                edge_label = ""
-                edge_type = ""
-            
-            
-            if use_special_tokens:
-                if use_edge_types:
-                    edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {edge_type} {EDGE_END} {NODE_LABEL} {v_str}"
-                else:
-                    edge_str = f"{NODE_LABEL} {u_str} {EDGE_START} {edge_label} {EDGE_END} {NODE_LABEL} {v_str}"
-            else:
-                if use_edge_types:
-                    edge_str = f"{u_str} {edge_label} {edge_type} {v_str}"
-                else:
-                    edge_str = f"{u_str} {edge_label} {v_str}"
-                
+            edge_str = get_edge_texts(
+                self.graph.numbered_graph, 
+                (u, v), 
+                d=self.distance, 
+                metadata=self.metadata, 
+                use_node_attributes=self.use_attributes, 
+                use_node_types=self.use_node_types, 
+                use_edge_types=self.use_edge_types,
+                use_edge_label=self.use_edge_label,
+                use_special_tokens=self.use_special_tokens, 
+                no_labels=self.no_labels,
+                preprocessor=preprocessor,
+                neg_samples=neg_samples
+            )
 
             edge_strs[(u, v)] = edge_str
 
@@ -269,19 +244,21 @@ class TorchEdgeGraph(TorchGraph):
             neg_samples_ratio=1,
             use_edge_types=False,
             use_node_types=False,
+            use_edge_label=False,
             use_attributes=False,
             use_special_tokens=False,
             no_labels=False
         ):
 
         super().__init__(
-            graph, 
-            metadata, 
-            distance, 
-            test_ratio, 
-            use_edge_types, 
-            use_node_types,
-            use_attributes, 
+            graph=graph, 
+            metadata=metadata, 
+            distance=distance, 
+            test_ratio=test_ratio, 
+            use_node_types=use_node_types,
+            use_edge_types=use_edge_types,
+            use_attributes=use_attributes, 
+            use_edge_label=use_edge_label,
             use_special_tokens=use_special_tokens,
             no_labels=no_labels
         )
@@ -334,6 +311,17 @@ class TorchEdgeGraph(TorchGraph):
         else:
             train_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
             train_data.neg_edge_label = torch.tensor([], dtype=torch.long)
+        
+        nx.set_edge_attributes(
+            self.graph.numbered_graph, 
+            {tuple(edge): False for edge in train_data.pos_edge_label_index.T.tolist()}, 
+            'masked'
+        )
+        nx.set_edge_attributes(
+            self.graph.numbered_graph, 
+            {tuple(edge): True for edge in test_data.pos_edge_label_index.T.tolist()}, 
+            'masked'
+        )
 
         setattr(d, 'train_pos_edge_label_index', train_data.pos_edge_label_index)
         setattr(d, 'train_pos_edge_label', train_data.pos_edge_label)
@@ -362,8 +350,6 @@ class TorchEdgeGraph(TorchGraph):
 
     def get_link_prediction_texts(self, label, task_type):
         data = dict()
-        node_strs = self.get_graph_node_strs(self.data.edge_index)
-        
         train_pos_edge_index = self.data.edge_index
         train_neg_edge_index = self.data.train_neg_edge_label_index
         test_pos_edge_index = self.data.test_pos_edge_label_index
@@ -381,14 +367,9 @@ class TorchEdgeGraph(TorchGraph):
         }
 
         for edge_index_label, edge_index in edge_indices.items():
-            edge_strs = self.get_graph_edge_strs_from_node_strs(
-                node_strs, 
-                edge_index,
-                use_edge_types=self.use_edge_types,
-                use_node_types=self.use_node_types,
+            edge_strs = self.get_graph_edge_strs(
+                edge_index=edge_index,
                 neg_samples="neg" in edge_index_label,
-                use_special_tokens=self.use_special_tokens,
-                no_labels=self.no_labels
             )
             
             edge_strs = list(edge_strs.values())
@@ -414,7 +395,9 @@ class TorchNodeGraph(TorchGraph):
             metadata: dict,
             distance = 1,
             test_ratio=0.2,
+            use_node_types=False,
             use_edge_types=False,
+            use_edge_label=False,
             use_attributes=False,
             use_special_tokens=False,
             no_labels=False
@@ -425,7 +408,9 @@ class TorchNodeGraph(TorchGraph):
             metadata=metadata, 
             distance=distance, 
             test_ratio=test_ratio, 
-            use_edge_types=use_edge_types, 
+            use_node_types=use_node_types,
+            use_edge_types=use_edge_types,
+            use_edge_label=use_edge_label, 
             use_attributes=use_attributes,
             use_special_tokens=use_special_tokens,
             no_labels=no_labels
@@ -438,12 +423,17 @@ class TorchNodeGraph(TorchGraph):
     def get_pyg_data(self):
         d = GraphData()
         train_nodes, test_nodes = train_test_split(
-            list(self.graph.numbered_graph.nodes), test_size=self.test_ratio, shuffle=True, random_state=42
+            list(self.graph.numbered_graph.nodes), 
+            test_size=self.test_ratio, 
+            shuffle=True, 
+            random_state=42
         )
+
+        nx.set_node_attributes(self.graph.numbered_graph, {node: False for node in train_nodes}, 'masked')
+        nx.set_node_attributes(self.graph.numbered_graph, {node: True for node in test_nodes}, 'masked')
 
         train_idx = torch.tensor(train_nodes, dtype=torch.long)
         test_idx = torch.tensor(test_nodes, dtype=torch.long)
-
 
         setattr(d, 'train_node_mask', train_idx)
         setattr(d, 'test_node_mask', test_idx)
@@ -451,6 +441,8 @@ class TorchNodeGraph(TorchGraph):
 
         assert all([self.graph.numbered_graph.has_node(n) for n in train_nodes])
         assert all([self.graph.numbered_graph.has_node(n) for n in test_nodes])
+
+
 
         edge_index = self.graph.edge_index
         setattr(d, 'edge_index', edge_index)

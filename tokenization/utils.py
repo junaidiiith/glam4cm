@@ -1,12 +1,12 @@
 from re import finditer
 from tokenization.special_tokens import (
-    EDGE_START, EDGE_END, NODE_SEP, NODE_PATH_SEP, NODE_LABEL
+    EDGE_START, EDGE_END, NODE_LABEL
 )
 from transformers import AutoTokenizer
 
 def get_special_tokens():
     return {
-        'additional_special_tokens': [EDGE_START, EDGE_END, NODE_SEP, NODE_PATH_SEP, NODE_LABEL]
+        'additional_special_tokens': [EDGE_START, EDGE_END, NODE_LABEL]
     }
 
 
