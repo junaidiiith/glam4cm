@@ -51,7 +51,13 @@ def run(args):
 
     graph_data_params = get_config_params(args)
     print("Loading graph dataset")
-    graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
+    graph_dataset = GraphEdgeDataset(
+        dataset, 
+        dict(
+            **graph_data_params, 
+            add_negative_train_samples=args.add_negative_train_samples, 
+            neg_sampling_ratio=args.neg_sampling_ratio
+    ))
 
     input_dim = graph_dataset[0].data.x.shape[1]
 

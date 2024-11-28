@@ -68,8 +68,8 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    assert hasattr(graph_dataset, f'num_edges_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
-    num_labels = getattr(graph_dataset, f"num_edges_{args.cls_label}")
+    assert hasattr(graph_dataset, f'num_edges_{args.edge_cls_label}'), f"Dataset does not have node_{args.edge_cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_edges_{args.edge_cls_label}")
 
 
     model_name = args.model_name
@@ -78,7 +78,7 @@ def run(args):
     print("Getting Edge Classification data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(
         tokenizer=tokenizer,
-        label=args.cls_label,
+        label=args.edge_cls_label,
         task_type=LP_TASK_EDGE_CLS
     )
 
@@ -99,6 +99,7 @@ def run(args):
         'results',
         dataset_name,
         'edge_cls',
+        f'{args.edge_cls_label}',
         f"{graph_dataset.config_hash}",
     )
 
@@ -106,6 +107,7 @@ def run(args):
         'logs',
         dataset_name,
         'edge_cls',
+        f'{args.edge_cls_label}',
         f"{graph_dataset.config_hash}",
     )
 

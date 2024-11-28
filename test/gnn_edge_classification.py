@@ -52,7 +52,7 @@ def run(args):
     dropout = args.dropout
     aggregation = args.aggregation
 
-    num_edges_label = f"num_edges_{args.cls_label}"
+    num_edges_label = f"num_edges_{args.edge_cls_label}"
     assert hasattr(graph_dataset, num_edges_label), f"Graph dataset does not have attribute {num_edges_label}"
     num_classes = getattr(graph_dataset, num_edges_label)
 
@@ -93,7 +93,7 @@ def run(args):
         gnn_conv_model, 
         mlp_predictor, 
         graph_torch_data,
-        cls_label=args.cls_label,
+        cls_label=args.edge_cls_label,
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,

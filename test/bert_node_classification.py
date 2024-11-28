@@ -49,7 +49,6 @@ def get_parser():
     parser = merge_argument_parsers(common_parser, bert_parser)
 
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
-    parser.add_argument('--cls_label', type=str, required=True)
 
     return parser
 
@@ -76,15 +75,15 @@ def run(args):
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    assert hasattr(graph_dataset, f'num_nodes_{args.cls_label}'), f"Dataset does not have node_{args.cls_label} attribute"
-    num_labels = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
+    assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node_{args.node_cls_label} attribute"
+    num_labels = getattr(graph_dataset, f"num_nodes_{args.node_cls_label}")
 
     model_name = args.model_name
-    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
+    tokenizer = get_tokenizer(model_name, use_special_tokens=args.use_special_tokens)
 
     print("Getting node classification data")
     bert_dataset = graph_dataset.get_node_classification_lm_data(
-        label=args.cls_label,
+        label=args.node_cls_label,
         tokenizer=tokenizer,
         distance=distance,
     )
@@ -95,7 +94,9 @@ def run(args):
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
-    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.ckpt if args.ckpt else model_name, num_labels=num_labels
+    )
 
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
@@ -107,7 +108,7 @@ def run(args):
         'results',
         dataset_name,
         'node_cls',
-        args.cls_label,
+        f'{args.node_cls_label}',
         f"{graph_dataset.config_hash}",
     )
 
@@ -115,6 +116,7 @@ def run(args):
         'logs',
         dataset_name,
         'node_cls',
+        f'{args.node_cls_label}',
         f"{graph_dataset.config_hash}",
     )
 

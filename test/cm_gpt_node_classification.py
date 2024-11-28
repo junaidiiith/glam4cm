@@ -40,10 +40,10 @@ def run(args):
     models_dataset = get_models_dataset(args.dataset, **models_dataset_params)
     graph_dataset = GraphNodeDataset(models_dataset, **graph_params)
 
-    assert hasattr(graph_dataset, f'num_nodes_{args.cls_label}'), f"Dataset does not have node labels for {args.cls_label}"
+    assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node labels for {args.node_cls_label}"
 
     node_label_dataset = graph_dataset.get_node_classification_lm_data(
-        args.cls_label,
+        args.node_cls_label,
         tokenizer=tokenizer,
         distance=1,
     )
@@ -61,7 +61,7 @@ def run(args):
             n_head=args.n_head,
         )
     
-    cmgpt_classifier = CMGPTClassifier(cmgpt, num_classes=getattr(graph_dataset, f"num_nodes_{args.cls_label}"))
+    cmgpt_classifier = CMGPTClassifier(cmgpt, num_classes=getattr(graph_dataset, f"num_nodes_{args.node_cls_label}"))
 
     trainer = CMGPTTrainer(
         cmgpt_classifier, 

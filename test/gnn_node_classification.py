@@ -48,9 +48,9 @@ def run(args):
 
     graph_torch_data = graph_dataset.get_torch_dataset()
 
-    num_nodes_label = f"num_nodes_{args.cls_label}"
+    num_nodes_label = f"num_nodes_{args.node_cls_label}"
     assert hasattr(graph_dataset, num_nodes_label), f"Graph dataset does not have attribute {num_nodes_label}"
-    num_classes = getattr(graph_dataset, f"num_nodes_{args.cls_label}")
+    num_classes = getattr(graph_dataset, f"num_nodes_{args.node_cls_label}")
 
 
     input_dim = graph_torch_data[0].x.shape[1]
@@ -102,8 +102,8 @@ def run(args):
         gnn_conv_model, 
         mlp_predictor, 
         graph_torch_data,
-        cls_label=args.cls_label,
-        exclude_labels=getattr(graph_dataset, f"node_exclude_{args.cls_label}"),
+        cls_label=args.node_cls_label,
+        exclude_labels=getattr(graph_dataset, f"node_exclude_{args.node_cls_label}"),
         lr=args.lr,
         num_epochs=args.num_epochs,
         use_edge_attrs=args.use_edge_attrs,

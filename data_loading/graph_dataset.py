@@ -109,6 +109,7 @@ class GraphDataset(torch.utils.data.Dataset):
         test_ratio=0.2,
 
         use_embeddings=False,
+        use_special_tokens=False,
         embed_model_name='bert-base-uncased',
         ckpt=None,
         reload=False,
@@ -131,7 +132,6 @@ class GraphDataset(torch.utils.data.Dataset):
         self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
 
         self.reload = reload
-        
 
         self.use_edge_types = use_edge_types
         self.use_node_types = use_node_types
@@ -147,6 +147,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self.no_shuffle = no_shuffle
         self.exclude_labels = exclude_labels
 
+        self.use_special_tokens = use_special_tokens
         self.node_cls_label = node_cls_label
         self.edge_cls_label = edge_cls_label
 
@@ -165,6 +166,7 @@ class GraphDataset(torch.utils.data.Dataset):
             use_node_types=use_node_types,
             use_edge_label=use_edge_label,
             no_labels=no_labels,
+            use_special_tokens=use_special_tokens,
             use_embeddings=use_embeddings,
             embed_model_name=embed_model_name if use_embeddings else None,
             ckpt=ckpt if use_embeddings else None,
@@ -226,6 +228,7 @@ class GraphDataset(torch.utils.data.Dataset):
             use_node_types=self.use_node_types,
             use_edge_types=self.use_edge_types,
             use_edge_label=self.use_edge_label,
+            use_special_tokens=self.use_special_tokens,
             no_labels=self.no_labels,
             node_cls_label=self.node_cls_label,
             edge_cls_label=self.edge_cls_label
@@ -571,6 +574,8 @@ class GraphEdgeDataset(GraphDataset):
             randomize_ee = False,
             random_embed_dim=128,
 
+            use_special_tokens=False,
+
             limit: int = -1,
 
             node_cls_label: str = None,
@@ -592,6 +597,9 @@ class GraphEdgeDataset(GraphDataset):
             add_negative_train_samples=add_negative_train_samples,
             neg_sampling_ratio=neg_sampling_ratio,
             
+            use_special_tokens=use_special_tokens,
+            
+
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
 
@@ -705,6 +713,7 @@ class GraphNodeDataset(GraphDataset):
         use_edge_types=False,
         use_node_types=False,
         use_edge_label=False,
+        use_special_tokens=False,
 
         use_embeddings=False,
         embed_model_name='bert-base-uncased',
@@ -743,6 +752,8 @@ class GraphNodeDataset(GraphDataset):
 
             reload=reload,
             no_shuffle=no_shuffle,
+            
+            use_special_tokens=use_special_tokens,
 
             randomize_ne=randomize_ne,
             randomize_ee=randomize_ee,

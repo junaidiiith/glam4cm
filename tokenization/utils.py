@@ -10,13 +10,13 @@ def get_special_tokens():
     }
 
 
-def get_tokenizer(model_name, special_tokens=False, max_length=512) -> AutoTokenizer:
+def get_tokenizer(model_name, use_special_tokens=False, max_length=512) -> AutoTokenizer:
     print(f"Loading tokenizer for {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    if special_tokens:
+    if use_special_tokens:
         tokenizer.add_special_tokens(get_special_tokens())
 
     tokenizer.model_max_length = max_length

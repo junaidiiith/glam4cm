@@ -13,8 +13,7 @@ def get_config_params(args):
         use_edge_label=args.use_edge_label,
         no_labels=args.no_labels,
 
-        add_negative_train_samples=args.add_negative_train_samples,
-        neg_sampling_ratio=args.neg_sampling_ratio,
+        use_special_tokens=args.use_special_tokens,
 
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
@@ -65,6 +64,10 @@ def get_common_args_parser():
     parser.add_argument('--use_special_tokens', action='store_true')
     parser.add_argument('--no_labels', action='store_true')
 
+    parser.add_argument('--node_cls_label', type=str, default='type')
+    parser.add_argument('--edge_cls_label', type=str, default='type')
+
+
     parser.add_argument('--limit', type=int, default=-1)
 
 
@@ -84,7 +87,7 @@ def get_common_args_parser():
 
 
     parser.add_argument('--test_ratio', type=float, default=0.2)
-    parser.add_argument('--add_neg_samples', action='store_true')
+    parser.add_argument('--add_negative_train_samples', action='store_true')
     parser.add_argument('--neg_sampling_ratio', type=int, default=1)
 
     parser.add_argument('--num_epochs', type=int, default=100)
