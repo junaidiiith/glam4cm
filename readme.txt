@@ -15,3 +15,20 @@ We distribute two files, under CC-BY-SA 3.0:
 
  - cooking.stackexchange.id, which contains the corresponding row IDs,
    from the original data dump.
+
+
+Node classification
+  Language Model
+    Freezing parameters
+    Effect of attributes
+    Effect of edge information
+    Edge of partial node type information
+
+  GNN
+    GCNConv, SAGEConv, GATConv
+    Random Node Embeddings
+    Bert Node Embeddings
+    Finetuned Node Embeddings
+    Random Edge Embeddings
+    Bert Edge Embeddings
+    Finetuned Edge Embeddings
