@@ -10,6 +10,7 @@ import numpy as np
 
 class BertEmbedder(Embedder):
     def __init__(self, model_name, ckpt=None):
+        super().__init__(name='BERT')
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(ckpt if ckpt else model_name)
         self.model.to(device)

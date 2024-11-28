@@ -1,4 +1,9 @@
 from argparse import ArgumentParser
+from settings import (
+    BERT_MODEL,
+    WORD2VEC_MODEL,
+    TFIDF_MODEL
+)
 
 
 def get_config_params(args):
@@ -75,7 +80,12 @@ def get_common_args_parser():
     parser.add_argument('--distance', type=int, default=0)
     parser.add_argument('--use_embeddings', action='store_true')
     parser.add_argument('--regen_embeddings', action='store_true')
-    parser.add_argument('--embed_model_name', type=str, default='bert-base-uncased')
+    parser.add_argument(
+        '--embed_model_name', 
+        type=str, 
+        default='bert-base-uncased', 
+        choices=[BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL]
+    )
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--ckpt', type=str, default=None)
     

@@ -6,7 +6,6 @@ from sklearn.metrics import (
     recall_score
 )
 from transformers import (
-    AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments
 )

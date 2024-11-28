@@ -6,7 +6,7 @@ from data_loading.graph_dataset import GraphNodeDataset
 from data_loading.utils import oversample_dataset
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from transformers import AutoModelForSequenceClassification
+
 
 from sklearn.metrics import (
     accuracy_score, 

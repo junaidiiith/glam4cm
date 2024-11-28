@@ -64,6 +64,7 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = get_config_params(args)
+    graph_data_params = {**graph_data_params, 'task': LP_TASK_EDGE_CLS}
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -77,11 +78,7 @@ def run(args):
     tokenizer = get_tokenizer(model_name, args.use_special_tokens)
 
     print("Getting Edge Classification data")
-    bert_dataset = graph_dataset.get_link_prediction_lm_data(
-        tokenizer=tokenizer,
-        label=args.edge_cls_label,
-        task_type=LP_TASK_EDGE_CLS
-    )
+    bert_dataset = graph_dataset.get_link_prediction_lm_data(tokenizer=tokenizer)
 
     if args.oversampling_ratio != -1:
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])

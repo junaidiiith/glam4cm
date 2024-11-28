@@ -14,7 +14,6 @@ from sklearn.metrics import (
 )
 from transformers import (
     AutoTokenizer,
-    AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments
 )

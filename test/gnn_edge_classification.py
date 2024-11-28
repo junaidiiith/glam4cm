@@ -1,6 +1,7 @@
 import os
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
+from settings import LP_TASK_EDGE_CLS
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
@@ -32,6 +33,7 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = get_config_params(args)
+    graph_data_params = {**graph_data_params, 'task': LP_TASK_EDGE_CLS}
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)

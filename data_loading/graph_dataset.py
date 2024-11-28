@@ -14,6 +14,8 @@ from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph, GraphD
 from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
+from embeddings.w2v import Word2VecEmbedder
+from embeddings.tfidf import TfidfEmbedder
 from embeddings.common import get_embedding_model
 from lang2graph.common import LangGraph, get_node_data, get_edge_data
 from data_loading.metadata import ArchimateMetaData, EcoreMetaData
@@ -213,12 +215,12 @@ class GraphDataset(torch.utils.data.Dataset):
             for graph in models_dataset
         }
 
-    def set_torch_graphs(
+    def get_torch_graphs(
             self, 
             type: str,
             models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset], 
             limit: int =-1
-        ):
+        ) -> List[tuple[TorchGraph, str]]:
         
         common_params = dict(
             metadata=self.metadata,
@@ -243,7 +245,7 @@ class GraphDataset(torch.utils.data.Dataset):
         def create_edge_graph(graph: LangGraph):
             edge_params = {
                 **common_params,
-                'use_neg_samples': self.add_negative_train_samples,
+                'add_negative_train_samples': self.add_negative_train_samples,
                 'neg_samples_ratio': self.neg_sampling_ratio
             }
             torch_graph = TorchEdgeGraph(graph, **edge_params)
@@ -255,13 +257,20 @@ class GraphDataset(torch.utils.data.Dataset):
             if (limit == -1 or limit > len(models_dataset)) else limit
         
         models_dataset = models_dataset[:models_size]
-
-        for graph in tqdm(models_dataset, desc=f'Embedding {type} graphs'):
+        torch_graphs = list()
+        for graph in tqdm(models_dataset, desc=f'Creating {type} graphs'):
             fp = self.file_paths[graph.hash]
             if type == 'node':
                 torch_graph = create_node_graph(graph)
             elif type == 'edge':
                 torch_graph = create_edge_graph(graph)
+            torch_graphs.append((torch_graph, fp))
+        
+        return torch_graphs
+
+    
+    def embed(self, torch_graphs: List[tuple[TorchGraph, str]]):
+        for torch_graph, fp in tqdm(torch_graphs, desc='Embedding graphs'):
             torch_graph.embed(
                 self.embedder, 
                 save_path=os.path.join(fp),
@@ -271,8 +280,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 random_embed_dim=self.random_embed_dim
             )
 
-        for graph in tqdm(models_dataset, desc='Creating graphs'):
-            fp = self.file_paths[graph.hash]
+        for torch_graph, fp in tqdm(torch_graphs, desc='Re-Loading graphs'):
             tg = TorchGraph.load(fp)
             self.graphs.append(tg)
         
@@ -579,7 +587,9 @@ class GraphEdgeDataset(GraphDataset):
             limit: int = -1,
 
             node_cls_label: str = None,
-            edge_cls_label: str = 'type'
+            edge_cls_label: str = 'type',
+
+            task_type=LP_TASK_EDGE_CLS
         ):
         
         super().__init__(
@@ -616,7 +626,19 @@ class GraphEdgeDataset(GraphDataset):
             random_embed_dim=random_embed_dim,
         )
 
-        self.set_torch_graphs('edge', models_dataset, limit)
+        self.task_type = task_type
+
+        torch_graphs = self.get_torch_graphs('edge', models_dataset, limit)
+
+
+        if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
+            texts = self.get_link_prediction_texts()
+            texts = sum([v for _, v in texts.items() if not v.endswith("classes")], [])
+            print(f"Training {self.embedder.name} Embedder")
+            self.embedder.train(texts)
+            print(f"Trained {self.embedder.name} Embedder")
+        
+        self.embed(torch_graphs)
 
         train_count, test_count = dict(), dict()
         for g in self.graphs:
@@ -638,12 +660,14 @@ class GraphEdgeDataset(GraphDataset):
 
     def get_link_prediction_texts(
         self, 
-        label: str = 'type',
-        task_type=LP_TASK_EDGE_CLS
+        label: str = None
     ):
+        if label is None:
+            label = self.edge_cls_label
+
         data = defaultdict(list)
-        for graph in tqdm(self.graphs, desc=f'Getting {task_type} data'):
-            graph_data = graph.get_link_prediction_texts(label, task_type)
+        for graph in tqdm(self.graphs, desc=f'Getting {self.task_type} data'):
+            graph_data = graph.get_link_prediction_texts(label, self.task_type)
             for k, v in graph_data.items():
                 data[k] += v
 
@@ -659,8 +683,14 @@ class GraphEdgeDataset(GraphDataset):
         self, 
         tokenizer: AutoTokenizer,
         label: str = None,
-        task_type=LP_TASK_EDGE_CLS
+        task_type=None
     ):
+        if label is None:
+            label = self.edge_cls_label
+        
+        if task_type is None:
+            task_type = self.task_type
+
         data = self.get_link_prediction_texts(
             label, 
             task_type
@@ -760,7 +790,17 @@ class GraphNodeDataset(GraphDataset):
             random_embed_dim=random_embed_dim,
         )
 
-        self.set_torch_graphs('node', models_dataset, limit)
+        torch_graphs = self.get_torch_graphs('node', models_dataset, limit)
+
+        if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
+            texts = self.get_node_classification_texts()
+            texts = sum([v for _, v in texts.items() if not v.endswith("classes")], [])
+            print(f"Training {self.embedder.name} Embedder")
+            self.embedder.train(texts)
+            print(f"Trained {self.embedder.name} Embedder")
+        
+        self.embed(torch_graphs)
+
 
         node_labels = self.metadata.node_cls
         if isinstance(node_labels, str):
@@ -791,6 +831,7 @@ class GraphNodeDataset(GraphDataset):
             distance = self.distance
 
         label = self.metadata.node_cls if label is None else label
+
         if isinstance(label, list):
             label = label[0]
 

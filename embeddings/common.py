@@ -3,11 +3,17 @@ import json
 import os
 from typing import List, Union
 import torch
+from settings import (
+    BERT_MODEL,
+    WORD2VEC_MODEL,
+    TFIDF_MODEL
+)
 
 
 class Embedder:
 
-    def ___init__(self):
+    def ___init__(self, name: str):
+        self.name = name
         self.finetuned = False
 
     @abstractmethod
@@ -29,5 +35,11 @@ def get_embedding_model(
     if 'bert' in model_name:
         from embeddings.bert import BertEmbedder
         return BertEmbedder(model_name, ckpt)
+    elif WORD2VEC_MODEL in model_name:
+        from embeddings.w2v import Word2VecEmbedder
+        return Word2VecEmbedder()
+    elif TFIDF_MODEL in model_name:
+        from embeddings.tfidf import TfidfEmbedder
+        return TfidfEmbedder()
     else:
         raise ValueError(f'Unknown model name: {model_name}')

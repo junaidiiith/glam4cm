@@ -9,8 +9,16 @@ logger.setLevel(logging.DEBUG)
 
 
 BERT_MODEL = 'bert-base-uncased'
+WORD2VEC_MODEL = 'word2vec'
+TFIDF_MODEL = 'tfidf'
 FAST_TEXT_MODEL = 'uml-fasttext.bin'
 
+W2V_CONFIG = dict(
+    vector_size=100,
+    window=5,
+    min_count=1,
+    workers=4
+)
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 torch.set_float32_matmul_precision('high')

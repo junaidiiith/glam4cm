@@ -1,6 +1,7 @@
 import os
 from data_loading.graph_dataset import GraphEdgeDataset
 from models.gnn_layers import GNNConv, EdgeClassifer
+from settings import LP_TASK_LINK_PRED
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
@@ -56,7 +57,8 @@ def run(args):
         dict(
             **graph_data_params, 
             add_negative_train_samples=args.add_negative_train_samples, 
-            neg_sampling_ratio=args.neg_sampling_ratio
+            neg_sampling_ratio=args.neg_sampling_ratio,
+            task=LP_TASK_LINK_PRED
     ))
 
     input_dim = graph_dataset[0].data.x.shape[1]

@@ -7,7 +7,7 @@ from settings import LP_TASK_LINK_PRED
 from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 from test.utils import get_models_dataset
 from tokenization.special_tokens import *
-from transformers import AutoModelForSequenceClassification
+
 
 from sklearn.metrics import (
     f1_score, 
@@ -69,6 +69,7 @@ def run(args):
 
 
     graph_data_params = get_config_params(args)
+    graph_data_params = {**graph_data_params, 'task': LP_TASK_LINK_PRED}
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
@@ -76,7 +77,8 @@ def run(args):
         dict(
             **graph_data_params, 
             add_negative_train_samples=args.add_negative_train_samples, 
-            neg_sampling_ratio=args.neg_sampling_ratio
+            neg_sampling_ratio=args.neg_sampling_ratio,
+            task=LP_TASK_LINK_PRED
     ))
     print("Loaded graph dataset")
 
