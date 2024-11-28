@@ -5,7 +5,6 @@ from embeddings.common import Embedder
 from data_loading.encoding import EncodingDataset
 from torch.utils.data import DataLoader
 from settings import device
-from tqdm.auto import tqdm
 import numpy as np
 
 class BertEmbedder(Embedder):

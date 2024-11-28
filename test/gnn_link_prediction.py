@@ -41,15 +41,6 @@ def run(args):
     dropout = args.dropout
     aggregation = args.aggregation
 
-    
-    logs_dir = os.path.join(
-        "logs",
-        dataset_name,
-        "gnn_lp",
-        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
-    )
-
-
     graph_data_params = get_config_params(args)
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
@@ -84,8 +75,14 @@ def run(args):
         edge_dim=edge_dim
     )
 
+    logs_dir = os.path.join(
+        "logs",
+        dataset_name,
+        "gnn_lp",
+        f'{graph_dataset.config_hash}',
+    )
+
     clf_input_dim = gnn_conv_model.out_dim*num_heads if args.num_heads else output_dim
-    # clf_input_dim = input_dim
     mlp_predictor = EdgeClassifer(
         input_dim=clf_input_dim,
         hidden_dim=hidden_dim,

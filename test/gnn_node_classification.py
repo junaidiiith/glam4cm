@@ -5,14 +5,13 @@ from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
 from utils import merge_argument_parsers, set_seed
-from test.common_args import get_common_args_parser, get_gnn_args_parser
+from test.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 
 
 def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
-    parser.add_argument('--cls_label', type=str, required=True)
     return parser
 
 
@@ -30,17 +29,7 @@ def run(args):
     dataset_name = args.dataset
 
     dataset = get_models_dataset(dataset_name, **config_params)
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        use_edge_types=args.use_edge_types,
-        randomize_ne=args.randomize_ne,
-        no_labels=args.no_labels,
-        ckpt=args.ckpt
-    )
+    graph_data_params = get_config_params(args)
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)

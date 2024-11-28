@@ -127,6 +127,7 @@ class TorchGraph:
             return pickle.load(f)
     
     def save(self, pkl_path):
+        os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
         with open(pkl_path, 'wb') as f:
             pickle.dump(self, f)
 
@@ -150,22 +151,29 @@ class TorchGraph:
             randomize_ee=False,
             random_embed_dim=128
         ):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        def generate_embeddings():
+            if randomize_ne or embedder is None:
+                print("Randomizing node embeddings")
+                self.data.x = np.random.randn(self.graph.number_of_nodes(), random_embed_dim)
+            else:
+                self.data.x = embedder.embed(list(self.node_texts.values()))
+            
+            if randomize_ee or embedder is None:
+                print("Randomizing edge embeddings")
+                self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
+            else:
+                self.data.edge_attr = embedder.embed(list(self.edge_texts.values()))
+
         if os.path.exists(f"{save_path}") and not reload:
             with open(f"{save_path}", 'rb') as f:
                 obj: Union[TorchEdgeGraph, TorchNodeGraph] = pickle.load(f)
-                return obj.data
+            if not hasattr(obj.data, 'x') or not hasattr(obj.data, 'edge_attr'):
+                generate_embeddings()
+                self.save(save_path)
         else:
             if embedder is not None:
-                self.data.x = embedder.embed(list(self.node_texts.values()))
-                self.data.edge_attr = embedder.embed(list(self.edge_texts.values()))
-                if randomize_ne:
-                    print("Randomizing node embeddings")
-                    self.data.x = np.random.randn(self.graph.number_of_nodes(), random_embed_dim)
-                
-                if randomize_ee:
-                    print("Randomizing edge embeddings")
-                    self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
+                generate_embeddings()
             else:
                 self.data.x = np.random.randn(self.graph.number_of_nodes(), random_embed_dim)
                 self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
@@ -247,7 +255,7 @@ class TorchEdgeGraph(TorchGraph):
             metadata: Union[EcoreMetaData, ArchimateMetaData],
             distance = 1,
             test_ratio=0.2,
-            use_neg_samples=False,
+            add_negative_train_samples=False,
             neg_samples_ratio=1,
             use_edge_types=False,
             use_node_types=False,
@@ -273,7 +281,7 @@ class TorchEdgeGraph(TorchGraph):
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label
         )
-        self.use_neg_samples = use_neg_samples
+        self.add_negative_train_samples = add_negative_train_samples
         self.neg_sampling_ratio = neg_samples_ratio
         self.data, self.node_texts, self.edge_texts = self.get_pyg_data()
         self.validate_data()
@@ -286,7 +294,7 @@ class TorchEdgeGraph(TorchGraph):
         transform = RandomLinkSplit(
             num_val=0, 
             num_test=self.test_ratio, 
-            add_negative_train_samples=self.use_neg_samples,
+            add_negative_train_samples=self.add_negative_train_samples,
             neg_sampling_ratio=self.neg_sampling_ratio,
             split_labels=True
         )

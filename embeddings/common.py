@@ -4,15 +4,13 @@ import os
 from typing import List, Union
 import torch
 from settings import (
-    BERT_MODEL,
     WORD2VEC_MODEL,
     TFIDF_MODEL
 )
 
 
 class Embedder:
-
-    def ___init__(self, name: str):
+    def __init__(self, name: str):
         self.name = name
         self.finetuned = False
 

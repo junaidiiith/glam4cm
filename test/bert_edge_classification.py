@@ -43,7 +43,6 @@ def get_parser():
     parser = merge_argument_parsers(common_parser, bert_parser)
 
     parser.add_argument('--oversampling_ratio', type=float, default=-1)
-    parser.add_argument('--cls_label', type=str, default='type')
 
     return parser
 
@@ -64,7 +63,7 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = get_config_params(args)
-    graph_data_params = {**graph_data_params, 'task': LP_TASK_EDGE_CLS}
+    graph_data_params = {**graph_data_params, 'task_type': LP_TASK_EDGE_CLS}
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -80,6 +79,8 @@ def run(args):
     print("Getting Edge Classification data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(tokenizer=tokenizer)
 
+    # exit(0)
+    
     if args.oversampling_ratio != -1:
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]

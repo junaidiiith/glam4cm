@@ -13,7 +13,6 @@ def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
-    parser.add_argument('--cls_label', type=str, default='type')
     return parser
 
 

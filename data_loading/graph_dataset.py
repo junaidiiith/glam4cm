@@ -121,7 +121,7 @@ class GraphDataset(torch.utils.data.Dataset):
         randomize_ee=False,
         random_embed_dim=128,
         
-        exclude_labels: list = [None]
+        exclude_labels: list = [None],
     ):
         if isinstance(models_dataset, EcoreModelDataset):
             self.metadata = EcoreMetaData()
@@ -185,11 +185,6 @@ class GraphDataset(torch.utils.data.Dataset):
         self.save_dir = os.path.join(save_dir, models_dataset.name)
         os.makedirs(self.save_dir, exist_ok=True)
 
-        self.file_paths = {
-            graph.hash: os.path.join(self.save_dir, f'{graph.hash}', 'data.pkl') 
-            for graph in models_dataset
-        }
-
 
     def get_config_hash(self):
         if os.path.exists(os.path.join(self.save_dir, 'configs.json')):
@@ -215,7 +210,10 @@ class GraphDataset(torch.utils.data.Dataset):
             for graph in models_dataset
         }
 
-    def get_torch_graphs(
+        print("Number of duplicate graphs: ", len(models_dataset) - len(self.file_paths))
+
+
+    def set_torch_graphs(
             self, 
             type: str,
             models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset], 
@@ -251,26 +249,26 @@ class GraphDataset(torch.utils.data.Dataset):
             torch_graph = TorchEdgeGraph(graph, **edge_params)
             return torch_graph
         
-        self.set_file_hashes(models_dataset)
+        
         
         models_size = len(models_dataset) \
             if (limit == -1 or limit > len(models_dataset)) else limit
         
-        models_dataset = models_dataset[:models_size]
-        torch_graphs = list()
-        for graph in tqdm(models_dataset, desc=f'Creating {type} graphs'):
-            fp = self.file_paths[graph.hash]
-            if type == 'node':
-                torch_graph = create_node_graph(graph)
-            elif type == 'edge':
-                torch_graph = create_edge_graph(graph)
-            torch_graphs.append((torch_graph, fp))
-        
-        return torch_graphs
+        self.set_file_hashes(models_dataset[:models_size])
 
-    
-    def embed(self, torch_graphs: List[tuple[TorchGraph, str]]):
-        for torch_graph, fp in tqdm(torch_graphs, desc='Embedding graphs'):
+        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {type} graphs'):
+            fp = self.file_paths[graph.hash]
+            if not os.path.exists(fp) or self.reload:
+                if type == 'node':
+                    torch_graph = create_node_graph(graph)
+                elif type == 'edge':
+                    torch_graph = create_edge_graph(graph)
+                
+                torch_graph.save(fp)
+
+    def embed(self):
+        for fp in tqdm(self.file_paths.values(), desc='Embedding graphs'):
+            torch_graph = TorchGraph.load(fp)
             torch_graph.embed(
                 self.embedder, 
                 save_path=os.path.join(fp),
@@ -280,9 +278,9 @@ class GraphDataset(torch.utils.data.Dataset):
                 random_embed_dim=self.random_embed_dim
             )
 
-        for torch_graph, fp in tqdm(torch_graphs, desc='Re-Loading graphs'):
-            tg = TorchGraph.load(fp)
-            self.graphs.append(tg)
+        for fp in tqdm(self.file_paths.values(), desc='Re-Loading graphs'):
+            torch_graph = TorchGraph.load(fp)
+            self.graphs.append(torch_graph)
         
         if not self.no_shuffle:
             shuffle(self.graphs)
@@ -628,8 +626,7 @@ class GraphEdgeDataset(GraphDataset):
 
         self.task_type = task_type
 
-        torch_graphs = self.get_torch_graphs('edge', models_dataset, limit)
-
+        self.set_torch_graphs('edge', models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
             texts = self.get_link_prediction_texts()
@@ -638,7 +635,7 @@ class GraphEdgeDataset(GraphDataset):
             self.embedder.train(texts)
             print(f"Trained {self.embedder.name} Embedder")
         
-        self.embed(torch_graphs)
+        self.embed()
 
         train_count, test_count = dict(), dict()
         for g in self.graphs:
@@ -683,22 +680,15 @@ class GraphEdgeDataset(GraphDataset):
         self, 
         tokenizer: AutoTokenizer,
         label: str = None,
-        task_type=None
     ):
         if label is None:
             label = self.edge_cls_label
         
-        if task_type is None:
-            task_type = self.task_type
-
-        data = self.get_link_prediction_texts(
-            label, 
-            task_type
-        )
+        data = self.get_link_prediction_texts(label)
 
 
         print("Tokenizing data")
-        if task_type == LP_TASK_EDGE_CLS:
+        if self.task_type == LP_TASK_EDGE_CLS:
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -711,7 +701,7 @@ class GraphEdgeDataset(GraphDataset):
                     data['test_edge_classes']
                 )
             }
-        elif task_type == LP_TASK_LINK_PRED:
+        elif self.task_type == LP_TASK_LINK_PRED:
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -724,6 +714,8 @@ class GraphEdgeDataset(GraphDataset):
                     [1] * len(data['test_pos_edges']) + [0] * len(data['test_neg_edges'])
                 )
             }
+        else:
+            raise ValueError(f"Invalid task type: {self.task_type}")
         
         print("Tokenized data")
         
@@ -765,8 +757,6 @@ class GraphNodeDataset(GraphDataset):
             distance=distance,
             test_ratio=test_ratio,
             
-            
-            
             use_node_types=use_node_types,
             use_edge_types=use_edge_types,
             use_edge_label=use_edge_label,
@@ -790,7 +780,7 @@ class GraphNodeDataset(GraphDataset):
             random_embed_dim=random_embed_dim,
         )
 
-        torch_graphs = self.get_torch_graphs('node', models_dataset, limit)
+        self.set_torch_graphs('node', models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
             texts = self.get_node_classification_texts()
@@ -799,8 +789,7 @@ class GraphNodeDataset(GraphDataset):
             self.embedder.train(texts)
             print(f"Trained {self.embedder.name} Embedder")
         
-        self.embed(torch_graphs)
-
+        self.embed()
 
         node_labels = self.metadata.node_cls
         if isinstance(node_labels, str):

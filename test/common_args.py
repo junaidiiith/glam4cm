@@ -121,11 +121,10 @@ def get_gnn_args_parser():
     parser.add_argument('--l_norm', action='store_true')
     parser.add_argument('--aggregation', type=str, default='sum')
     parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--lr', type=float, default=1e-2)
+    parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--gnn_conv_model', type=str, default='SAGEConv')
 
     parser.add_argument('--use_edge_attrs', action='store_true')
-    
     
     return parser
 
