@@ -1,3 +1,4 @@
+from models.hf import get_model
 from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 import os
 from transformers import TrainingArguments, Trainer
@@ -94,8 +95,10 @@ def run(args):
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
         bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.ckpt if args.ckpt else model_name, num_labels=num_labels
+    model = get_model(
+        args.ckpt if args.ckpt else model_name, 
+        num_labels=2, 
+        len_tokenizer=len(tokenizer)
     )
 
     if args.freeze_pretrained_weights:

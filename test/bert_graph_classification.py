@@ -12,6 +12,7 @@ from transformers import (
 )
 
 from data_loading.graph_dataset import GraphNodeDataset
+from models.hf import get_model
 from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 from test.utils import get_models_dataset
 from tokenization.utils import get_tokenizer
@@ -75,9 +76,9 @@ def run(args):
     ):
         train_dataset = classification_dataset['train']
         test_dataset = classification_dataset['test']
-        num_classes = classification_dataset['num_classes']
+        num_labels = classification_dataset['num_classes']
 
-        print(len(train_dataset), len(test_dataset), num_classes)
+        print(len(train_dataset), len(test_dataset), num_labels)
 
         print("Training model")
         output_dir = os.path.join(
@@ -94,10 +95,7 @@ def run(args):
             f"{graph_dataset.config_hash}"
         )
 
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.ckpt if args.ckpt else model_name, 
-            num_labels=num_classes
-        )
+        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
 
         if args.freeze_pretrained_weights:
             for param in model.base_model.parameters():

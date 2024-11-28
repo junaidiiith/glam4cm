@@ -20,6 +20,7 @@ from transformers import (
 )
 
 from data_loading.encoding import EncodingDataset
+from models.hf import get_model
 
 
 
@@ -82,7 +83,7 @@ def run(args):
 
     texts = [text for text, _ in texts]
 
-    num_classes = len(y_map)
+    num_labels = len(y_map)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     k = args.k
@@ -99,13 +100,12 @@ def run(args):
         test_y = [y[i] for i in test_idx]
 
 
-        print(f'Train: {len(train_texts)}, Test: {len(test_texts)}', num_classes)
+        print(f'Train: {len(train_texts)}, Test: {len(test_texts)}', num_labels)
 
         train_dataset = EncodingDataset(tokenizer, train_texts, train_y)
         test_dataset = EncodingDataset(tokenizer, test_texts, test_y)
 
-        model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_classes)
-        model.resize_token_embeddings(len(tokenizer))
+        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
 
         print("Training model")
         output_dir = os.path.join(

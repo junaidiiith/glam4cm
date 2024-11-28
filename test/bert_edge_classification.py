@@ -4,8 +4,9 @@ from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.utils import oversample_dataset
 from settings import LP_TASK_EDGE_CLS
 from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
-from transformers import AutoModelForSequenceClassification
+from models.hf import get_model
 from test.utils import get_models_dataset
+
 
 from sklearn.metrics import (
     accuracy_score, 
@@ -88,9 +89,9 @@ def run(args):
 
     print("Training model")
     print(f'Number of labels: {num_labels}')
-    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=num_labels)
-    model.resize_token_embeddings(len(tokenizer))
-
+    
+    model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
+    
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
             param.requires_grad = False

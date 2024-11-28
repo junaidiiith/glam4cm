@@ -2,6 +2,7 @@ from collections import Counter
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
+from models.hf import get_model
 from settings import LP_TASK_LINK_PRED
 from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 from test.utils import get_models_dataset
@@ -92,8 +93,7 @@ def run(args):
     )
 
     print("Training model")
-    model = AutoModelForSequenceClassification.from_pretrained(args.ckpt if args.ckpt else model_name, num_labels=2)
-    model.resize_token_embeddings(len(tokenizer))
+    model = get_model(args.ckpt if args.ckpt else model_name, num_labels=2, len_tokenizer=len(tokenizer))
 
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():

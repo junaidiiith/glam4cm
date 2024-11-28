@@ -56,3 +56,10 @@ Output Dir:  results/eamodelset/node_cls/type/6222da6fbf343f252e2376c0d365f732
 Logs Dir:  logs/eamodelset/node_cls/type/6222da6fbf343f252e2376c0d365f732
 Len Train Dataset:  46023
 Len Test Dataset:  11775
+{'loss': 2.9637, 'grad_norm': 4.723838806152344, 'learning_rate': 4.8611111111111115e-05, 'epoch': 0.28}
+{'eval_loss': 2.1658098697662354, 'eval_balanced_accuracy': 0.169063740117158, 'eval_accuracy': 0.43524416135881105, 'eval_f1_macro': 0.14404311726926364, 'eval_precision': 0.43524416135881105, 'eval_recall': 0.169063740117158, 'eval_runtime': 26.5461, 'eval_samples_per_second': 443.567, 'eval_steps_per_second': 1.733, 'epoch': 0.28}
+{'loss': 1.9791, 'grad_norm': 6.502124309539795, 'learning_rate': 4.722222222222222e-05, 'epoch': 0.56}
+{'eval_loss': 1.7706717252731323, 'eval_balanced_accuracy': 0.28827358678949466, 'eval_accuracy': 0.5481953290870488, 'eval_f1_macro': 0.2730509401024548, 'eval_precision': 0.5481953290870488, 'eval_recall': 0.28827358678949466, 'eval_runtime': 26.6851, 'eval_samples_per_second': 441.257, 'eval_steps_per_second': 1.724, 'epoch': 0.56}
+{'loss': 1.7, 'grad_norm': 5.733453750610352, 'learning_rate': 4.5833333333333334e-05, 'epoch': 0.83}
+{'eval_loss': 1.515366554260254, 'eval_balanced_accuracy': 0.3796235218463845, 'eval_accuracy': 0.6104458598726115, 'eval_f1_macro': 0.40297552484487975, 'eval_precision': 0.6104458598726115, 'eval_recall': 0.3796235218463845, 'eval_runtime': 26.5835, 'eval_samples_per_second': 442.944, 'eval_steps_per_second': 1.73, 'epoch': 0.83}
+{'loss': 1.4441, 'grad_norm': 6.960084915161133, 'learning_rate': 4.4444444444444447e-05, 'epoch': 1.11}

@@ -27,19 +27,18 @@ class EncodingDataset(Dataset):
             padding='max_length', 
             max_length=max_length
         )
-        # print("Number of Texts: ", len(texts))
+
         if labels:
             self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels else None
 
-            # print("Number of labels: ", len(set(labels)))
  
-
     def __len__(self):
         return len(self.inputs['input_ids'])
-    
+
 
     def __getitem__(self, index):
         return {k: v[index] for k, v in self.inputs.items()}
+
 
 class GPTTextDataset(Dataset):
     def __init__(self, texts, tokenizer, max_length=512):
