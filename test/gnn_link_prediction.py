@@ -5,7 +5,7 @@ from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
 from utils import merge_argument_parsers, set_seed
-from test.common_args import get_common_args_parser, get_gnn_args_parser
+from test.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 
 
 def get_parser():
@@ -49,23 +49,7 @@ def run(args):
     )
 
 
-    gnn_conv_model, mlp_predictor, trainer = None, None, None
-
-    graph_data_params = dict(
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        random_embed_dim=args.random_embed_dim,
-        add_negative_train_samples=True,
-        neg_sampling_ratio=args.neg_sampling_ratio,
-        use_node_types=args.use_node_types,
-        use_special_tokens=args.use_special_tokens,
-        no_labels=args.no_labels,
-        
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt
-    )
-
+    graph_data_params = get_config_params(args)
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
 
@@ -78,32 +62,30 @@ def run(args):
         else:
             edge_dim = graph_dataset[0].data.edge_attr.shape[1]
     
-    if gnn_conv_model is None:
-        gnn_conv_model = GNNConv(
-            model_name=model_name,
-            input_dim=input_dim,
-            hidden_dim=hidden_dim,
-            out_dim=output_dim,
-            num_layers=num_conv_layers,
-            num_heads=num_heads,
-            residual=residual,
-            l_norm=l_norm,
-            dropout=dropout,
-            aggregation=aggregation,
-            edge_dim=edge_dim
-        )
+    gnn_conv_model = GNNConv(
+        model_name=model_name,
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        out_dim=output_dim,
+        num_layers=num_conv_layers,
+        num_heads=num_heads,
+        residual=residual,
+        l_norm=l_norm,
+        dropout=dropout,
+        aggregation=aggregation,
+        edge_dim=edge_dim
+    )
 
     clf_input_dim = gnn_conv_model.out_dim*num_heads if args.num_heads else output_dim
     # clf_input_dim = input_dim
-    if mlp_predictor is None:
-        mlp_predictor = EdgeClassifer(
-            input_dim=clf_input_dim,
-            hidden_dim=hidden_dim,
-            num_layers=num_mlp_layers, 
-            num_classes=2,
-            edge_dim=edge_dim,
-            bias=False,
-        )
+    mlp_predictor = EdgeClassifer(
+        input_dim=clf_input_dim,
+        hidden_dim=hidden_dim,
+        num_layers=num_mlp_layers, 
+        num_classes=2,
+        edge_dim=edge_dim,
+        bias=False,
+    )
 
     
     trainer = Trainer(

@@ -1,0 +1,44 @@
+Loading eamodelset from pickle
+Loaded eamodelset with 558 graphs
+Loaded eamodelset with 558 graphs
+Graphs: 558
+Loaded dataset
+Loading graph dataset
+Using tokenizer
+Loading tokenizer for bert-base-uncased
+['AndJunction' 'ApplicationCollaboration' 'ApplicationComponent'
+ 'ApplicationEvent' 'ApplicationFunction' 'ApplicationInteraction'
+ 'ApplicationInterface' 'ApplicationProcess' 'ApplicationService'
+ 'Artifact' 'Assessment' 'BusinessActor' 'BusinessCollaboration'
+ 'BusinessEvent' 'BusinessFunction' 'BusinessInteraction'
+ 'BusinessInterface' 'BusinessObject' 'BusinessProcess' 'BusinessRole'
+ 'BusinessService' 'Capability' 'CommunicationNetwork' 'Constraint'
+ 'Contract' 'CourseOfAction' 'DataObject' 'Deliverable' 'Device'
+ 'DistributionNetwork' 'Driver' 'Equipment' 'Facility' 'Gap' 'Goal'
+ 'Grouping' 'ImplementationEvent' 'Junction' 'Location' 'Material'
+ 'Meaning' 'Node' 'OrJunction' 'Outcome' 'Path' 'Plateau' 'Principle'
+ 'Product' 'Representation' 'Requirement' 'Resource' 'Stakeholder'
+ 'SystemSoftware' 'TechnologyCollaboration' 'TechnologyEvent'
+ 'TechnologyFunction' 'TechnologyInteraction' 'TechnologyInterface'
+ 'TechnologyProcess' 'TechnologyService' 'Value' 'ValueStream'
+ 'WorkPackage' None]
+Setting num_nodes_ type 63
+['application' 'business' 'implementation_migration' 'motivation' 'other'
+ 'strategy' 'technology' None]
+Setting num_nodes_ layer 7
+Edge Classes:  ['Access' 'Aggregation' 'Assignment' 'Association' 'Composition' 'Flow'
+ 'Influence' 'Realization' 'Serving' 'Specialization' 'Triggering']
+Train classes: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+Test classes: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+Number of classes in training set: 11
+Number of classes in test set: 11
+Train edge classes: {4: 12821, 7: 7130, 8: 5409, 2: 5711, 3: 7524, 5: 4437, 1: 3515, 0: 3948, 10: 4429, 9: 1192, 6: 686}
+Test edge classes: {7: 1743, 4: 3071, 3: 1825, 5: 1025, 1: 883, 0: 1019, 9: 314, 2: 1450, 10: 1068, 6: 177, 8: 1348}
+Loaded graph dataset
+Loading tokenizer for bert-base-uncased
+Getting link prediction data
+Train Texts:  ['PASS<edge_begin><edge_end>European Front office', 'Merchant portal data exposure<edge_begin><edge_end>MP Reconciliation status preparation', 'Download Acquiring Transaction of a merchant user<edge_begin><edge_end>Send Acq data access request to data storage location', 'c IAM<edge_begin><edge_end>Broadcast Merchant data to platforms', 'Create contract hierarchies<edge_begin><edge_end>Create PASS merchant hierarchy', 'Activate existing merchant for reconciliation<edge_begin><edge_end>Update contract hierarchies for reconciliation', 'c IAM<edge_begin><edge_end>Enable Acceptance and Acquiring data access in Acceptance applications', 'Transaction report (Acc & Acquiring)<edge_begin><edge_end>Reconciliation engine', 'Merchant Portal<edge_begin><edge_end>e Com Acc (WLOP)', 'Data Platform<edge_begin><edge_end>Ingestion', 'Merchant Provisioning<edge_begin><edge_end>Broadcast Merchant data to platforms', 'Reconcile e Com Acceptance and Acquiring transactions<edge_begin><edge_end>Decide on reconciliation status', 'Data Platform<edge_begin><edge_end>Merchant portal data exposure', 'Merchant portal data exposure<edge_begin><edge_end>MP e Com data extraction', 'Merchant users boarding<edge_begin><edge_end>Activate existing merchant for reconciliation', 'Ingestion<edge_begin><edge_end>e P2 data ingestion', 'Merchant Portal<edge_begin><edge_end>Transaction report (Acc & Acquiring)', 'Reconcile e Com Acceptance and Acquiring transactions<edge_begin><edge_end>Compare Acquiring to acceptance transaction lifecycle status', 'MEPO<edge_begin><edge_end>Create contract hierarchies', 'PASS<edge_begin><edge_end>Settlements']
+Test Texts:  ['MEON<edge_begin><edge_end>Create contract hierarchies', 'Download Acquiring Transaction of a merchant user<edge_begin><edge_end>Store Acquiring transaction data', 'MEON<edge_begin><edge_end>Broadcast Merchant data to platforms', 'WLOP<edge_begin><edge_end>WLOP Transaction d B', 'Ingestion<edge_begin><edge_end>WLOP data ingestion', 'Merchant portal data exposure<edge_begin><edge_end>MP Acc data extraction', 'Merchant portal data exposure<edge_begin><edge_end>MP in Store acc data extraction', 'Update contract hierarchies for reconciliation<edge_begin><edge_end>Create a common merchant ID', 'Merchant portal data exposure<edge_begin><edge_end>MP PASS data extraction', 'Activate existing merchant for reconciliation<edge_begin><edge_end>Create a common merchant ID', 'entity 6<edge_begin><edge_end>aggregate 6', 'aggregate 5<edge_begin><edge_end>aggregate 6', 'Bounded context 1<edge_begin><edge_end>service 1', 'entity 3<edge_begin><edge_end>entity 2', 'entity 3<edge_begin><edge_end>aggregate 3', 'entity 3<edge_begin><edge_end>entity 5', 'aggregate 3<edge_begin><edge_end>service 1', 'Bounded context 1<edge_begin><edge_end>core domain (subdomain)', 'Bounded context 1<edge_begin><edge_end>team 2 (low priority)', 'Claim Management Services<edge_begin><edge_end>Claim received']
+Tokenizing data
+Tokenized data
+Training model

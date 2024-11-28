@@ -1,6 +1,40 @@
 from argparse import ArgumentParser
 
 
+def get_config_params(args):
+    common_params = dict(
+        distance=args.distance,
+        reload=args.reload,
+        test_ratio=args.test_ratio,
+
+        use_attributes=args.use_attributes,
+        use_node_types=args.use_node_types,
+        use_edge_types=args.use_edge_types,
+        use_edge_label=args.use_edge_label,
+        no_labels=args.no_labels,
+
+        add_negative_train_samples=args.add_negative_train_samples,
+        neg_sampling_ratio=args.neg_sampling_ratio,
+
+        use_embeddings=args.use_embeddings,
+        embed_model_name=args.embed_model_name,
+        ckpt=args.ckpt,
+        
+        no_shuffle=args.no_shuffle,
+        randomize_ne=args.randomize_ne,
+        randomize_ee=args.randomize_ee,
+        random_embed_dim=args.random_embed_dim,
+
+        limit = args.limit,
+
+        node_cls_label=args.node_cls_label,
+        edge_cls_label=args.edge_cls_label,
+    )
+    
+
+    return common_params
+
+
 def get_common_args_parser():
     parser = ArgumentParser()
 
@@ -46,7 +80,7 @@ def get_common_args_parser():
     parser.add_argument('--no_shuffle', action='store_true')
     parser.add_argument('--randomize_ne', action='store_true')
     parser.add_argument('--randomize_ee', action='store_true')
-    parser.add_argument('--random_embed_dim', type=int, default=768)
+    parser.add_argument('--random_embed_dim', type=int, default=128)
 
 
     parser.add_argument('--test_ratio', type=float, default=0.2)

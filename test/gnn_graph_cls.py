@@ -2,7 +2,7 @@ import os
 from data_loading.graph_dataset import GraphNodeDataset
 from models.gnn_layers import GNNConv, GraphClassifer
 from trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
-from test.common_args import get_common_args_parser, get_gnn_args_parser
+from test.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 from utils import merge_argument_parsers, set_seed
 from test.utils import get_models_dataset
 
@@ -31,19 +31,7 @@ def run(args):
 
     dataset = get_models_dataset(dataset_name, **config_params)
 
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt,
-        regen_embeddings=args.regen_embeddings,
-        no_shuffle=args.no_shuffle,
-        randomize_ne = args.randomize_ne,
-        randomize_ee = args.randomize_ne,
-        random_embed_dim=args.random_embed_dim,
-    )
+    graph_data_params = get_config_params(args)
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
@@ -70,7 +58,7 @@ def run(args):
         "logs",
         dataset_name,
         "gnn_graph_cls",
-        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+        f"{graph_dataset.config_hash}",
     )
 
     for datasets in graph_dataset.get_kfold_gnn_graph_classification_data():

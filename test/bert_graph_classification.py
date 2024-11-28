@@ -12,9 +12,9 @@ from transformers import (
 )
 
 from data_loading.graph_dataset import GraphNodeDataset
-from test.common_args import get_bert_args_parser, get_common_args_parser
+from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 from test.utils import get_models_dataset
-from tokenization.utils import get_special_tokens, get_tokenizer
+from tokenization.utils import get_tokenizer
 from utils import merge_argument_parsers, set_seed
 
 
@@ -60,17 +60,7 @@ def run(args):
     dataset_name = args.dataset
 
     dataset = get_models_dataset(dataset_name, **config_params)
-
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        no_shuffle=args.no_shuffle,
-        use_attributes=args.use_attributes,
-        use_edge_types=args.use_edge_types,
-        use_special_tokens=args.use_special_tokens,
-    )
-
+    graph_data_params = get_config_params(args)
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
@@ -94,14 +84,14 @@ def run(args):
             'results',
             dataset_name,
             f'graph_cls_',
-            f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+            f"{graph_dataset.config_hash}",
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
             f'graph_cls_',
-            f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}_fold_{fold_id}'
+            f"{graph_dataset.config_hash}"
         )
 
         model = AutoModelForSequenceClassification.from_pretrained(

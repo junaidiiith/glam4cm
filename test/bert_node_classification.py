@@ -1,4 +1,4 @@
-from test.common_args import get_bert_args_parser, get_common_args_parser
+from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 import os
 from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphNodeDataset
@@ -71,22 +71,7 @@ def run(args):
 
     print("Loaded dataset")
 
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        use_attributes=args.use_attributes,
-        use_edge_types=args.use_edge_types,
-        use_edge_label=args.use_edge_label,
-        use_special_tokens=args.use_special_tokens,
-        no_labels=args.no_labels,
-        
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        ckpt=args.ckpt,
-    )
-
-
+    graph_data_params = get_config_params(args)
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
@@ -103,6 +88,8 @@ def run(args):
         tokenizer=tokenizer,
         distance=distance,
     )
+
+    # exit(0)
 
     if args.oversampling_ratio != -1:
         ind_w_oversamples = oversample_dataset(bert_dataset['train'])
@@ -121,14 +108,14 @@ def run(args):
         dataset_name,
         'node_cls',
         args.cls_label,
-        f"{args.cls_label}_me_{args.min_edges}_attr_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
+        f"{graph_dataset.config_hash}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'node_cls',
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}",
+        f"{graph_dataset.config_hash}",
     )
 
     print("Output Dir: ", output_dir)

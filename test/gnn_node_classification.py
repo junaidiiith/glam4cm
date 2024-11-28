@@ -95,7 +95,7 @@ def run(args):
         "logs",
         dataset_name,
         "gnn_node_cls",
-        f'{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_edge_types)}',
+        f"{graph_dataset.config_hash}",
     )
 
     trainer = Trainer(

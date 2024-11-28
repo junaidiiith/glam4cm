@@ -1,3 +1,4 @@
+import json
 import pickle
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sklearn.preprocessing import LabelEncoder
@@ -14,7 +15,7 @@ from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
 from data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
 from embeddings.common import get_embedding_model
-from lang2graph.common import get_node_data, get_edge_data
+from lang2graph.common import LangGraph, get_node_data, get_edge_data
 from data_loading.metadata import ArchimateMetaData, EcoreMetaData
 from settings import seed
 from settings import (
@@ -22,6 +23,7 @@ from settings import (
     LP_TASK_LINK_PRED,
 )
 from tokenization.utils import doc_tokenizer, get_tokenizer
+import utils
 
 
 def exclude_labels_from_data(X, labels, exclude_labels):
@@ -92,12 +94,14 @@ class GraphDataset(torch.utils.data.Dataset):
         self,
         models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
         save_dir='datasets/graph_data',
-        config_str='dummy-config',
         distance=1,
+        add_negative_train_samples=False,
+        neg_sampling_ratio=1,
         use_attributes=False,
         use_edge_types=False,
         use_node_types=False,
         use_edge_label=False,
+        no_labels=False,
 
         node_cls_label=None,
         edge_cls_label='type',
@@ -105,12 +109,15 @@ class GraphDataset(torch.utils.data.Dataset):
         test_ratio=0.2,
 
         use_embeddings=False,
-        use_special_tokens=False,
         embed_model_name='bert-base-uncased',
         ckpt=None,
         reload=False,
         no_shuffle=False,
-        tokenizer_special_tokens=None,
+        
+        randomize_ne=False,
+        randomize_ee=False,
+        random_embed_dim=128,
+        
         exclude_labels: list = [None]
     ):
         if isinstance(models_dataset, EcoreModelDataset):
@@ -119,38 +126,159 @@ class GraphDataset(torch.utils.data.Dataset):
             self.metadata = ArchimateMetaData()
 
         self.distance = distance
-        self.save_dir = os.path.join(save_dir, models_dataset.name, config_str)
-        os.makedirs(self.save_dir, exist_ok=True)
-
+        self.use_embeddings = use_embeddings
+        self.ckpt = ckpt
         self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
 
-        print("Using tokenizer")
-        self.tokenizer = get_tokenizer(embed_model_name, use_special_tokens)
         self.reload = reload
         
-        if tokenizer_special_tokens:
-            self.tokenizer.add_special_tokens(tokenizer_special_tokens)
 
         self.use_edge_types = use_edge_types
         self.use_node_types = use_node_types
         self.use_attributes = use_attributes
         self.use_edge_label = use_edge_label
-        self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
+        self.no_labels = no_labels
+        
+        self.add_negative_train_samples = add_negative_train_samples
+        self.neg_sampling_ratio = neg_sampling_ratio
 
         self.test_ratio = test_ratio
 
         self.no_shuffle = no_shuffle
         self.exclude_labels = exclude_labels
 
-        self.use_special_tokens = use_special_tokens
         self.node_cls_label = node_cls_label
         self.edge_cls_label = edge_cls_label
+
+        self.randomize_ne = randomize_ne
+        self.randomize_ee = randomize_ee
+        self.random_embed_dim = random_embed_dim
+
+        self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
+        self.config = dict(
+            name=models_dataset.name,
+            distance=distance,
+            add_negative_train_samples=add_negative_train_samples,
+            neg_sampling_ratio=neg_sampling_ratio,
+            use_attributes=use_attributes,
+            use_edge_types=use_edge_types,
+            use_node_types=use_node_types,
+            use_edge_label=use_edge_label,
+            no_labels=no_labels,
+            use_embeddings=use_embeddings,
+            embed_model_name=embed_model_name if use_embeddings else None,
+            ckpt=ckpt if use_embeddings else None,
+            no_shuffle=no_shuffle,
+            exclude_labels=exclude_labels,
+            node_cls_label=node_cls_label,
+            edge_cls_label=edge_cls_label,
+            test_ratio=test_ratio,
+            randomize_ne=randomize_ne,
+            randomize_ee=randomize_ee,
+            random_embed_dim=random_embed_dim
+        )
+
+        self.save_dir = os.path.join(save_dir, models_dataset.name)
+        os.makedirs(self.save_dir, exist_ok=True)
 
         self.file_paths = {
             graph.hash: os.path.join(self.save_dir, f'{graph.hash}', 'data.pkl') 
             for graph in models_dataset
         }
+
+
+    def get_config_hash(self):
+        if os.path.exists(os.path.join(self.save_dir, 'configs.json')):
+            with open(os.path.join(self.save_dir, 'configs.json'), 'r') as f:
+                configs = json.load(f)
+        else:
+            configs = dict()
+        
+        config_hash = utils.md5_hash(str(self.config))
+        if config_hash not in configs:
+            configs[config_hash] = self.config
+            with open(os.path.join(self.save_dir, 'configs.json'), 'w') as f:
+                json.dump(configs, f)
+        
+        return config_hash
     
+
+    def set_file_hashes(self, models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset]):
+        self.config_hash = self.get_config_hash()
+        os.makedirs(os.path.join(self.save_dir, self.config_hash), exist_ok=True)
+        self.file_paths = {
+            graph.hash: os.path.join(self.save_dir, self.config_hash, f'{graph.hash}', 'data.pkl') 
+            for graph in models_dataset
+        }
+
+    def set_torch_graphs(
+            self, 
+            type: str,
+            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset], 
+            limit: int =-1
+        ):
+        
+        common_params = dict(
+            metadata=self.metadata,
+            distance=self.distance,
+            test_ratio=self.test_ratio,
+            use_attributes=self.use_attributes,
+            use_node_types=self.use_node_types,
+            use_edge_types=self.use_edge_types,
+            use_edge_label=self.use_edge_label,
+            no_labels=self.no_labels,
+            node_cls_label=self.node_cls_label,
+            edge_cls_label=self.edge_cls_label
+        )
+        def create_node_graph(graph: LangGraph):
+            node_params = {
+                **common_params,
+            }
+            torch_graph = TorchNodeGraph(graph, **node_params)
+            return torch_graph
+        
+        def create_edge_graph(graph: LangGraph):
+            edge_params = {
+                **common_params,
+                'use_neg_samples': self.add_negative_train_samples,
+                'neg_samples_ratio': self.neg_sampling_ratio
+            }
+            torch_graph = TorchEdgeGraph(graph, **edge_params)
+            return torch_graph
+        
+        self.set_file_hashes(models_dataset)
+        
+        models_size = len(models_dataset) \
+            if (limit == -1 or limit > len(models_dataset)) else limit
+        
+        models_dataset = models_dataset[:models_size]
+
+        for graph in tqdm(models_dataset, desc=f'Embedding {type} graphs'):
+            fp = self.file_paths[graph.hash]
+            if type == 'node':
+                torch_graph = create_node_graph(graph)
+            elif type == 'edge':
+                torch_graph = create_edge_graph(graph)
+            torch_graph.embed(
+                self.embedder, 
+                save_path=os.path.join(fp),
+                reload=self.reload,
+                randomize_ne=self.randomize_ne,
+                randomize_ee=self.randomize_ee,
+                random_embed_dim=self.random_embed_dim
+            )
+
+        for graph in tqdm(models_dataset, desc='Creating graphs'):
+            fp = self.file_paths[graph.hash]
+            tg = TorchGraph.load(fp)
+            self.graphs.append(tg)
+        
+        if not self.no_shuffle:
+            shuffle(self.graphs)
+
+        self.post_process_graphs()
+        self.validate_graphs()
+
 
     def post_process_graphs(self):
         self.add_cls_labels()
@@ -225,8 +353,15 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def validate_graphs(self):
         for torch_graph in self.graphs:
-            assert torch_graph.data.x.shape[0] == torch_graph.graph.number_of_nodes(), f"Number of nodes mismatch, {torch_graph.data.x.shape[0]} != {torch_graph.graph.number_of_nodes()}"
-            assert torch_graph.data.overall_edge_index.shape[1] == torch_graph.graph.number_of_edges(), f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
+            assert torch_graph.data.x.shape[0] == torch_graph.graph.number_of_nodes(), \
+            f"Number of nodes mismatch, {torch_graph.data.x.shape[0]} != {torch_graph.graph.number_of_nodes()}"
+            
+            if isinstance(torch_graph, TorchEdgeGraph):
+                assert torch_graph.data.overall_edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
+                f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
+            else:
+                assert torch_graph.data.edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
+                f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
 
     def add_cls_labels(self):
         self.add_node_labels()
@@ -374,20 +509,17 @@ class GraphDataset(torch.utils.data.Dataset):
             }
 
 
-    def __get_lm_data(self, indices, tokenizer=None, remove_duplicates=False):
+    def __get_lm_data(self, indices, tokenizer, remove_duplicates=False):
         graph_label_name = self.metadata.graph_cls
         assert graph_label_name is not None, "No Graph Label found in data. Please define graph label in metadata"
         X = [getattr(self.graphs[i], 'text') for i in indices]
         y = [getattr(self.graphs[i].data, f'graph_{graph_label_name}')[0].item() for i in indices]
-        if tokenizer is None:
-            assert self.tokenizer is not None, "Tokenizer is not defined. Please define a tokenizer to tokenize data"
-            tokenizer = self.tokenizer
 
         dataset = EncodingDataset(tokenizer, X, y, remove_duplicates=remove_duplicates)
         return dataset
 
 
-    def get_lm_graph_classification_data(self, tokenizer=None):
+    def get_lm_graph_classification_data(self, tokenizer):
         assert self.metadata.graph_cls, "No Graph Label found in data. Please define graph label in metadata"
         train_idx, test_idx = self.get_train_test_split()
         train_dataset = self.__get_lm_data(train_idx, tokenizer)
@@ -400,7 +532,7 @@ class GraphDataset(torch.utils.data.Dataset):
         }
         
     
-    def get_kfold_lm_graph_classification_data(self, tokenizer=None, remove_duplicates=True):
+    def get_kfold_lm_graph_classification_data(self, tokenizer, remove_duplicates=True):
         assert self.metadata.graph_cls, "No Graph Label found in data. Please define graph label in metadata"
         for train_idx, test_idx in self.k_fold_split():
             train_dataset = self.__get_lm_data(train_idx, tokenizer, remove_duplicates)
@@ -420,107 +552,64 @@ class GraphEdgeDataset(GraphDataset):
             distance=0,
             reload=False,
             test_ratio=0.2,
+
             add_negative_train_samples=False,
             neg_sampling_ratio=1,
-            use_embeddings=False,
-            use_special_tokens=False,
+
             use_attributes=False,
             use_edge_types=False,
             use_edge_label=False,
             use_node_types=False,
+            no_labels=False,
+            
+            use_embeddings=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
+
             no_shuffle=False,
             randomize_ne = False,
             randomize_ee = False,
             random_embed_dim=128,
-            tokenizer_special_tokens=None,
+
             limit: int = -1,
-            no_labels=False,
+
             node_cls_label: str = None,
             edge_cls_label: str = 'type'
         ):
-        config_str = 'edge_data'
-        config_str += f'_dist_{distance}'
-        config_str += '_neg' if add_negative_train_samples else ''
-        config_str += f'_nsr_{int(neg_sampling_ratio)}' if add_negative_train_samples else ''
-        config_str += f'_et_{int(use_edge_types)}' if use_edge_types else ''
-        config_str += f'_attr_{int(use_attributes)}' if use_attributes else ''
-        config_str += f'_nt_{int(use_node_types)}' if use_node_types else ''
-        config_str += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
-        config_str += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
-        config_str += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
-        config_str += f'_test_{test_ratio}'
-
+        
         super().__init__(
             models_dataset=models_dataset,
             save_dir=save_dir,
-            config_str=config_str,
             distance=distance,
             test_ratio=test_ratio,
-            use_embeddings=use_embeddings,
-            use_special_tokens=use_special_tokens,
 
+            use_node_types=use_node_types,
+            use_edge_types=use_edge_types,
+            use_edge_label=use_edge_label,
+            use_attributes=use_attributes,
+            no_labels=no_labels,
+
+            add_negative_train_samples=add_negative_train_samples,
+            neg_sampling_ratio=neg_sampling_ratio,
+            
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
 
+            use_embeddings=use_embeddings,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
+
             reload=reload,
-            use_edge_types=use_edge_types,
-            use_node_types=use_node_types,
-            use_attributes=use_attributes,
-            use_edge_label=use_edge_label,
             no_shuffle=no_shuffle,
-            tokenizer_special_tokens=tokenizer_special_tokens
+            
+            
+            randomize_ne=randomize_ne,
+            randomize_ee=randomize_ee,
+            random_embed_dim=random_embed_dim,
         )
 
-        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit
-        models_dataset = models_dataset[:models_size]
-        # print(self.file_paths[models_dataset[0].hash])
-        # exit(0)
+        self.set_torch_graphs('edge', models_dataset, limit)
 
-        for graph in tqdm(models_dataset, desc='Embeddings graphs'):
-            fp = self.file_paths[graph.hash]
-            
-            torch_graph = TorchEdgeGraph(
-                graph, 
-                metadata=self.metadata,
-                distance=distance,
-                test_ratio=test_ratio,
-                use_neg_samples=add_negative_train_samples,
-                neg_samples_ratio=neg_sampling_ratio,
-                use_node_types=use_node_types,
-                use_edge_types=use_edge_types,
-                use_edge_label=use_edge_label,
-                use_attributes=use_attributes,
-                use_special_tokens=use_special_tokens,
-                no_labels=no_labels,
-                edge_cls_label=edge_cls_label,
-                node_cls_label=node_cls_label
-            )
-            torch_graph.embed(
-                self.embedder, 
-                save_path=os.path.join(fp),
-                reload=self.reload,
-                randomize_ne=randomize_ne,
-                randomize_ee=randomize_ee,
-                random_embed_dim=random_embed_dim
-            )
-
-        
-        for graph in tqdm(models_dataset, desc='Creating graphs'):
-            fp = self.file_paths[graph.hash]
-            tg = TorchGraph.load(fp)
-            self.graphs.append(tg)
-
-
-        if not self.no_shuffle:
-            shuffle(self.graphs)
-
-
-        self.post_process_graphs()
-        self.validate_graphs()
         train_count, test_count = dict(), dict()
         for g in self.graphs:
             train_mask = g.data.train_edge_mask
@@ -605,103 +694,62 @@ class GraphEdgeDataset(GraphDataset):
 
 class GraphNodeDataset(GraphDataset):
     def __init__(
-            self, 
-            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
-            save_dir='datasets/graph_data',
-            distance=0,
-            test_ratio=0.2,
-            reload=False,
-            
-            use_attributes=False,
-            use_edge_types=False,
-            use_node_types=False,
-            use_edge_label=False,
-            use_special_tokens=False,
+        self, 
+        models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+        save_dir='datasets/graph_data',
+        distance=0,
+        test_ratio=0.2,
+        reload=False,
+        
+        use_attributes=False,
+        use_edge_types=False,
+        use_node_types=False,
+        use_edge_label=False,
 
-            use_embeddings=False,
-            embed_model_name='bert-base-uncased',
-            ckpt=None,
+        use_embeddings=False,
+        embed_model_name='bert-base-uncased',
+        ckpt=None,
 
-            no_shuffle=False,
-            randomize_ne=False,
-            randomize_ee=False,
-            random_embed_dim=128,
+        no_shuffle=False,
+        randomize_ne=False,
+        randomize_ee=False,
+        random_embed_dim=128,
 
-            tokenizer_special_tokens=None,
-            limit: int = -1,
-            no_labels=False,
-            node_cls_label: str = None,
-            edge_cls_label: str = 'type'
-        ):
+        limit: int = -1,
+        no_labels=False,
+        node_cls_label: str = None,
+        edge_cls_label: str = 'type'
+    ):
         super().__init__(
             models_dataset=models_dataset,
             save_dir=save_dir,
             distance=distance,
             test_ratio=test_ratio,
-            use_embeddings=use_embeddings,
-            use_special_tokens=use_special_tokens,
+            
+            
+            
             use_node_types=use_node_types,
             use_edge_types=use_edge_types,
             use_edge_label=use_edge_label,
+            use_attributes=use_attributes,
+            no_labels=no_labels,
 
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
 
+            use_embeddings=use_embeddings,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
+
             reload=reload,
             no_shuffle=no_shuffle,
-            tokenizer_special_tokens=tokenizer_special_tokens
+
+            randomize_ne=randomize_ne,
+            randomize_ee=randomize_ee,
+            random_embed_dim=random_embed_dim,
         )
 
-        save_path = os.path.join(self.save_dir, 'node_data')
-        save_path += f'_dist_{distance}'
-        save_path += f'_et_{int(use_edge_types)}' if use_edge_types else ''
-        save_path += f'_attr_{int(use_attributes)}' if use_attributes else ''
-        save_path += f'_sp_{int(use_special_tokens)}' if use_special_tokens else ''
-        save_path += f'_nl_{int(no_labels)}' if no_labels else ''
-        save_path += f'_use_emb_{int(use_embeddings)}' if use_embeddings else ''
-        save_path += f'_ckpt_{ckpt.replace("/", "_")}' if ckpt else ''
-        save_path += f'_test_{test_ratio}'
-        save_path += '.pkl'
-
-        models_size = len(models_dataset) if (limit == -1 or limit > len(models_dataset)) else limit
-        models_dataset = models_dataset[:models_size]
-
-        for graph in tqdm(models_dataset, desc='Creating Embeddings'):
-            fp = self.file_paths[graph.hash]
-            torch_graph = TorchNodeGraph(
-                graph, 
-                metadata=self.metadata,
-                distance=distance,
-                test_ratio=test_ratio,
-                use_attributes=use_attributes,
-                use_node_types=use_node_types,
-                use_edge_types=use_edge_types,
-                use_edge_label=use_edge_label,
-                use_special_tokens=use_special_tokens,
-                no_labels=no_labels,
-                node_cls_label=node_cls_label,
-                edge_cls_label=edge_cls_label
-            )
-            
-            torch_graph.embed(
-                self.embedder, 
-                save_path=os.path.join(fp),
-                reload=self.reload,
-                randomize_ne=randomize_ne,
-                randomize_ee=randomize_ee,
-                random_embed_dim=random_embed_dim
-            )
-
-            
-        for graph in tqdm(models_dataset, desc='Creating graphs'):
-            fp = self.file_paths[graph.hash]
-            tg = TorchGraph.load(fp)
-            self.graphs.append(tg)
-
-        
-        self.post_process_graphs()
+        self.set_torch_graphs('node', models_dataset, limit)
 
         node_labels = self.metadata.node_cls
         if isinstance(node_labels, str):
@@ -775,7 +823,7 @@ class GraphNodeDataset(GraphDataset):
         self, 
         label: str,
         tokenizer: AutoTokenizer,
-        distance: int = 1, 
+        distance: int = 0, 
     ):
         data = self.get_node_classification_texts(distance, label)
         dataset = {

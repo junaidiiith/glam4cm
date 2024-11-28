@@ -5,7 +5,7 @@ from test.utils import get_models_dataset
 from tokenization.special_tokens import *
 from trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
 from utils import set_seed, merge_argument_parsers
-from test.common_args import get_common_args_parser, get_gnn_args_parser
+from test.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 
 
 def get_parser():
@@ -31,18 +31,7 @@ def run(args):
 
     dataset = get_models_dataset(dataset_name, **config_params)
 
-    graph_data_params = dict(
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        add_negative_train_samples=True,
-        neg_sampling_ratio=args.neg_sampling_ratio,
-        use_embeddings=args.use_embeddings,
-        embed_model_name=args.embed_model_name,
-        use_node_types=args.use_node_types,
-        use_special_tokens=args.use_special_tokens,
-        no_labels=args.no_labels,
-        ckpt=args.ckpt
-    )
+    graph_data_params = get_config_params(args)
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -73,7 +62,7 @@ def run(args):
         "logs",
         dataset_name,
         "gnn_edge_cls",
-        f'{args.min_edges}_att_{int(args.use_attributes)}_et_{int(args.use_edge_types)}_nt_{int(args.use_node_types)}',
+        f"{graph_dataset.config_hash}",
     )
 
     gnn_conv_model = GNNConv(

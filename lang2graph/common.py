@@ -162,7 +162,7 @@ def format_path(
         
         node_label = f"{node_type} {node_label}".strip()
         if use_special_tokens:
-            node_label = f"{NODE_LABEL}{node_label}"
+            node_label = f"{NODE_BEGIN}{node_label}{NODE_END}"
         
         return node_label.strip()
 

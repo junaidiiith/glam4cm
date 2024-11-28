@@ -3,7 +3,7 @@ from transformers import TrainingArguments, Trainer
 from data_loading.graph_dataset import GraphEdgeDataset
 from data_loading.utils import oversample_dataset
 from settings import LP_TASK_EDGE_CLS
-from test.common_args import get_bert_args_parser, get_common_args_parser
+from test.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 from transformers import AutoModelForSequenceClassification
 from test.utils import get_models_dataset
 
@@ -62,18 +62,7 @@ def run(args):
     print("Loaded dataset")
     dataset = get_models_dataset(dataset_name, **config_params)
 
-    graph_data_params = dict(
-        distance=args.distance,
-        reload=args.reload,
-        test_ratio=args.test_ratio,
-        use_attributes=args.use_attributes,
-        use_embeddings=args.use_embeddings,
-        use_edge_label=args.use_edge_label,
-        use_node_types=args.use_node_types,
-        use_special_tokens=args.use_special_tokens,
-        no_labels=args.no_labels,
-    )
-
+    graph_data_params = get_config_params(args)
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -110,14 +99,14 @@ def run(args):
         'results',
         dataset_name,
         'edge_cls',
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_node_types)}",
+        f"{graph_dataset.config_hash}",
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
         'edge_cls',
-        f"{args.cls_label}_{args.min_edges}_att_{int(args.use_attributes)}_nt_{int(args.use_node_types)}",
+        f"{graph_dataset.config_hash}",
     )
 
     training_args = TrainingArguments(

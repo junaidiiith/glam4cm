@@ -8,12 +8,14 @@ import json
 import os
 from data_loading.encoding import EncodingDataset
 from lang2graph.archimate import ArchiMateNxG
+from lang2graph.ecore import EcoreNxG
+from lang2graph.common import LangGraph
 from settings import (
     datasets_dir, 
     seed,
 )
 import numpy as np
-from lang2graph.ecore import EcoreNxG
+
 
 from settings import logger
 
@@ -98,7 +100,7 @@ class ModelDataset:
     def __repr__(self):
         return f'Dataset({self.name}, graphs={len(self.graphs)})'
     
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> LangGraph:
         return self.graphs[key]
     
     def __iter__(self):
