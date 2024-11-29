@@ -10,6 +10,7 @@ from data_loading.encoding import EncodingDataset
 from lang2graph.archimate import ArchiMateNxG
 from lang2graph.ecore import EcoreNxG
 from lang2graph.common import LangGraph
+from lang2graph.ontouml import OntoUMLNxG
 from settings import (
     datasets_dir, 
     seed,
@@ -40,6 +41,8 @@ class ModelDataset:
         self.min_enr = min_enr
         self.timeout = timeout
         self.preprocess_graph_text = preprocess_graph_text
+
+        self.graphs: List[LangGraph] = []
 
 
     def get_train_test_split(self, train_size=0.8):
@@ -139,9 +142,27 @@ class ModelDataset:
         
         self.filter_graphs()
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+    
+
+    @property
+    def summary(self):
+        num_graphs = len(self.graphs)
+        num_edges = sum([g.number_of_edges() for g in self.graphs])
+        num_nodes = sum([g.number_of_nodes() for g in self.graphs])
+        average_nodes = num_nodes / num_graphs
+        average_edges = num_edges / num_graphs
+        average_n2e_ratio = np.mean([g.number_of_nodes() / g.number_of_edges() for g in self.graphs])
+        return {
+            'num_graphs': num_graphs,
+            'num_edges': num_edges,
+            'num_nodes': num_nodes,
+            'average_nodes': f"{average_nodes:.2f}",
+            'average_edges': f"{average_edges:.2f}",
+            'average_n2e_ratio': f"{average_n2e_ratio:.2f}"
+        }
 
 
-class EcoreModelDataset(ModelDataset):
+class EcoreDataset(ModelDataset):
     def __init__(
             self, 
             dataset_name: str, 
@@ -196,9 +217,11 @@ class EcoreModelDataset(ModelDataset):
         logger.info(f'Deduplicating {self.name}')
         return [g for g in self.graphs if not g.is_duplicated]
 
+    def __repr__(self):
+        return f"EcoreDataset({self.name}, graphs={len(self.graphs)})"
 
 
-class ArchiMateModelDataset(ModelDataset):
+class ArchiMateDataset(ModelDataset):
     def __init__(
             self, 
             dataset_name: str, 
@@ -266,3 +289,73 @@ class ArchiMateModelDataset(ModelDataset):
 
     def dedup(self) -> List[ArchiMateNxG]:
         return list({str(g.edges(data=True)): g for g in self.graphs}.values())
+    
+    def __repr__(self):
+        return f"ArchiMateDataset({self.name}, graphs={len(self.graphs)})"
+
+
+class OntoUMLDataset(ModelDataset):
+    def __init__(
+            self, 
+            dataset_name: str, 
+            dataset_dir=datasets_dir,
+            save_dir='datasets/pickles',
+            reload=False,
+            remove_duplicates=False,
+            min_edges: int = -1,
+            min_enr: float = -1,
+            timeout=-1,
+            preprocess_graph_text: callable = None
+        ):
+        super().__init__(
+            dataset_name, 
+            dataset_dir=dataset_dir, 
+            save_dir=save_dir, 
+            min_edges=min_edges, 
+            min_enr=min_enr,
+            timeout=timeout,
+            preprocess_graph_text=preprocess_graph_text
+        )
+        os.makedirs(save_dir, exist_ok=True)
+        
+        dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
+        if reload or not dataset_exists:
+            self.graphs: List[OntoUMLNxG] = []
+            data_path = os.path.join(dataset_dir, dataset_name, 'models')
+            model_dirs = os.listdir(data_path)
+
+            for model_dir in tqdm(model_dirs, desc=f'Loading {dataset_name.title()}'):
+                model_dir = os.path.join(data_path, model_dir)
+                if os.path.isdir(model_dir):
+                    model_file = os.path.join(model_dir, 'ontology.json')
+                    if os.path.exists(model_file):
+                        with open(model_file, encoding='iso-8859-1') as f:
+                            model = json.load(f)
+                        try:
+                            nxg = OntoUMLNxG(model)
+                            if nxg.number_of_edges() < 1:
+                                continue
+                            self.graphs.append(nxg)
+                            
+                        except Exception as e:
+                            print(f"Error in {model_file} {e}")
+                
+            self.filter_graphs()
+            self.save()
+        else:
+            self.load()
+        
+        if remove_duplicates:
+            self.dedup()
+        
+        print(f'Loaded {self.name} with {len(self.graphs)} graphs')
+        print(f'Graphs: {len(self.graphs)}')
+    
+
+    def dedup(self) -> List[OntoUMLNxG]:
+        return list({str(g.edges(data=True)): g for g in self.graphs}.values())
+    
+    def __repr__(self):
+        return f"OntoUMLDataset({self.name}, graphs={len(self.graphs)})"
+
+

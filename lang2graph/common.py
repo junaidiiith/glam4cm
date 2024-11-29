@@ -29,15 +29,6 @@ class LangGraph(nx.DiGraph):
     def create_graph(self):
         pass
 
-    @abstractmethod
-    def get_graph_node_text(self, node):
-        pass
-
-
-    @abstractmethod
-    def get_node_texts(self, distance=1):
-        pass
-
 
     def set_numbered_labels(self):
         self.node_label_to_id = {label: i for i, label in enumerate(self.nodes())}
@@ -353,6 +344,8 @@ def get_node_data(
         return get_archimate_node_data(node_data, node_label)
     elif model_type == 'ecore':
         return get_uml_node_data(node_data, node_label)
+    elif model_type == 'ontouml':
+        return get_ontouml_node_data(node_data, node_label)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -367,6 +360,8 @@ def get_edge_data(
         return get_archimate_edge_data(edge_data, edge_label)
     elif model_type == 'ecore':
         return get_uml_edge_data(edge_data, edge_label)
+    elif model_type == 'ontouml':
+        return get_ontouml_edge_data(edge_data, edge_label)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -375,6 +370,9 @@ def get_archimate_node_data(edge_data: dict, node_label: str):
     return edge_data.get(node_label)
 
 def get_uml_node_data(node_data: dict, node_label: str):
+    return node_data.get(node_label, '')
+
+def get_ontouml_node_data(node_data: dict, node_label: str):
     return node_data.get(node_label, '')
 
 
@@ -390,6 +388,8 @@ def get_uml_edge_data(edge_data: dict, edge_label: str):
     else:
         raise ValueError(f"Unknown edge label: {edge_label}")
 
+def get_ontouml_edge_data(edge_data: dict, edge_label: str):
+    return edge_data.get(edge_label)
 
 def get_uml_edge_type(edge_data):
     edge_type = edge_data.get('type')

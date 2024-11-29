@@ -7,7 +7,7 @@ from transformers import (
     AutoTokenizer
 )
 from data_loading.graph_dataset import GraphDataset
-from data_loading.models_dataset import EcoreModelDataset
+from data_loading.models_dataset import EcoreDataset
 from settings import device
 from sklearn.preprocessing import LabelEncoder
 from trainers.metrics import compute_metrics
@@ -32,7 +32,7 @@ class BertTrainer:
         dataset = dataset.get_lm_graph_classification_data() 
 
 
-def train_hf(model_name, model_ds: EcoreModelDataset, epochs):
+def train_hf(model_name, model_ds: EcoreDataset, epochs):
     max_len = max_length_map[model_name]
     i = 0
     print(f'Device used: {device}')

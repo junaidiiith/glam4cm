@@ -10,21 +10,21 @@ from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
 from transformers import AutoTokenizer
-from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph, GraphData
-from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
+from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
+from data_loading.models_dataset import ArchiMateDataset, EcoreDataset, OntoUMLDataset
 from data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
 from embeddings.w2v import Word2VecEmbedder
 from embeddings.tfidf import TfidfEmbedder
 from embeddings.common import get_embedding_model
 from lang2graph.common import LangGraph, get_node_data, get_edge_data
-from data_loading.metadata import ArchimateMetaData, EcoreMetaData
+from data_loading.metadata import ArchimateMetaData, EcoreMetaData, OntoUMLMetaData
 from settings import seed
 from settings import (
     LP_TASK_EDGE_CLS,
     LP_TASK_LINK_PRED,
 )
-from tokenization.utils import doc_tokenizer, get_tokenizer
+from tokenization.utils import doc_tokenizer
 import utils
 
 
@@ -94,7 +94,7 @@ def validate_classes(torch_graphs: List[TorchGraph], label, exclude_labels, elem
 class GraphDataset(torch.utils.data.Dataset):
     def __init__(
         self,
-        models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+        models_dataset: Union[EcoreDataset, ArchiMateDataset],
         save_dir='datasets/graph_data',
         distance=1,
         add_negative_train_samples=False,
@@ -106,7 +106,7 @@ class GraphDataset(torch.utils.data.Dataset):
         no_labels=False,
 
         node_cls_label=None,
-        edge_cls_label='type',
+        edge_cls_label=None,
         
         test_ratio=0.2,
 
@@ -123,10 +123,12 @@ class GraphDataset(torch.utils.data.Dataset):
         
         exclude_labels: list = [None],
     ):
-        if isinstance(models_dataset, EcoreModelDataset):
+        if isinstance(models_dataset, EcoreDataset):
             self.metadata = EcoreMetaData()
-        elif isinstance(models_dataset, ArchiMateModelDataset):
+        elif isinstance(models_dataset, ArchiMateDataset):
             self.metadata = ArchimateMetaData()
+        elif isinstance(models_dataset, OntoUMLDataset):
+            self.metadata = OntoUMLMetaData()
 
         self.distance = distance
         self.use_embeddings = use_embeddings
@@ -202,7 +204,7 @@ class GraphDataset(torch.utils.data.Dataset):
         return config_hash
     
 
-    def set_file_hashes(self, models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset]):
+    def set_file_hashes(self, models_dataset: Union[EcoreDataset, ArchiMateDataset]):
         self.config_hash = self.get_config_hash()
         os.makedirs(os.path.join(self.save_dir, self.config_hash), exist_ok=True)
         self.file_paths = {
@@ -216,7 +218,7 @@ class GraphDataset(torch.utils.data.Dataset):
     def set_torch_graphs(
             self, 
             type: str,
-            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset], 
+            models_dataset: Union[EcoreDataset, ArchiMateDataset], 
             limit: int =-1
         ) -> List[tuple[TorchGraph, str]]:
         
@@ -315,7 +317,6 @@ class GraphDataset(torch.utils.data.Dataset):
         
         if self.use_edge_types and self.edge_cls_label:
             set_types('edge')
-
 
     def __len__(self):
         return len(self.graphs)
@@ -450,7 +451,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 for e in self.exclude_labels
                 if e in edge_label_map.classes_
             ]
-            setattr(self, f"edge_exclude_{label}", edge_label_map.transform(exclude_labels))
+            setattr(self, f"edge_exclude_{label}", edge_label_map.inverse_transform(exclude_labels))
 
             num_labels = len(edge_label_map.classes_) - len(exclude_labels)
             setattr(self, f"num_edges_{label}", num_labels)
@@ -556,7 +557,7 @@ class GraphDataset(torch.utils.data.Dataset):
 class GraphEdgeDataset(GraphDataset):
     def __init__(
             self, 
-            models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+            models_dataset: Union[EcoreDataset, ArchiMateDataset],
             save_dir='datasets/graph_data',
             distance=0,
             reload=False,
@@ -585,7 +586,7 @@ class GraphEdgeDataset(GraphDataset):
             limit: int = -1,
 
             node_cls_label: str = None,
-            edge_cls_label: str = 'type',
+            edge_cls_label: str = None,
 
             task_type=LP_TASK_EDGE_CLS
         ):
@@ -661,6 +662,8 @@ class GraphEdgeDataset(GraphDataset):
     ):
         if label is None:
             label = self.edge_cls_label
+        
+        assert label is not None, "No edge label found in data. Please define edge label in metadata"
 
         data = defaultdict(list)
         for graph in tqdm(self.graphs, desc=f'Getting {self.task_type} data'):
@@ -725,7 +728,7 @@ class GraphEdgeDataset(GraphDataset):
 class GraphNodeDataset(GraphDataset):
     def __init__(
         self, 
-        models_dataset: Union[EcoreModelDataset, ArchiMateModelDataset],
+        models_dataset: Union[EcoreDataset, ArchiMateDataset],
         save_dir='datasets/graph_data',
         distance=0,
         test_ratio=0.2,
@@ -749,7 +752,7 @@ class GraphNodeDataset(GraphDataset):
         limit: int = -1,
         no_labels=False,
         node_cls_label: str = None,
-        edge_cls_label: str = 'type'
+        edge_cls_label: str = None
     ):
         super().__init__(
             models_dataset=models_dataset,
@@ -886,7 +889,7 @@ class GraphNodeDataset(GraphDataset):
     
 
 def get_models_gpt_dataset(
-        models_dataset: Union[ArchiMateModelDataset, EcoreModelDataset], 
+        models_dataset: Union[ArchiMateDataset, EcoreDataset], 
         tokenizer: AutoTokenizer,
         chunk_size: int = 100,
         chunk_overlap: int = 20,

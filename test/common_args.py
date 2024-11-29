@@ -53,7 +53,8 @@ def get_common_args_parser():
             'modelset', 
             'ecore_555', 
             'mar-ecore-github', 
-            'eamodelset'
+            'eamodelset',
+            'ontouml'
         ]
     )
     parser.add_argument('--remove_duplicates', action='store_true')

@@ -15,7 +15,7 @@ class ArchiMateNxG(LangGraph):
         self.graph_id = json_obj['identifier'].split('/')[-1]
 
 
-        self.graph = self.__create_graph()
+        self.__create_graph()
         self.set_numbered_labels()
 
         self.text = " ".join([

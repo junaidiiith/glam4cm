@@ -1,6 +1,6 @@
 from data_loading.models_dataset import (
-    ArchiMateModelDataset, 
-    EcoreModelDataset
+    ArchiMateDataset, 
+    EcoreDataset
 )
 
 
@@ -19,9 +19,9 @@ def get_metamodel_dataset_type(dataset):
 def get_model_dataset_class(dataset_name):
     dataset_type = get_metamodel_dataset_type(dataset_name)
     if dataset_type == 'ea':
-        dataset_class = ArchiMateModelDataset
+        dataset_class = ArchiMateDataset
     elif dataset_type == 'ecore':
-        dataset_class = EcoreModelDataset
+        dataset_class = EcoreDataset
     else:
         raise ValueError(f"Unknown dataset type: {dataset_type}")
     return dataset_class

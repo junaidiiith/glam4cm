@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 
-from data_loading.models_dataset import ArchiMateModelDataset, EcoreModelDataset
+from data_loading.models_dataset import ArchiMateDataset, EcoreDataset
 from data_loading.graph_dataset import (
     GraphNodeDataset,
     GraphEdgeDataset
@@ -28,10 +28,10 @@ def run(args):
         min_enr = args.min_enr,
         min_edges = args.min_edges,
     )
-    ecore = EcoreModelDataset('ecore_555', reload=args.reload, **config_params)
-    modelset = EcoreModelDataset('modelset', reload=args.reload, remove_duplicates=True, **config_params)
-    mar = EcoreModelDataset('mar-ecore-github', reload=args.reload, **config_params)
-    eamodelset = ArchiMateModelDataset('eamodelset', reload=args.reload, **config_params)
+    ecore = EcoreDataset('ecore_555', reload=args.reload, **config_params)
+    modelset = EcoreDataset('modelset', reload=args.reload, remove_duplicates=True, **config_params)
+    mar = EcoreDataset('mar-ecore-github', reload=args.reload, **config_params)
+    eamodelset = ArchiMateDataset('eamodelset', reload=args.reload, **config_params)
 
     graph_data_params = dict(
         distance=args.distance,
