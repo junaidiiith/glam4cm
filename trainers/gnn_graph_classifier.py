@@ -117,6 +117,7 @@ class GNNGraphClassificationTrainer(Trainer):
             epoch_metrics['phase'] = 'test'
             self.results.append(epoch_metrics)
         
-        print(f"Epoch: {len(self.results)//2} | Loss: {epoch_loss} | F1: {epoch_metrics['f1-score']} | Acc: {epoch_metrics['accuracy']} | Balanced Acc: {epoch_metrics['balanced_accuracy']}")
+        s2t = lambda x: x.replace("_", " ").title()
+        print(f"Epoch: {len(self.results)//2} {' | '.join([f'{s2t(k)}: {v:.4f}' for k, v in epoch_metrics.items() if k != 'phase'])}")
 
         return epoch_metrics

@@ -324,6 +324,12 @@ def get_node_texts(
 
 def get_attribute_labels(node_data, attribute_labels):
     if isinstance(node_data[attribute_labels], list):
+        if not node_data[attribute_labels]:
+            return ''
+        if isinstance(node_data[attribute_labels][0], tuple):
+            return ", ".join([f"{k}: {v}" for k, v in node_data[attribute_labels]])
+        elif isinstance(node_data[attribute_labels][0], dict):
+            return ", ".join([f"{k}: {v}" for d in node_data[attribute_labels] for k, v in d.items()])
         return ", ".join(node_data[attribute_labels])
     if isinstance(node_data[attribute_labels], dict):
         return ", ".join([f"{k}: {v}" for k, v in node_data[attribute_labels].items()])

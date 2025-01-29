@@ -188,3 +188,7 @@ def count_total_lines_of_code(directory):
                 file_path = os.path.join(root, file)
                 total_lines += count_lines_of_code_in_file(file_path)
     return total_lines
+
+
+def snake_to_title(snake_str: str):
+    return snake_str.replace("_", " ").title()

@@ -1,5 +1,4 @@
 import json
-import pickle
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sklearn.preprocessing import LabelEncoder
 from collections import Counter, defaultdict
@@ -25,7 +24,6 @@ from settings import (
     LP_TASK_EDGE_CLS,
     LP_TASK_LINK_PRED,
 )
-from tokenization.utils import doc_tokenizer
 import utils
 
 
@@ -188,6 +186,10 @@ class GraphDataset(torch.utils.data.Dataset):
         self.save_dir = os.path.join(save_dir, models_dataset.name)
         os.makedirs(self.save_dir, exist_ok=True)
 
+    
+    @property
+    def node_dim(self):
+        pass
 
     def get_config_hash(self):
         if os.path.exists(os.path.join(self.save_dir, 'configs.json')):
@@ -291,7 +293,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
         self.post_process_graphs()
         self.validate_graphs()
-        self.save()
+        # self.save()
         print("Graphs saved")
 
 
@@ -316,7 +318,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 elif prefix == 'edge':
                     g.data.edge_attr = concatenate(g.data.edge_attr, types)
                 
-                g.save()
+                # g.save()
                     
             node_dim = self.graphs[0].data.x.shape[1]
             assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
@@ -385,6 +387,9 @@ class GraphDataset(torch.utils.data.Dataset):
             else:
                 assert torch_graph.data.edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
                 f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
+
+
+
 
     def add_cls_labels(self):
         self.add_node_labels()
@@ -522,8 +527,8 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def get_kfold_gnn_graph_classification_data(self):
         for train_idx, test_idx in self.k_fold_split():
-            train_data = [self.graphs[i].data for i in train_idx]
-            test_data = [self.graphs[i].data for i in test_idx]
+            train_data = [self.graphs[i].data.to_graph_data() for i in train_idx]
+            test_data = [self.graphs[i].data.to_graph_data() for i in test_idx]
             yield {
                 'train': train_data,
                 'test': test_data,
@@ -680,8 +685,8 @@ class GraphEdgeDataset(GraphDataset):
         assert label is not None, "No edge label found in data. Please define edge label in metadata"
 
         data = defaultdict(list)
-        for fp in tqdm(self.file_paths.values(), desc='Getting Graph Texts'):
-            torch_graph: TorchEdgeGraph = TorchGraph.load(fp)
+        for torch_graph in tqdm(self.graphs, desc='Getting Graph Texts'):
+            # torch_graph: TorchEdgeGraph = TorchGraph.load(fp)
             graph_data = torch_graph.get_link_prediction_texts(label, self.task_type, only_texts)
             for k, v in graph_data.items():
                 data[k] += v
@@ -845,15 +850,15 @@ class GraphNodeDataset(GraphDataset):
         node_label_map = getattr(self, f"node_label_map_{label}")
 
         data = {'train_nodes': [], 'train_node_classes': [], 'test_nodes': [], 'test_node_classes': []}
-        for fp in tqdm(self.file_paths.values(), desc='Getting node classification data'):
-            graph: TorchNodeGraph = TorchGraph.load(fp)
-            node_strs = list(graph.get_graph_node_strs(graph.data.edge_index, distance).values())
+        for torch_graph in tqdm(self.graphs, desc='Getting node classification data'):
+            # graph: TorchNodeGraph = TorchGraph.load(fp)
+            node_strs = list(torch_graph.get_graph_node_strs(torch_graph.data.edge_index, distance).values())
 
-            train_node_strs = [node_strs[i.item()] for i in graph.data.train_node_mask]
-            test_node_strs = [node_strs[i.item()] for i in graph.data.test_node_mask]
+            train_node_strs = [node_strs[i.item()] for i in torch_graph.data.train_node_mask]
+            test_node_strs = [node_strs[i.item()] for i in torch_graph.data.test_node_mask]
             
-            train_node_classes = getattr(graph.data, f'node_{label}')[graph.data.train_node_mask]
-            test_node_classes = getattr(graph.data, f'node_{label}')[graph.data.test_node_mask]
+            train_node_classes = getattr(torch_graph.data, f'node_{label}')[torch_graph.data.train_node_mask]
+            test_node_classes = getattr(torch_graph.data, f'node_{label}')[torch_graph.data.test_node_mask]
 
             exclude_labels = getattr(self, f'node_exclude_{label}')
             train_node_strs, train_node_classes = exclude_labels_from_data(train_node_strs, train_node_classes, exclude_labels)
