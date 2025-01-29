@@ -206,8 +206,8 @@ class EcoreDataset(ModelDataset):
         
         logger.info(f'Loaded {self.name} with {len(self.graphs)} graphs')
         
-        if remove_duplicates:
-            self.dedup()
+        # if remove_duplicates:
+        #     self.dedup()
 
         logger.info(f'Graphs: {len(self.graphs)}')
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')

@@ -1,8 +1,8 @@
-import torch
 from typing import List, Union
 from embeddings.common import Embedder
 from settings import W2V_CONFIG
 from gensim.models import Word2Vec
+import numpy as np
 
 
 class Word2VecEmbedder(Embedder):
@@ -15,14 +15,23 @@ class Word2VecEmbedder(Embedder):
     
     def train(self, texts: List[str]):
         print("Word2VecEmbedder: Training Word2Vec model")
-        self.model = Word2Vec(texts, **W2V_CONFIG)
+        texts = [text.split() for text in texts]
+        self.model = Word2Vec(texts, **W2V_CONFIG, epochs=100)
+        print("Total words in the model:", len(self.model.wv))
         print("Word2VecEmbedder: Word2Vec model trained")
     
     def embed(self, text: Union[str, List[str]]):
+
+        def get_text_embedding(text: str):
+            words = text.split()
+            word_vectors = [self.model.wv[word] for word in words if word in self.model.wv]
+            if word_vectors:
+                return np.mean(word_vectors, axis=0)
+            else:
+                return np.zeros(self.embedding_dim)
+
         if isinstance(text, str):
-            text = text.split()
-        word_vectors = [self.model.wv[word] for word in text if word in self.model.wv]
-        if word_vectors:
-            return torch.tensor(word_vectors).mean(dim=0)
-        else:
-            return torch.zeros(self.embedding_dim)
+            text = [text]
+        word_vectors = [get_text_embedding(t) for t in text]
+        return np.array(word_vectors)
+        

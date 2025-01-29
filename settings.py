@@ -17,7 +17,7 @@ W2V_CONFIG = dict(
     vector_size=100,
     window=5,
     min_count=1,
-    workers=4
+    workers=4,
 )
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')

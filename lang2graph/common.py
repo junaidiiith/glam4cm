@@ -141,11 +141,12 @@ def format_path(
     """Format a path into a string representation."""
     def get_node_label(node):
         masked = graph.nodes[node].get('masked')
-        node_type = f"{node_cls_label}:{graph.nodes[node].get(f'{node_cls_label}', '')}" if use_node_types and not masked and node_cls_label else ''
+        node_type = f"{graph.nodes[node].get(f'{node_cls_label}', '')}" if use_node_types and not masked and node_cls_label else ''
+        node_type = f"{node_cls_label}: {node_type}" if node_type else ''
         node_label = get_node_name(
             graph.nodes[node], 
             metadata.node_label, 
-            use_node_attributes and metadata.node_attributes, 
+            use_node_attributes, 
             metadata.node_attributes
         ) if not no_labels else ''
         if preprocessor:
@@ -321,17 +322,26 @@ def get_node_texts(
     return paths_dict
 
 
+def get_attribute_labels(node_data, attribute_labels):
+    if isinstance(node_data[attribute_labels], list):
+        return ", ".join(node_data[attribute_labels])
+    if isinstance(node_data[attribute_labels], dict):
+        return ", ".join([f"{k}: {v}" for k, v in node_data[attribute_labels].items()])
+    return node_data[attribute_labels]
+
+
 def get_node_name(
         node_data, 
         label, 
-        use_attributes=False,
-        attribute_labels='attributes',
+        use_attributes,
+        attribute_labels,
     ):
     if use_attributes and attribute_labels in node_data:
-        attributes_str = "(" + ', '.join([k for k, _ in node_data[attribute_labels]]) + ")"
+        attributes_str = "(" + get_attribute_labels(node_data, attribute_labels) + ")"
     else:
         attributes_str = ''
     node_label = node_data.get(label, '')
+    node_label = '' if node_label.lower() == 'null' else node_label
     return f"{node_label}{attributes_str}".strip()
 
 

@@ -13,12 +13,13 @@ from lang2graph.archimate import ArchiMateNxG
 from lang2graph.ecore import EcoreNxG
 from lang2graph.common import (
     create_graph_from_edge_index,
-    format_path, 
     get_node_texts,
     get_edge_texts
 )
 
-from settings import LP_TASK_EDGE_CLS
+from scipy.sparse import csr_matrix
+
+from settings import LP_TASK_EDGE_CLS, LP_TASK_LINK_PRED
 from tokenization.special_tokens import *
 from torch_geometric.transforms import RandomLinkSplit
 import torch
@@ -80,8 +81,14 @@ class NumpyData:
         for k, v in self.__dict__.items():
             if isinstance(v, np.ndarray):
                 v = torch.from_numpy(v)
-                if v.dtype == torch.float64:
-                    v = v.float()
+            elif isinstance(v, csr_matrix):
+                v = torch.from_numpy(v.toarray())
+            elif isinstance(v, int):
+                v = torch.tensor(v, dtype=torch.long)
+            
+            if v.dtype == torch.float64:
+                v = v.float()
+            
             setattr(data, k, v)
         return data
 
@@ -100,9 +107,11 @@ class TorchGraph:
             use_special_tokens=False,
             no_labels=False,
             node_cls_label=None,
-            edge_cls_label='type'
+            edge_cls_label='type',
+            fp='test_graph.pkl'
         ):
 
+        self.fp = fp
         self.graph = graph
         self.metadata = metadata
         
@@ -126,9 +135,9 @@ class TorchGraph:
         with open(pkl_path, 'rb') as f:
             return pickle.load(f)
     
-    def save(self, pkl_path):
-        os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
-        with open(pkl_path, 'wb') as f:
+    def save(self):
+        os.makedirs(os.path.dirname(self.fp), exist_ok=True)
+        with open(self.fp, 'wb') as f:
             pickle.dump(self, f)
 
     
@@ -145,7 +154,6 @@ class TorchGraph:
     def embed(
             self, 
             embedder: Union[Embedder, None], 
-            save_path: str = 'tmp/graph_embeddings', 
             reload=False,
             randomize_ne=False,
             randomize_ee=False,
@@ -165,12 +173,12 @@ class TorchGraph:
             else:
                 self.data.edge_attr = embedder.embed(list(self.edge_texts.values()))
 
-        if os.path.exists(f"{save_path}") and not reload:
-            with open(f"{save_path}", 'rb') as f:
+        if os.path.exists(f"{self.fp}") and not reload:
+            with open(f"{self.fp}", 'rb') as f:
                 obj: Union[TorchEdgeGraph, TorchNodeGraph] = pickle.load(f)
             if not hasattr(obj.data, 'x') or not hasattr(obj.data, 'edge_attr'):
                 generate_embeddings()
-                self.save(save_path)
+                self.save()
         else:
             if embedder is not None:
                 generate_embeddings()
@@ -178,7 +186,7 @@ class TorchGraph:
                 self.data.x = np.random.randn(self.graph.number_of_nodes(), random_embed_dim)
                 self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
                   
-            self.save(save_path)
+            self.save()
     
 
     def get_graph_node_strs(
@@ -240,6 +248,13 @@ class TorchGraph:
 
     def validate_data(self):
         assert self.data.num_nodes == self.graph.number_of_nodes()
+    
+    def set_graph_label(self):
+        if self.metadata.graph_label is not None and not hasattr(self.graph, self.metadata.graph_label):  #Graph has a label
+            text = doc_tokenizer("\n".join(list(self.node_texts.values())))
+            # print("Text:", text)
+            # print("-" * 100)
+            setattr(self.graph, self.metadata.graph_label, text)
         
 
     @property
@@ -264,7 +279,8 @@ class TorchEdgeGraph(TorchGraph):
             use_special_tokens=False,
             node_cls_label=None,
             edge_cls_label='type',
-            no_labels=False
+            no_labels=False,
+            fp: str = 'test_graph.pkl'
         ):
 
         super().__init__(
@@ -279,13 +295,17 @@ class TorchEdgeGraph(TorchGraph):
             use_special_tokens=use_special_tokens,
             no_labels=no_labels,
             node_cls_label=node_cls_label,
-            edge_cls_label=edge_cls_label
+            edge_cls_label=edge_cls_label,
+            fp=fp
         )
         self.add_negative_train_samples = add_negative_train_samples
         self.neg_sampling_ratio = neg_samples_ratio
         self.data, self.node_texts, self.edge_texts = self.get_pyg_data()
         self.validate_data()
-    
+        self.set_graph_label()
+
+        
+
     
     def get_pyg_data(self):
         
@@ -318,18 +338,20 @@ class TorchEdgeGraph(TorchGraph):
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.edge_index.t().tolist()])
         assert all([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.pos_edge_label_index.t().tolist()])
 
-        if hasattr(test_data, 'neg_edge_label_index'):
-            assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
-        else:
-            test_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
-            test_data.neg_edge_label = torch.tensor([], dtype=torch.long)
+        setattr(d, 'train_pos_edge_label_index', train_data.pos_edge_label_index)
+        setattr(d, 'train_pos_edge_label', train_data.pos_edge_label)
+        setattr(d, 'test_pos_edge_label_index', test_data.pos_edge_label_index)
+        setattr(d, 'test_pos_edge_label', test_data.pos_edge_label)
 
 
         if hasattr(train_data, 'neg_edge_label_index'):
             assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
-        else:
-            train_data.neg_edge_label_index = torch.tensor([], dtype=torch.long)
-            train_data.neg_edge_label = torch.tensor([], dtype=torch.long)
+            assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
+            setattr(d, 'train_neg_edge_label_index', train_data.neg_edge_label_index)
+            setattr(d, 'train_neg_edge_label', train_data.neg_edge_label)
+            setattr(d, 'test_neg_edge_label_index', test_data.neg_edge_label_index)
+            setattr(d, 'test_neg_edge_label', test_data.neg_edge_label)
+        
         
         nx.set_edge_attributes(
             self.graph.numbered_graph, 
@@ -341,16 +363,6 @@ class TorchEdgeGraph(TorchGraph):
             {tuple(edge): True for edge in test_data.pos_edge_label_index.T.tolist()}, 
             'masked'
         )
-
-        setattr(d, 'train_pos_edge_label_index', train_data.pos_edge_label_index)
-        setattr(d, 'train_pos_edge_label', train_data.pos_edge_label)
-        setattr(d, 'train_neg_edge_label_index', train_data.neg_edge_label_index)
-        setattr(d, 'train_neg_edge_label', train_data.neg_edge_label)
-        setattr(d, 'test_pos_edge_label_index', test_data.pos_edge_label_index)
-        setattr(d, 'test_pos_edge_label', test_data.pos_edge_label)
-        setattr(d, 'test_neg_edge_label_index', test_data.neg_edge_label_index)
-        setattr(d, 'test_neg_edge_label', test_data.neg_edge_label)
-
 
         edge_index = train_data.edge_index
         # import code; code.interact(local=locals())
@@ -367,12 +379,17 @@ class TorchEdgeGraph(TorchGraph):
         return d, node_texts, edge_texts
     
 
-    def get_link_prediction_texts(self, label, task_type):
+    def get_link_prediction_texts(self, label, task_type, only_texts=False):
         data = dict()
         train_pos_edge_index = self.data.edge_index
-        train_neg_edge_index = self.data.train_neg_edge_label_index
         test_pos_edge_index = self.data.test_pos_edge_label_index
-        test_neg_edge_index = self.data.test_neg_edge_label_index
+
+        if task_type == LP_TASK_LINK_PRED:
+            train_neg_edge_index = self.data.train_neg_edge_label_index
+            test_neg_edge_index = self.data.test_neg_edge_label_index
+        else:
+            train_neg_edge_index = None
+            test_neg_edge_index = None
 
         validate_edges(self)
 
@@ -386,6 +403,8 @@ class TorchEdgeGraph(TorchGraph):
         }
 
         for edge_index_label, edge_index in edge_indices.items():
+            if edge_index is None:
+                continue
             edge_strs = self.get_graph_edge_strs(
                 edge_index=edge_index,
                 neg_samples="neg" in edge_index_label,
@@ -395,7 +414,7 @@ class TorchEdgeGraph(TorchGraph):
             data[f'{edge_index_label}_edges'] = edge_strs
 
 
-        if task_type == LP_TASK_EDGE_CLS:
+        if task_type == LP_TASK_EDGE_CLS and not only_texts:
             train_mask = self.data.train_edge_mask
             test_mask = self.data.test_edge_mask
             train_classes, test_classes = getattr(self.data, f'edge_{label}')[train_mask], getattr(self.data, f'edge_{label}')[test_mask]
@@ -421,7 +440,8 @@ class TorchNodeGraph(TorchGraph):
             use_special_tokens=False,
             no_labels=False,
             node_cls_label=None,
-            edge_cls_label='type'
+            edge_cls_label='type',
+            fp='test_graph.pkl'
         ):
 
         super().__init__(
@@ -436,11 +456,14 @@ class TorchNodeGraph(TorchGraph):
             use_special_tokens=use_special_tokens,
             no_labels=no_labels,
             node_cls_label=node_cls_label,
-            edge_cls_label=edge_cls_label
+            edge_cls_label=edge_cls_label,
+            fp=fp
         )
         
         self.data, self.node_texts, self.edge_texts = self.get_pyg_data()
         self.validate_data()
+        self.set_graph_label()
+
             
     
     def get_pyg_data(self):
@@ -488,17 +511,24 @@ class TorchNodeGraph(TorchGraph):
 def validate_edges(graph: Union[TorchEdgeGraph, TorchNodeGraph]):
 
     train_pos_edge_index = graph.data.edge_index
-    train_neg_edge_index = graph.data.train_neg_edge_label_index
     test_pos_edge_index = graph.data.test_pos_edge_label_index
-    test_neg_edge_index = graph.data.test_neg_edge_label_index
+    train_neg_edge_index = graph.data.train_neg_edge_label_index if hasattr(graph.data, 'train_neg_edge_label_index') else None
+    test_neg_edge_index = graph.data.test_neg_edge_label_index if hasattr(graph.data, 'test_neg_edge_label_index') else None
 
     assert set((a, b) for a, b in train_pos_edge_index.T.tolist()).issubset(set(graph.graph.numbered_graph.edges()))
     assert set((a, b) for a, b in test_pos_edge_index.T.tolist()).issubset(set(graph.graph.numbered_graph.edges()))
+    assert len(set((a, b) for a, b in train_pos_edge_index.T.tolist()).intersection(set((a, b) for a, b in test_pos_edge_index.T.tolist()))) == 0
 
-    assert len(set(graph.graph.numbered_graph.edges()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
-    assert len(set(graph.graph.numbered_graph.edges()).intersection(set((a, b) for a, b in train_neg_edge_index.T.tolist()))) == 0
-    assert len(set((a, b) for a, b in train_pos_edge_index.T.tolist()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
-    assert len(set((a, b) for a, b in train_pos_edge_index.T.tolist()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
+    if train_neg_edge_index is not None:
+        assert len(set(graph.graph.numbered_graph.edges()).intersection(set((a, b) for a, b in train_neg_edge_index.T.tolist()))) == 0
+
+    if test_neg_edge_index is not None:
+        assert len(set(graph.graph.numbered_graph.edges()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
+    
+    if train_neg_edge_index is not None and test_neg_edge_index is not None:
+        assert len(set((a, b) for a, b in train_neg_edge_index.T.tolist()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
+    
+    
 
 
 class LinkPredictionCollater:

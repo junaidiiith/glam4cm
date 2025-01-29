@@ -2,12 +2,12 @@ from typing import List
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
+from data_loading.data import GraphData
 from models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
 
-from torch_geometric.data import Data
 from trainers.gnn_trainer import Trainer
 from settings import device
 
@@ -22,7 +22,7 @@ class GNNEdgeClassificationTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: EdgeClassifer, 
-            dataset: List[Data],
+            dataset: List[GraphData],
             cls_label='type',
             lr=1e-3,
             num_epochs=100,
@@ -85,7 +85,7 @@ class GNNEdgeClassificationTrainer(Trainer):
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
 
-        print(f"Train Metrics: {epoch_metrics}")
+        # print(f"Train Metrics: {epoch_metrics}")
 
         return epoch_metrics
 

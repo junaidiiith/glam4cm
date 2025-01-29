@@ -34,8 +34,7 @@ class EcoreNxG(LangGraph):
         self.label = json_obj.get('labels')
         self.is_duplicated = json_obj.get('is_duplicated')
         self.directed = json.loads(json_obj.get('graph')).get('directed')
-        self.text = doc_tokenizer(json_obj.get('txt'))
-        # self.text = json_obj.get('txt')
+        # self.text = doc_tokenizer(json_obj.get('txt'))
 
         self.__create_graph()
         self.set_numbered_labels()        

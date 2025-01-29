@@ -9,6 +9,7 @@ from typing import List, Union
 from sklearn.model_selection import StratifiedKFold
 import torch
 import numpy as np
+from scipy.sparse import csr_matrix
 from transformers import AutoTokenizer
 from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
 from data_loading.models_dataset import ArchiMateDataset, EcoreDataset, OntoUMLDataset
@@ -121,7 +122,7 @@ class GraphDataset(torch.utils.data.Dataset):
         randomize_ee=False,
         random_embed_dim=128,
         
-        exclude_labels: list = [None],
+        exclude_labels: list = [None, ''],
     ):
         if isinstance(models_dataset, EcoreDataset):
             self.metadata = EcoreMetaData()
@@ -220,7 +221,7 @@ class GraphDataset(torch.utils.data.Dataset):
             type: str,
             models_dataset: Union[EcoreDataset, ArchiMateDataset], 
             limit: int =-1
-        ) -> List[tuple[TorchGraph, str]]:
+        ):
         
         common_params = dict(
             metadata=self.metadata,
@@ -235,18 +236,20 @@ class GraphDataset(torch.utils.data.Dataset):
             node_cls_label=self.node_cls_label,
             edge_cls_label=self.edge_cls_label
         )
-        def create_node_graph(graph: LangGraph):
+        def create_node_graph(graph: LangGraph, fp: str) -> TorchNodeGraph:
             node_params = {
                 **common_params,
+                'fp': fp,
             }
             torch_graph = TorchNodeGraph(graph, **node_params)
             return torch_graph
         
-        def create_edge_graph(graph: LangGraph):
+        def create_edge_graph(graph: LangGraph, fp: str) -> TorchEdgeGraph:
             edge_params = {
                 **common_params,
                 'add_negative_train_samples': self.add_negative_train_samples,
-                'neg_samples_ratio': self.neg_sampling_ratio
+                'neg_samples_ratio': self.neg_sampling_ratio,
+                'fp': fp,
             }
             torch_graph = TorchEdgeGraph(graph, **edge_params)
             return torch_graph
@@ -262,18 +265,17 @@ class GraphDataset(torch.utils.data.Dataset):
             fp = self.file_paths[graph.hash]
             if not os.path.exists(fp) or self.reload:
                 if type == 'node':
-                    torch_graph = create_node_graph(graph)
+                    torch_graph: TorchNodeGraph = create_node_graph(graph, fp)
                 elif type == 'edge':
-                    torch_graph = create_edge_graph(graph)
+                    torch_graph: TorchEdgeGraph = create_edge_graph(graph, fp)
                 
-                torch_graph.save(fp)
+                torch_graph.save()
 
     def embed(self):
         for fp in tqdm(self.file_paths.values(), desc='Embedding graphs'):
             torch_graph = TorchGraph.load(fp)
             torch_graph.embed(
                 self.embedder, 
-                save_path=os.path.join(fp),
                 reload=self.reload,
                 randomize_ne=self.randomize_ne,
                 randomize_ee=self.randomize_ee,
@@ -289,12 +291,19 @@ class GraphDataset(torch.utils.data.Dataset):
 
         self.post_process_graphs()
         self.validate_graphs()
+        self.save()
+        print("Graphs saved")
 
 
     def post_process_graphs(self):
         self.add_cls_labels()
 
         def set_types(prefix):
+            def concatenate(a, b):
+                if isinstance(a, csr_matrix):
+                    return csr_matrix(np.concatenate([a.toarray(), b], axis=1))
+                return np.concatenate([a, b], axis=1)
+            
             prefix_cls = getattr(self, f"{prefix}_cls_label")
             num_classes = getattr(self, f"num_{prefix}s_{prefix_cls}") + 1
             # print(f"Number of {prefix} types: {num_classes}")
@@ -302,9 +311,12 @@ class GraphDataset(torch.utils.data.Dataset):
                 types = np.eye(num_classes)[getattr(g.data, f"{prefix}_{prefix_cls}")]
                 
                 if prefix == 'node':
-                    g.data.x = np.concatenate([g.data.x, types], axis=1)
+                    g.data.x = concatenate(g.data.x, types)
+
                 elif prefix == 'edge':
-                    g.data.edge_attr = np.concatenate([g.data.edge_attr, types], axis=1)
+                    g.data.edge_attr = concatenate(g.data.edge_attr, types)
+                
+                g.save()
                     
             node_dim = self.graphs[0].data.x.shape[1]
             assert all(g.data.x.shape[1] == node_dim for g in self.graphs), "Node types not added correctly"
@@ -330,17 +342,18 @@ class GraphDataset(torch.utils.data.Dataset):
         return [g.data.to_graph_data() for g in self.graphs]
 
 
-    def save(self, save_path):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        print(f"Saving data to {save_path}")
-        with open(save_path, 'wb') as f:
-            pickle.dump(self.graphs, f)
+    def save(self):
+        # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        # print(f"Saving data to {save_path}")
+        # with open(save_path, 'wb') as f:
+        #     pickle.dump(self.graphs, f)
+        for torch_graph in self.graphs:
+            torch_graph.save()
 
-
-    def load(self, save_path):
-        print(f"Loading data from {save_path}")
-        with open(save_path, 'rb') as f:
-            self.graphs = pickle.load(f)
+    # def load(self, save_path):
+    #     print(f"Loading data from {save_path}")
+    #     with open(save_path, 'rb') as f:
+    #         self.graphs = pickle.load(f)
 
 
     def get_train_test_split(self):
@@ -382,16 +395,16 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def add_node_labels(self):
         model_type = self.metadata.type
-        labels = self.metadata.node_cls
-        if isinstance(labels, str):
-            labels = [labels]
+        cls_labels = self.metadata.node_cls
+        if isinstance(cls_labels, str):
+            cls_labels = [cls_labels]
         
-        for label in labels:
+        for cls_label in cls_labels:
             label_values = list()
             for torch_graph in self.graphs:
                 values = list()
                 for _, node in torch_graph.graph.nodes(data=True):
-                    node_data = get_node_data(node, label, model_type)
+                    node_data = get_node_data(node, cls_label, model_type)
                     values.append(node_data)
                 
                 label_values.append(values)
@@ -402,38 +415,38 @@ class GraphDataset(torch.utils.data.Dataset):
             print(node_label_map.classes_)
             
             for torch_graph, node_classes in zip(self.graphs, label_values):
-                setattr(torch_graph.data, f"node_{label}", np.array(node_classes))
+                setattr(torch_graph.data, f"node_{cls_label}", np.array(node_classes))
             
-            setattr(self, f"node_label_map_{label}", node_label_map)
+            setattr(self, f"node_label_map_{cls_label}", node_label_map)
             
             exclude_labels = [
                 node_label_map.transform([e])[0] 
                 for e in self.exclude_labels
                 if e in node_label_map.classes_
             ]
-            setattr(self, f"node_exclude_{label}", exclude_labels)
+            setattr(self, f"node_exclude_{cls_label}", exclude_labels)
             
             num_labels = len(node_label_map.classes_) - len(exclude_labels)
 
-            print("Setting num_nodes_", label, num_labels)
-            setattr(self, f"num_nodes_{label}", num_labels)
+            print("Setting num_nodes_", cls_label, num_labels)
+            setattr(self, f"num_nodes_{cls_label}", num_labels)
 
             if hasattr(self.graphs[0].data, 'train_node_mask'):
-                validate_classes(self.graphs, label, exclude_labels, 'node')
+                validate_classes(self.graphs, cls_label, exclude_labels, 'node')
 
 
     def add_edge_labels(self):
         model_type = self.metadata.type
-        labels = self.metadata.edge_cls
-        if isinstance(labels, str):
-            labels = [labels]
+        cls_labels = self.metadata.edge_cls
+        if isinstance(cls_labels, str):
+            cls_labels = [cls_labels]
         
-        for label in labels:
+        for cls_label in cls_labels:
             label_values = list()
             for torch_graph in self.graphs:
                 values = list()
                 for _, _, edge_data in torch_graph.graph.edges(data=True):
-                    values.append(get_edge_data(edge_data, label, model_type))
+                    values.append(get_edge_data(edge_data, cls_label, model_type))
                 label_values.append(values)
 
             edge_label_map = LabelEncoder()
@@ -442,61 +455,59 @@ class GraphDataset(torch.utils.data.Dataset):
             print("Edge Classes: ", edge_label_map.classes_)
 
             for torch_graph, edge_classes in zip(self.graphs, label_values):
-                setattr(torch_graph.data, f"edge_{label}", np.array(edge_classes))
+                setattr(torch_graph.data, f"edge_{cls_label}", np.array(edge_classes))
             
-            setattr(self, f"edge_label_map_{label}", edge_label_map)
+            setattr(self, f"edge_label_map_{cls_label}", edge_label_map)
 
             exclude_labels = [
                 edge_label_map.transform([e])[0] 
                 for e in self.exclude_labels
                 if e in edge_label_map.classes_
             ]
-            setattr(self, f"edge_exclude_{label}", edge_label_map.inverse_transform(exclude_labels))
+            setattr(self, f"edge_exclude_{cls_label}", edge_label_map.inverse_transform(exclude_labels))
 
             num_labels = len(edge_label_map.classes_) - len(exclude_labels)
-            setattr(self, f"num_edges_{label}", num_labels)
+            setattr(self, f"num_edges_{cls_label}", num_labels)
 
             if hasattr(self.graphs[0].data, 'train_edge_mask'):
-                validate_classes(self.graphs, label, exclude_labels, 'edge')
+                validate_classes(self.graphs, cls_label, exclude_labels, 'edge')
 
 
     def add_graph_labels(self):
         if hasattr(self.metadata, 'graph'):
-            label = self.metadata.graph_cls
-            if label and hasattr(self.graphs[0].graph, label):
+            cls_label = self.metadata.graph_cls
+            if cls_label and hasattr(self.graphs[0].graph, cls_label):
                 graph_labels = list()
                 for torch_graph in self.graphs:
-                    graph_labels.append(getattr(torch_graph.graph, label))
+                    graph_labels.append(getattr(torch_graph.graph, cls_label))
 
                 graph_label_map = LabelEncoder()
                 graph_labels = graph_label_map.fit_transform(graph_labels)
 
+                print("Graph Classes: ", graph_label_map.classes_)
+
                 for torch_graph, graph_label in zip(self.graphs, graph_labels):
-                    setattr(torch_graph.data, f"graph_{label}", np.array([graph_label]))
+                    setattr(torch_graph.data, f"graph_{cls_label}", np.array([graph_label]))
                 
                 exclude_labels = [
                     graph_label_map.transform([e])[0]
                     for e in self.exclude_labels
                     if e in graph_label_map.classes_
                 ]
-                setattr(self, f"graph_exclude_{label}", exclude_labels)
+                setattr(self, f"graph_exclude_{cls_label}", exclude_labels)
                 num_labels = len(graph_label_map.classes_) - len(exclude_labels)
 
-
-                setattr(self, f"num_graph_{label}", num_labels)
-                setattr(self, f"graph_label_map_{label}", graph_label_map)
+                print("Setting num_graph_", cls_label, num_labels)
+                setattr(self, f"num_graph_{cls_label}", num_labels)
+                setattr(self, f"graph_label_map_{cls_label}", graph_label_map)
                 
 
 
     def add_graph_text(self):
         label = self.metadata.graph_label
-        for torch_graph in self.graphs:
-            if label and hasattr(torch_graph.graph, label):
-                setattr(torch_graph, 'text', getattr(torch_graph.graph, label))
-            else:
-                node_label = self.metadata.node_label
-                node_names = [node_data.get(node_label, "") for _, node_data in torch_graph.graph.nodes(data=True)]
-                setattr(torch_graph, 'text', doc_tokenizer(" ".join(node_names)))
+        if label:
+            for torch_graph in self.graphs:
+                setattr(torch_graph, label, getattr(torch_graph.graph, label))
 
     
     def get_gnn_graph_classification_data(self):
@@ -522,10 +533,12 @@ class GraphDataset(torch.utils.data.Dataset):
     def __get_lm_data(self, indices, tokenizer, remove_duplicates=False):
         graph_label_name = self.metadata.graph_cls
         assert graph_label_name is not None, "No Graph Label found in data. Please define graph label in metadata"
-        X = [getattr(self.graphs[i], 'text') for i in indices]
+        X = [getattr(self.graphs[i], self.metadata.graph_label) for i in indices]
         y = [getattr(self.graphs[i].data, f'graph_{graph_label_name}')[0].item() for i in indices]
 
         dataset = EncodingDataset(tokenizer, X, y, remove_duplicates=remove_duplicates)
+        print("\n".join([f"Label: {self.graph_label_map_label.inverse_transform([l])[0]}, Text: {i}" for i, l in zip(X, y)]))
+
         return dataset
 
 
@@ -630,8 +643,8 @@ class GraphEdgeDataset(GraphDataset):
         self.set_torch_graphs('edge', models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
-            texts = self.get_link_prediction_texts()
-            texts = sum([v for _, v in texts.items() if not v.endswith("classes")], [])
+            texts = self.get_link_prediction_texts(only_texts=True)
+            texts = sum([v for k, v in texts.items() if not k.endswith("classes")], [])
             print(f"Training {self.embedder.name} Embedder")
             self.embedder.train(texts)
             print(f"Trained {self.embedder.name} Embedder")
@@ -658,7 +671,8 @@ class GraphEdgeDataset(GraphDataset):
 
     def get_link_prediction_texts(
         self, 
-        label: str = None
+        label: str = None,
+        only_texts: bool = False
     ):
         if label is None:
             label = self.edge_cls_label
@@ -666,8 +680,9 @@ class GraphEdgeDataset(GraphDataset):
         assert label is not None, "No edge label found in data. Please define edge label in metadata"
 
         data = defaultdict(list)
-        for graph in tqdm(self.graphs, desc=f'Getting {self.task_type} data'):
-            graph_data = graph.get_link_prediction_texts(label, self.task_type)
+        for fp in tqdm(self.file_paths.values(), desc='Getting Graph Texts'):
+            torch_graph: TorchEdgeGraph = TorchGraph.load(fp)
+            graph_data = torch_graph.get_link_prediction_texts(label, self.task_type, only_texts)
             for k, v in graph_data.items():
                 data[k] += v
 
@@ -830,7 +845,8 @@ class GraphNodeDataset(GraphDataset):
         node_label_map = getattr(self, f"node_label_map_{label}")
 
         data = {'train_nodes': [], 'train_node_classes': [], 'test_nodes': [], 'test_node_classes': []}
-        for graph in tqdm(self.graphs, desc='Getting node classification data'):
+        for fp in tqdm(self.file_paths.values(), desc='Getting node classification data'):
+            graph: TorchNodeGraph = TorchGraph.load(fp)
             node_strs = list(graph.get_graph_node_strs(graph.data.edge_index, distance).values())
 
             train_node_strs = [node_strs[i.item()] for i in graph.data.train_node_mask]

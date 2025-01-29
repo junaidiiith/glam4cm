@@ -28,9 +28,13 @@ class EncodingDataset(Dataset):
             max_length=max_length
         )
 
-        if labels:
-            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels else None
+        if labels is not None:
+            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels is not None else None
 
+        print("Encoding Dataset created with {} samples".format(len(self.inputs['input_ids'])))
+        # print("\n".join([f"Label: {l}, Text: {i}" for i, l in zip(texts, labels)]))
+        # import code; code.interact(local=locals())
+        
  
     def __len__(self):
         return len(self.inputs['input_ids'])

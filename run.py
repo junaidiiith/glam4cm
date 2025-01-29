@@ -1,5 +1,5 @@
 import argparse
-from test import (
+from downstream_tasks import (
     bert_graph_classification_comp,
     bert_graph_classification,
     bert_node_classification,
@@ -13,22 +13,22 @@ from test import (
     create_dataset,
 )
 
-from test import cm_gpt_pretraining
-from test import cm_gpt_node_classification
-from test import cm_gpt_edge_classification
-from test.bert_graph_classification_comp import get_parser as bert_comp_parse_args
-from test.bert_graph_classification import get_parser as bert_parse_args
-from test.gnn_graph_cls import get_parser as gnn_parse_args
-from test.create_dataset import get_parser as create_dataset_parse_args
-from test.bert_link_prediction import get_parser as bert_lp_parse_args
-from test.gnn_edge_classification import get_parser as gnn_ec_parse_args
-from test.gnn_link_prediction import get_parser as gnn_lp_parse_args
-from test.bert_edge_classification import get_parser as bert_ec_parse_args
-from test.gnn_node_classification import get_parser as gnn_nc_parse_args
-from test.bert_node_classification import get_parser as bert_nc_parse_args
-from test.cm_gpt_pretraining import get_parser as cm_gpt_parse_args
-from test.cm_gpt_node_classification import get_parser as cm_gpt_nc_parse_args
-from test.cm_gpt_edge_classification import get_parser as cm_gpt_ec_parse_args
+from downstream_tasks import cm_gpt_pretraining
+from downstream_tasks import cm_gpt_node_classification
+from downstream_tasks import cm_gpt_edge_classification
+from downstream_tasks.bert_graph_classification_comp import get_parser as bert_comp_parse_args
+from downstream_tasks.bert_graph_classification import get_parser as bert_parse_args
+from downstream_tasks.gnn_graph_cls import get_parser as gnn_parse_args
+from downstream_tasks.create_dataset import get_parser as create_dataset_parse_args
+from downstream_tasks.bert_link_prediction import get_parser as bert_lp_parse_args
+from downstream_tasks.gnn_edge_classification import get_parser as gnn_ec_parse_args
+from downstream_tasks.gnn_link_prediction import get_parser as gnn_lp_parse_args
+from downstream_tasks.bert_edge_classification import get_parser as bert_ec_parse_args
+from downstream_tasks.gnn_node_classification import get_parser as gnn_nc_parse_args
+from downstream_tasks.bert_node_classification import get_parser as bert_nc_parse_args
+from downstream_tasks.cm_gpt_pretraining import get_parser as cm_gpt_parse_args
+from downstream_tasks.cm_gpt_node_classification import get_parser as cm_gpt_nc_parse_args
+from downstream_tasks.cm_gpt_edge_classification import get_parser as cm_gpt_ec_parse_args
 
 
 tasks = {

@@ -62,7 +62,9 @@ class ArchimateMetaData(GraphMetadata):
             "cls": "type"
         }
 
-        self.graph = {}
+        self.graph = {
+            "label": "text",
+        }
 
 
 class OntoUMLMetaData(GraphMetadata):
@@ -71,9 +73,12 @@ class OntoUMLMetaData(GraphMetadata):
         self.node = {
             "label": "name",
             "cls": ["stereotype"],
+            "attributes": "properties"
         }
         self.edge = {
             "cls": "stereotype"
         }
 
-        self.graph = {}
+        self.graph = {
+            "label": "text",
+        }

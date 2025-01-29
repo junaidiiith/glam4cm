@@ -18,10 +18,10 @@ class ArchiMateNxG(LangGraph):
         self.__create_graph()
         self.set_numbered_labels()
 
-        self.text = " ".join([
-            self.nodes[node]['name'] if 'name' in self.nodes[node] else ''
-            for node in self.nodes
-        ])
+        # self.text = " ".join([
+        #     self.nodes[node]['name'] if 'name' in self.nodes[node] else ''
+        #     for node in self.nodes
+        # ])
 
 
     def __create_graph(self):

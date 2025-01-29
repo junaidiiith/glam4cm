@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 from typing import List, Union
 from embeddings.common import Embedder
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -22,4 +22,4 @@ class TfidfEmbedder(Embedder):
     def embed(self, text: Union[str, List[str]]):
         if isinstance(text, str):
             text = [text]
-        return torch.tensor(self.model.transform(text).toarray()[0])
+        return self.model.transform(text)
