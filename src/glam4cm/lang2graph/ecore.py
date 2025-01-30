@@ -1,7 +1,7 @@
 import xmltodict
-from lang2graph.common import LangGraph
+from glam4cm.lang2graph.common import LangGraph
 import json
-from tokenization.utils import doc_tokenizer
+from glam4cm.tokenization.utils import doc_tokenizer
 from glam4cm.settings import logger
 
 

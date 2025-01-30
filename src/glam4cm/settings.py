@@ -14,10 +14,12 @@ TFIDF_MODEL = 'tfidf'
 FAST_TEXT_MODEL = 'uml-fasttext.bin'
 
 W2V_CONFIG = dict(
-    vector_size=100,
-    window=5,
-    min_count=1,
-    workers=4,
+    epoch=100,
+    dim=128,
+    ws=5,
+    minCount=1,
+    thread=4,
+    model='skipgram'
 )
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')

@@ -12,7 +12,7 @@ scipy
 pandas
 tensorboardX
 xmltodict
-gensim
 setuptools
 wheel
 twine
+fasttext

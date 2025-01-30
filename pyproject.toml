@@ -23,10 +23,12 @@ dependencies = [
     "pandas",
     "tensorboardX",
     "xmltodict",
-    "gensim"
+    "fasttext"
 ]
 
 dynamic = ["readme"]
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
 
 [project.optional-dependencies]
 dev = ["pytest", "black"]
@@ -34,6 +36,12 @@ dev = ["pytest", "black"]
 [project.scripts]
 glam4cm = "glam4cm.run:main"
 
-
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/junaidiiith/glam4cm"
+Issues = "https://github.com/junaidiiith/glam4cm/issues"

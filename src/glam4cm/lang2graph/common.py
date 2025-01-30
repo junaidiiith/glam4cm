@@ -4,9 +4,9 @@ import networkx as nx
 from uuid import uuid4
 import numpy as np
 import torch
-from data_loading.metadata import GraphMetadata
-from tokenization.special_tokens import *
-from tokenization.utils import doc_tokenizer
+from glam4cm.data_loading.metadata import GraphMetadata
+from glam4cm.tokenization.special_tokens import *
+from glam4cm.tokenization.utils import doc_tokenizer
 import glam4cm.utils as utils
 
 SEP = ' '

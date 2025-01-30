@@ -1,11 +1,11 @@
-from models.hf import get_model
-from downstream_tasks.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
+from glam4cm.models.hf import get_model
+from glam4cm.downstream_tasks.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
 import os
 from transformers import TrainingArguments, Trainer
-from data_loading.graph_dataset import GraphNodeDataset
-from data_loading.utils import oversample_dataset
-from downstream_tasks.utils import get_models_dataset
-from tokenization.special_tokens import *
+from glam4cm.data_loading.graph_dataset import GraphNodeDataset
+from glam4cm.data_loading.utils import oversample_dataset
+from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.tokenization.special_tokens import *
 
 
 from sklearn.metrics import (
@@ -15,7 +15,7 @@ from sklearn.metrics import (
     balanced_accuracy_score
 )
 
-from tokenization.utils import get_tokenizer
+from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.utils import merge_argument_parsers, set_seed
 
 

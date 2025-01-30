@@ -1,5 +1,5 @@
 import argparse
-from downstream_tasks import (
+from glam4cm.downstream_tasks import (
     bert_graph_classification_comp,
     bert_graph_classification,
     bert_node_classification,
@@ -13,22 +13,22 @@ from downstream_tasks import (
     create_dataset,
 )
 
-from downstream_tasks import cm_gpt_pretraining
-from downstream_tasks import cm_gpt_node_classification
-from downstream_tasks import cm_gpt_edge_classification
-from downstream_tasks.bert_graph_classification_comp import get_parser as bert_comp_parse_args
-from downstream_tasks.bert_graph_classification import get_parser as bert_parse_args
-from downstream_tasks.gnn_graph_cls import get_parser as gnn_parse_args
-from downstream_tasks.create_dataset import get_parser as create_dataset_parse_args
-from downstream_tasks.bert_link_prediction import get_parser as bert_lp_parse_args
-from downstream_tasks.gnn_edge_classification import get_parser as gnn_ec_parse_args
-from downstream_tasks.gnn_link_prediction import get_parser as gnn_lp_parse_args
-from downstream_tasks.bert_edge_classification import get_parser as bert_ec_parse_args
-from downstream_tasks.gnn_node_classification import get_parser as gnn_nc_parse_args
-from downstream_tasks.bert_node_classification import get_parser as bert_nc_parse_args
-from downstream_tasks.cm_gpt_pretraining import get_parser as cm_gpt_parse_args
-from downstream_tasks.cm_gpt_node_classification import get_parser as cm_gpt_nc_parse_args
-from downstream_tasks.cm_gpt_edge_classification import get_parser as cm_gpt_ec_parse_args
+from glam4cm.downstream_tasks import cm_gpt_pretraining
+from glam4cm.downstream_tasks import cm_gpt_node_classification
+from glam4cm.downstream_tasks import cm_gpt_edge_classification
+from glam4cm.downstream_tasks.bert_graph_classification_comp import get_parser as bert_comp_parse_args
+from glam4cm.downstream_tasks.bert_graph_classification import get_parser as bert_parse_args
+from glam4cm.downstream_tasks.gnn_graph_cls import get_parser as gnn_parse_args
+from glam4cm.downstream_tasks.create_dataset import get_parser as create_dataset_parse_args
+from glam4cm.downstream_tasks.bert_link_prediction import get_parser as bert_lp_parse_args
+from glam4cm.downstream_tasks.gnn_edge_classification import get_parser as gnn_ec_parse_args
+from glam4cm.downstream_tasks.gnn_link_prediction import get_parser as gnn_lp_parse_args
+from glam4cm.downstream_tasks.bert_edge_classification import get_parser as bert_ec_parse_args
+from glam4cm.downstream_tasks.gnn_node_classification import get_parser as gnn_nc_parse_args
+from glam4cm.downstream_tasks.bert_node_classification import get_parser as bert_nc_parse_args
+from glam4cm.downstream_tasks.cm_gpt_pretraining import get_parser as cm_gpt_parse_args
+from glam4cm.downstream_tasks.cm_gpt_node_classification import get_parser as cm_gpt_nc_parse_args
+from glam4cm.downstream_tasks.cm_gpt_edge_classification import get_parser as cm_gpt_ec_parse_args
 
 
 tasks = {
@@ -68,16 +68,26 @@ tasks_handler_map = {
 }
 
 
-if __name__ == '__main__':
-
+def main():
     main_parser = argparse.ArgumentParser(description="Train ML models on conceptual models")
-    main_parser.add_argument('--task_id', type=int, required=True, help=f'ID of the task to run. Options are: {tasks}', choices=tasks.keys(), default=0)
+    main_parser.add_argument('--task_id', type=int, required=True, help=f'ID of the task to run. Options are: {"\n".join(f"{k}: {v}" for k, v in tasks.items())}', choices=list(tasks.keys()), default=0)
+    main_parser.add_argument('--th', '--task_help', action="store_true", help="Help for the task specified by --task_id")
+    
     
     args, remaining_args = main_parser.parse_known_args()
 
     if not any(vars(args).values()):
+        print("No arguments provided. Please provide arguments to run the task.")
         main_parser.print_help()
         exit(1)
+    
+    ### If args has -h or --help, print help
+    if any(x in remaining_args for x in ['-th', '--task_help']):
+        task_id = args.task_id
+        hander, task_parser = tasks_handler_map[task_id]
+        print("Help for task:", tasks[task_id])
+        task_parser().print_help()
+        exit(0)
 
     print("Running GLAM4CM with:", vars(args))  # Placeholder for real functionality
 

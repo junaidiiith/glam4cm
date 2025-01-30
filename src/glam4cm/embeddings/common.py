@@ -31,13 +31,13 @@ def get_embedding_model(
         model_name = json.load(open(os.path.join(ckpt, 'config.json')))['_name_or_path']
         
     if 'bert' in model_name:
-        from embeddings.bert import BertEmbedder
+        from glam4cm.embeddings.bert import BertEmbedder
         return BertEmbedder(model_name, ckpt)
     elif WORD2VEC_MODEL in model_name:
-        from embeddings.w2v import Word2VecEmbedder
+        from glam4cm.embeddings.w2v import Word2VecEmbedder
         return Word2VecEmbedder()
     elif TFIDF_MODEL in model_name:
-        from embeddings.tfidf import TfidfEmbedder
+        from glam4cm.embeddings.tfidf import TfidfEmbedder
         return TfidfEmbedder()
     else:
         raise ValueError(f'Unknown model name: {model_name}')

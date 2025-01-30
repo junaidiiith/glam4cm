@@ -4,12 +4,12 @@ import torch
 from collections import defaultdict
 from typing import List
 
-from models.gnn_layers import (
+from glam4cm.models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
 
-from trainers.gnn_trainer import Trainer
+from glam4cm.trainers.gnn_trainer import Trainer
 from tqdm.auto import tqdm
 from glam4cm.settings import device
 

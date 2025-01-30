@@ -1,8 +1,9 @@
+import os
 from typing import List, Union
-from embeddings.common import Embedder
+from glam4cm.embeddings.common import Embedder
 from glam4cm.settings import W2V_CONFIG
-from gensim.models import Word2Vec
 import numpy as np
+import fasttext
 
 
 class Word2VecEmbedder(Embedder):
@@ -16,7 +17,10 @@ class Word2VecEmbedder(Embedder):
     def train(self, texts: List[str]):
         print("Word2VecEmbedder: Training Word2Vec model")
         texts = [text.split() for text in texts]
-        self.model = Word2Vec(texts, **W2V_CONFIG, epochs=100)
+        with open('data.txt', 'w') as f:
+            f.write("\n".join(" ".join(words) for words in texts))
+        self.model = fasttext.train_unsupervised('data.txt', **W2V_CONFIG)
+        os.remove('data.txt')
         print("Total words in the model:", len(self.model.wv))
         print("Word2VecEmbedder: Word2Vec model trained")
     

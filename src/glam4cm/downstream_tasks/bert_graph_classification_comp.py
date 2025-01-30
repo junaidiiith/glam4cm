@@ -18,8 +18,8 @@ from transformers import (
     TrainingArguments
 )
 
-from data_loading.encoding import EncodingDataset
-from models.hf import get_model
+from glam4cm.data_loading.encoding import EncodingDataset
+from glam4cm.models.hf import get_model
 
 
 

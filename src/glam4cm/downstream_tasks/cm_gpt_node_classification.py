@@ -1,14 +1,14 @@
 import os
-from downstream_tasks.common_args import (
+from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_gpt_args_parser
 )
 
-from data_loading.graph_dataset import GraphNodeDataset
-from models.cmgpt import CMGPT, CMGPTClassifier
-from downstream_tasks.utils import get_models_dataset
-from tokenization.utils import get_tokenizer
-from trainers.cm_gpt_trainer import CMGPTTrainer
+from glam4cm.data_loading.graph_dataset import GraphNodeDataset
+from glam4cm.models.cmgpt import CMGPT, CMGPTClassifier
+from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.tokenization.utils import get_tokenizer
+from glam4cm.trainers.cm_gpt_trainer import CMGPTTrainer
 from glam4cm.utils import merge_argument_parsers, set_seed
 
 

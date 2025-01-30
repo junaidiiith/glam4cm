@@ -1,10 +1,10 @@
 import os
-from data_loading.graph_dataset import GraphNodeDataset
-from models.gnn_layers import GNNConv, GraphClassifer
-from trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
-from downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
+from glam4cm.data_loading.graph_dataset import GraphNodeDataset
+from glam4cm.models.gnn_layers import GNNConv, GraphClassifer
+from glam4cm.trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
+from glam4cm.downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 from glam4cm.utils import merge_argument_parsers, set_seed
-from downstream_tasks.utils import get_models_dataset
+from glam4cm.downstream_tasks.utils import get_models_dataset
 
 
 def get_parser():

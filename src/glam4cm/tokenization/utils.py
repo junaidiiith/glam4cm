@@ -1,5 +1,5 @@
 from re import finditer
-from tokenization.special_tokens import (
+from glam4cm.tokenization.special_tokens import (
     EDGE_START, EDGE_END, NODE_BEGIN, NODE_END
 )
 from transformers import AutoTokenizer

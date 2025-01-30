@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Union
-from embeddings.common import Embedder
+from glam4cm.embeddings.common import Embedder
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 

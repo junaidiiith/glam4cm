@@ -9,10 +9,10 @@ from transformers import (
     AutoModelForSequenceClassification, 
     AutoTokenizer
 )
-from data_loading.encoding import EncodingDataset
+from glam4cm.data_loading.encoding import EncodingDataset
 from glam4cm.settings import device
 from sklearn.preprocessing import LabelEncoder
-from trainers.metrics import compute_metrics
+from glam4cm.trainers.metrics import compute_metrics
 
 
 class BertTrainer:

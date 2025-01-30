@@ -3,7 +3,7 @@ import torch
 from typing import Union
 import pandas as pd
 
-from models.gnn_layers import (
+from glam4cm.models.gnn_layers import (
     GNNConv, 
     EdgeClassifer,
     NodeClassifier
@@ -17,7 +17,7 @@ from torch.optim import Adam
 from torch_geometric.loader import DataLoader
 
 from tensorboardX import SummaryWriter
-from trainers.metrics import compute_classification_metrics
+from glam4cm.trainers.metrics import compute_classification_metrics
 
 
 class Trainer:

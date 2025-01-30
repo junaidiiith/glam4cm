@@ -2,13 +2,13 @@ from typing import List
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
-from data_loading.data import GraphData
-from models.gnn_layers import (
+from glam4cm.data_loading.data import GraphData
+from glam4cm.models.gnn_layers import (
     GNNConv, 
     EdgeClassifer
 )
 
-from trainers.gnn_trainer import Trainer
+from glam4cm.trainers.gnn_trainer import Trainer
 from glam4cm.settings import device
 
 

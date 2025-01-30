@@ -10,15 +10,15 @@ import torch
 import numpy as np
 from scipy.sparse import csr_matrix
 from transformers import AutoTokenizer
-from data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
-from data_loading.models_dataset import ArchiMateDataset, EcoreDataset, OntoUMLDataset
-from data_loading.encoding import EncodingDataset, GPTTextDataset
+from glam4cm.data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
+from glam4cm.data_loading.models_dataset import ArchiMateDataset, EcoreDataset, OntoUMLDataset
+from glam4cm.data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
-from embeddings.w2v import Word2VecEmbedder
-from embeddings.tfidf import TfidfEmbedder
-from embeddings.common import get_embedding_model
-from lang2graph.common import LangGraph, get_node_data, get_edge_data
-from data_loading.metadata import ArchimateMetaData, EcoreMetaData, OntoUMLMetaData
+from glam4cm.embeddings.w2v import Word2VecEmbedder
+from glam4cm.embeddings.tfidf import TfidfEmbedder
+from glam4cm.embeddings.common import get_embedding_model
+from glam4cm.lang2graph.common import LangGraph, get_node_data, get_edge_data
+from glam4cm.data_loading.metadata import ArchimateMetaData, EcoreMetaData, OntoUMLMetaData
 from glam4cm.settings import seed
 from glam4cm.settings import (
     LP_TASK_EDGE_CLS,

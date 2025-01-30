@@ -1,6 +1,6 @@
 import json
 from tqdm.auto import tqdm
-from lang2graph.common import LangGraph
+from glam4cm.lang2graph.common import LangGraph
 from glam4cm.utils import find_files_with_extension
 from glam4cm.settings import logger
 

@@ -1,4 +1,4 @@
-from data_loading.models_dataset import (
+from glam4cm.data_loading.models_dataset import (
     ArchiMateDataset, 
     EcoreDataset
 )

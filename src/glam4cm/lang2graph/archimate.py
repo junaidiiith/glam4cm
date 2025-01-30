@@ -1,4 +1,4 @@
-from lang2graph.common import LangGraph
+from glam4cm.lang2graph.common import LangGraph
 
 
 class ArchiMateNxG(LangGraph):

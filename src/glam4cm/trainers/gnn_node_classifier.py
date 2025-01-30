@@ -3,11 +3,11 @@ from torch_geometric.loader import DataLoader
 import torch
 from collections import defaultdict
 from torch_geometric.data import Data
-from models.gnn_layers import (
+from glam4cm.models.gnn_layers import (
     GNNConv, 
     NodeClassifier
 )
-from trainers.gnn_trainer import Trainer
+from glam4cm.trainers.gnn_trainer import Trainer
 from glam4cm.settings import device
 
 

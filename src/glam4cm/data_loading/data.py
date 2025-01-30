@@ -4,14 +4,14 @@ from sklearn.model_selection import train_test_split
 import torch
 import networkx as nx
 import os
-from data_loading.metadata import (
+from glam4cm.data_loading.metadata import (
     ArchimateMetaData, 
     EcoreMetaData
 )
-from embeddings.common import Embedder
-from lang2graph.archimate import ArchiMateNxG
-from lang2graph.ecore import EcoreNxG
-from lang2graph.common import (
+from glam4cm.embeddings.common import Embedder
+from glam4cm.lang2graph.archimate import ArchiMateNxG
+from glam4cm.lang2graph.ecore import EcoreNxG
+from glam4cm.lang2graph.common import (
     create_graph_from_edge_index,
     get_node_texts,
     get_edge_texts
@@ -20,12 +20,12 @@ from lang2graph.common import (
 from scipy.sparse import csr_matrix
 
 from glam4cm.settings import LP_TASK_EDGE_CLS, LP_TASK_LINK_PRED
-from tokenization.special_tokens import *
+from glam4cm.tokenization.special_tokens import *
 from torch_geometric.transforms import RandomLinkSplit
 import torch
 from torch_geometric.data import Data, Dataset
 from typing import List, Optional, Sequence, Union
-from tokenization.utils import doc_tokenizer
+from glam4cm.tokenization.utils import doc_tokenizer
 
 
 

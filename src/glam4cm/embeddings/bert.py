@@ -1,8 +1,8 @@
 from transformers import AutoModel, AutoTokenizer
 import torch
 from typing import List, Union
-from embeddings.common import Embedder
-from data_loading.encoding import EncodingDataset
+from glam4cm.embeddings.common import Embedder
+from glam4cm.data_loading.encoding import EncodingDataset
 from torch.utils.data import DataLoader
 from glam4cm.settings import device
 import numpy as np

@@ -2,12 +2,12 @@ import random
 import torch
 import numpy as np
 
-from data_loading.models_dataset import ArchiMateDataset, EcoreDataset
-from data_loading.graph_dataset import (
+from glam4cm.data_loading.models_dataset import ArchiMateDataset, EcoreDataset
+from glam4cm.data_loading.graph_dataset import (
     GraphNodeDataset,
     GraphEdgeDataset
 )
-from downstream_tasks.common_args import get_common_args_parser
+from glam4cm.downstream_tasks.common_args import get_common_args_parser
 
 
 def get_parser():

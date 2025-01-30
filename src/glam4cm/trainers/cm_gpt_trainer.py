@@ -7,12 +7,12 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import torch.nn as nn
 
-from models.cmgpt import CMGPT, CMGPTClassifier
+from glam4cm.models.cmgpt import CMGPT, CMGPTClassifier
 import torch
 from glam4cm.settings import device
 
 
-from trainers.metrics import compute_classification_metrics
+from glam4cm.trainers.metrics import compute_classification_metrics
 
 
 class CMGPTTrainer:

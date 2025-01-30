@@ -6,11 +6,11 @@ from random import shuffle
 from sklearn.model_selection import StratifiedKFold
 import json
 import os
-from data_loading.encoding import EncodingDataset
-from lang2graph.archimate import ArchiMateNxG
-from lang2graph.ecore import EcoreNxG
-from lang2graph.common import LangGraph
-from lang2graph.ontouml import OntoUMLNxG
+from glam4cm.data_loading.encoding import EncodingDataset
+from glam4cm.lang2graph.archimate import ArchiMateNxG
+from glam4cm.lang2graph.ecore import EcoreNxG
+from glam4cm.lang2graph.common import LangGraph
+from glam4cm.lang2graph.ontouml import OntoUMLNxG
 from glam4cm.settings import (
     datasets_dir, 
     seed,

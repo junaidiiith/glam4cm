@@ -1,4 +1,5 @@
-from gensim.models import Word2Vec
+import os
+import fasttext
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import LabelEncoder
@@ -26,7 +27,7 @@ def get_embeddings(texts, model):
 	embeddings = []
 	for text in texts:
 		words = text.split()
-		word_vectors = [model.wv[word] for word in words if word in model.wv]
+		word_vectors = [model.get_word_vector(word) for word in words]
 		if word_vectors:
 			embeddings.append(np.mean(word_vectors, axis=0))
 		else:
@@ -35,8 +36,20 @@ def get_embeddings(texts, model):
 
 
 def run(data):
-    sentences = [text.split() for text in data['train_nodes'] + data['test_nodes']]
-    word2vec_model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, workers=4)
+    sentences = [text.split() for text in data['train_nodes'] + data['test_nodes']]    
+    with open('data.txt', 'w') as f:
+        f.write("\n".join(sentences))
+        
+    word2vec_model = fasttext.train_unsupervised(
+        'data.txt', 
+        dim=128, 
+        ws=5, 
+        minCount=1,
+        epoch=100,
+        lr=0.05, 
+        workers=4
+    )
+    os.remove('data.txt')   
 
     X_train_embeddings = get_embeddings(data['train_nodes'], word2vec_model)
     X_test_embeddings = get_embeddings(data['test_nodes'], word2vec_model)
