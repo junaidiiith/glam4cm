@@ -181,7 +181,6 @@ class GraphDataset(torch.utils.data.Dataset):
             randomize_ee=randomize_ee,
             random_embed_dim=random_embed_dim
         )
-
         self.save_dir = os.path.join(save_dir, models_dataset.name)
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -219,10 +218,11 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def set_torch_graphs(
             self, 
-            type: str,
+            task_type: str,
             models_dataset: Union[EcoreDataset, ArchiMateDataset], 
             limit: int =-1
         ):
+        self.config['type'] = task_type
         
         common_params = dict(
             metadata=self.metadata,
@@ -262,12 +262,12 @@ class GraphDataset(torch.utils.data.Dataset):
         
         self.set_file_hashes(models_dataset[:models_size])
 
-        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {type} graphs'):
+        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {task_type} graphs'):
             fp = self.file_paths[graph.hash]
             if not os.path.exists(fp) or self.reload:
-                if type == 'node':
+                if task_type == 'node':
                     torch_graph: TorchNodeGraph = create_node_graph(graph, fp)
-                elif type == 'edge':
+                elif task_type == 'edge':
                     torch_graph: TorchEdgeGraph = create_edge_graph(graph, fp)
                 
                 torch_graph.save()
@@ -532,7 +532,7 @@ class GraphDataset(torch.utils.data.Dataset):
         y = [getattr(self.graphs[i].data, f'graph_{graph_label_name}')[0].item() for i in indices]
 
         dataset = EncodingDataset(tokenizer, X, y, remove_duplicates=remove_duplicates)
-        print("\n".join([f"Label: {self.graph_label_map_label.inverse_transform([l])[0]}, Text: {i}" for i, l in zip(X, y)]))
+        # print("\n".join([f"Label: {self.graph_label_map_label.inverse_transform([l])[0]}, Text: {i}" for i, l in zip(X, y)]))
 
         return dataset
 
@@ -598,7 +598,6 @@ class GraphEdgeDataset(GraphDataset):
 
             task_type=LP_TASK_EDGE_CLS
         ):
-        
         super().__init__(
             models_dataset=models_dataset,
             save_dir=save_dir,
@@ -860,9 +859,8 @@ class GraphNodeDataset(GraphDataset):
             data['test_node_classes'] += test_node_classes
         
 
-        print("Tokenizing data")
-        print(data['train_nodes'][:10])
-        print(data['test_nodes'][:10])
+        print("\n".join(data['train_nodes']))
+        print("\n".join(data['test_nodes']))
         if hasattr(self, "node_label_map_type"):
             node_label_map.inverse_transform([i.item() for i in train_node_classes]) == train_node_strs
             node_label_map.inverse_transform([i.item() for i in test_node_classes]) == test_node_strs

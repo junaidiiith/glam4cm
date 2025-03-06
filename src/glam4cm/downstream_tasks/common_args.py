@@ -87,6 +87,8 @@ def get_common_args_parser():
         default='bert-base-uncased', 
         choices=[BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL]
     )
+    
+    parser.add_argument('--trust_remote_code', action='store_true')
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--ckpt', type=str, default=None)
     
@@ -134,7 +136,7 @@ def get_bert_args_parser():
     parser = ArgumentParser()
 
     parser.add_argument('--freeze_pretrained_weights', action='store_true')
-    parser.add_argument('--model_name', type=str, default='bert-base-uncased')
+    parser.add_argument('--model_name', type=str, default='answerdotai/ModernBERT-base')
 
     parser.add_argument('--warmup_steps', type=int, default=200)
     parser.add_argument('--num_log_steps', type=int, default=200)

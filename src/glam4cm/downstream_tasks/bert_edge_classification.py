@@ -88,7 +88,7 @@ def run(args):
     print("Training model")
     print(f'Number of labels: {num_labels}')
     
-    model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
+    model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)
     
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
@@ -98,8 +98,8 @@ def run(args):
         'results',
         dataset_name,
         'edge_cls',
-        f'{args.edge_cls_label}',
-        f"{graph_dataset.config_hash}",
+        # f'{args.edge_cls_label}',
+        # f"{graph_dataset.config_hash}",
     )
 
     logs_dir = os.path.join(
@@ -136,7 +136,7 @@ def run(args):
 
     trainer.train()
     print(trainer.evaluate())
-    trainer.save_model()
+    # trainer.save_model()
 
 
 if __name__ == '__main__':

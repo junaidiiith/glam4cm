@@ -84,7 +84,7 @@ def main():
     ### If args has -h or --help, print help
     if any(x in remaining_args for x in ['-th', '--task_help']):
         task_id = args.task_id
-        hander, task_parser = tasks_handler_map[task_id]
+        task_handler, task_parser = tasks_handler_map[task_id]
         print("Help for task:", tasks[task_id])
         task_parser().print_help()
         exit(0)
@@ -93,6 +93,10 @@ def main():
 
 
     task_id = args.task_id
-    hander, task_parser = tasks_handler_map[task_id]
+    task_handler, task_parser = tasks_handler_map[task_id]
     task_args = task_parser().parse_args(remaining_args)
-    hander(task_args)
+    task_handler(task_args)
+    
+    
+if __name__ == '__main__':
+    main()

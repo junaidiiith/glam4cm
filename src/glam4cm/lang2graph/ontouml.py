@@ -54,7 +54,7 @@ class OntoUMLNxG(LangGraph):
         self.set_numbered_labels()
 
         self.text = " ".join([
-            self.nodes[node]['name'] if 'name' in self.nodes[node] else ''
+            self.nodes[node]['name'] if 'name' in self.nodes[node] and self.nodes[node]['name'] else ''
             for node in self.nodes
         ])
     
@@ -85,7 +85,8 @@ class OntoUMLNxG(LangGraph):
                         self.nodes[k][prop] = v[prop] if prop in v else False
 
                     logger.info(f"Node: {node_name} type: {v[ONTOUML_ELEMENT_TYPE]}")
-
+                else:
+                    continue
                 
                 logger.info(f"Node: {node_name} type: {v[ONTOUML_ELEMENT_TYPE]}")
                 if ONTOUML_STEREOTYPE in v and v[ONTOUML_STEREOTYPE] is not None:
@@ -108,10 +109,8 @@ class OntoUMLNxG(LangGraph):
                     
                     elif ONTOUML_PROPERTIES in v and v[ONTOUML_PROPERTIES] is not None:
                         properties = v[ONTOUML_PROPERTIES] if isinstance(v[ONTOUML_PROPERTIES], list) else [v[ONTOUML_PROPERTIES]]
-                        properties_str = ", ".join([property[ONTOUML_ELEMENT_NAME] for property in properties])
-                        self.nodes[k][ONTOUML_PROPERTIES] = properties_str
-                        logger.info(f"Properties: {properties_str}")
-
+                        self.nodes[k][ONTOUML_PROPERTIES] = [property[ONTOUML_ELEMENT_NAME] for property in properties]
+                        
 
                 elif v[ONTOUML_ELEMENT_TYPE] == ONTOUML_RELATION:    
                     properties = v[ONTOUML_PROPERTIES] if isinstance(v[ONTOUML_PROPERTIES], list) else [v[ONTOUML_PROPERTIES]]
@@ -144,7 +143,7 @@ class OntoUMLNxG(LangGraph):
 
         def create_nxg_rel_as_edge():
             # TODO: To be implemented
-            pass
+            raise NotImplementedError
 
 
         id2obj_map = dict()

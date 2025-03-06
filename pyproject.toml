@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glam4cm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Graph Neural Networks and Language Models Trainer (Separate or combined) for conceptual models"
 authors = [
     {name = "Syed Juned Ali", email = "syed.juned.ali@tuwien.ac.at"}

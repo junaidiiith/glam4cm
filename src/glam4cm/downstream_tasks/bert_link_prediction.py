@@ -69,17 +69,19 @@ def run(args):
 
 
     graph_data_params = get_config_params(args)
-    graph_data_params = {**graph_data_params, 'task': LP_TASK_LINK_PRED}
+    graph_data_params = {
+        **graph_data_params, 
+        'add_negative_train_samples': True, 
+        'neg_sampling_ratio': args.neg_sampling_ratio,
+        'task_type': LP_TASK_LINK_PRED
+    }
+    print(graph_data_params)
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
         dataset, 
-        dict(
-            **graph_data_params, 
-            add_negative_train_samples=args.add_negative_train_samples, 
-            neg_sampling_ratio=args.neg_sampling_ratio,
-            task=LP_TASK_LINK_PRED
-    ))
+        **graph_data_params
+    )
     print("Loaded graph dataset")
 
 
@@ -89,13 +91,10 @@ def run(args):
 
 
     print("Getting link prediction data")
-    bert_dataset = graph_dataset.get_link_prediction_lm_data(
-        tokenizer=tokenizer,
-        task_type=LP_TASK_LINK_PRED
-    )
+    bert_dataset = graph_dataset.get_link_prediction_lm_data(tokenizer=tokenizer)
 
     print("Training model")
-    model = get_model(args.ckpt if args.ckpt else model_name, num_labels=2, len_tokenizer=len(tokenizer))
+    model = get_model(args.ckpt if args.ckpt else model_name, num_labels=2, len_tokenizer=len(tokenizer), trust_remote_code=args.trust_remote_code)
 
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
@@ -106,7 +105,7 @@ def run(args):
         'results',
         dataset_name,
         'lp',
-        f"{graph_dataset.config_hash}",
+        # f"{graph_dataset.config_hash}",
     )
 
     logs_dir = os.path.join(
@@ -142,4 +141,4 @@ def run(args):
 
     trainer.train()
     print(trainer.evaluate())
-    trainer.save_model()
+    # trainer.save_model()

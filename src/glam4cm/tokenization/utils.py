@@ -1,6 +1,6 @@
 from re import finditer
 from glam4cm.tokenization.special_tokens import (
-    EDGE_START, EDGE_END, NODE_BEGIN, NODE_END
+    EDGE_START, EDGE_END, NODE_BEGIN, NODE_END, escape_keywords
 )
 from transformers import AutoTokenizer
 
@@ -24,6 +24,8 @@ def get_tokenizer(model_name, use_special_tokens=False, max_length=512) -> AutoT
 
 
 def camel_case_split(identifier) -> list:
+    if any(ek in identifier for ek in escape_keywords):
+        return [identifier]
     matches = finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
     return [m.group(0) for m in matches]
 
@@ -31,7 +33,23 @@ def camel_case_split(identifier) -> list:
 def doc_tokenizer(doc, lower=False) -> str:
     words = doc.split()
     # split _
-    words = [w2 for w1 in words for w2 in w1.split('_') if w2 != '']
+    words = [
+        w2 
+        for w1 in words for w2 in w1.split('_') if w2 != '']
     # camelcase
-    words = [w2.lower() if lower else w2 for w1 in words for w2 in camel_case_split(w1) if w2 != '']
+    final_words = list()
+    for word in words:
+        if word in escape_keywords:
+            final_words.append(word)
+        else:
+            final_words.extend(camel_case_split(word))
+            
+    words = [
+        w2.lower() 
+        if lower else w2 
+        for w1 in words 
+        for w2 in camel_case_split(w1) 
+        if w2 != ''
+    ]
+    
     return " ".join(words)

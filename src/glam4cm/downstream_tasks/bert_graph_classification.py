@@ -83,8 +83,8 @@ def run(args):
         output_dir = os.path.join(
             'results',
             dataset_name,
-            f'graph_cls_',
-            f"{graph_dataset.config_hash}",
+            f'graph_cls_{args.cls_label}',
+            # f"{graph_dataset.config_hash}",
         )
 
         logs_dir = os.path.join(
@@ -94,7 +94,7 @@ def run(args):
             f"{graph_dataset.config_hash}"
         )
 
-        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
+        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)
 
         if args.freeze_pretrained_weights:
             for param in model.base_model.parameters():
@@ -134,4 +134,3 @@ def run(args):
         print(results)
         
         fold_id += 1
-        break

@@ -4,7 +4,7 @@ from sklearn.preprocessing import LabelEncoder
 import fasttext
 from scipy.sparse import csr_matrix
 import numpy as np
-from encoding.common import (
+from glam4cm.encoding.common import (
     doc_tokenizer, 
     SEP
 )

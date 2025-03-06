@@ -140,9 +140,17 @@ def format_path(
 ):
     """Format a path into a string representation."""
     def get_node_label(node):
+        
         masked = graph.nodes[node].get('masked')
-        node_type = f"{graph.nodes[node].get(f'{node_cls_label}', '')}" if use_node_types and not masked and node_cls_label else ''
-        node_type = f"{node_cls_label}: {node_type}" if node_type else ''
+        node_type = f"{graph.nodes[node].get(f'{node_cls_label}', '')}" \
+            if use_node_types and not masked and node_cls_label else ''    
+        
+        if node_type != '':
+            node_type = node_type.title()
+            if isinstance(graph.nodes[node].get(f'{node_cls_label}'), bool):
+                node_type = node_cls_label.title() if graph.nodes[node].get(f'{node_cls_label}') else ''
+                
+            
         node_label = get_node_name(
             graph.nodes[node], 
             metadata.node_label, 
@@ -207,6 +215,18 @@ def get_edge_texts(
         masked = graph.edges[n1, n2].get('masked')
         graph.edges[n1, n2]['masked'] = True
 
+    edge_data = graph.get_edge_data(n1, n2)
+    edge_type = get_edge_data(edge_data, edge_cls_label, metadata.type)
+    edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
+    
+    edge_text = ""
+    if use_edge_types:
+        edge_text += f" {edge_cls_label}: {edge_type} " if not no_labels else ''
+        
+    if use_edge_label:
+        edge_text += f" {edge_label} " if not no_labels else ''
+    
+    
     n1_text = get_node_text(
         graph=graph,
         node=n1,
@@ -241,8 +261,8 @@ def get_edge_texts(
     )
     if not neg_samples:
         graph.edges[n1, n2]['masked'] = masked or False
-
-    return n1_text + EDGE_START + EDGE_END + n2_text
+    
+    return n1_text + EDGE_START + f"{edge_text}" + EDGE_END + n2_text
 
 
 def get_node_text(
@@ -326,6 +346,8 @@ def get_attribute_labels(node_data, attribute_labels):
     if isinstance(node_data[attribute_labels], list):
         if not node_data[attribute_labels]:
             return ''
+        if isinstance(node_data[attribute_labels][0], str):
+            return ", ".join(node_data[attribute_labels])
         if isinstance(node_data[attribute_labels][0], tuple):
             return ", ".join([f"{k}: {v}" for k, v in node_data[attribute_labels]])
         elif isinstance(node_data[attribute_labels][0], dict):
@@ -346,8 +368,8 @@ def get_node_name(
         attributes_str = "(" + get_attribute_labels(node_data, attribute_labels) + ")"
     else:
         attributes_str = ''
-    node_label = node_data.get(label, '')
-    node_label = '' if node_label.lower() == 'null' else node_label
+    node_label = node_data.get(label, '') if node_data.get(label, '') else ''
+    node_label = '' if node_label and node_label.lower() in ['null', 'none'] else node_label
     return f"{node_label}{attributes_str}".strip()
 
 

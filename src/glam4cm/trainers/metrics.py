@@ -20,7 +20,7 @@ def compute_metrics(p):
     }
 
 
-def compute_classification_metrics(preds, labels):
+def compute_classification_metrics(preds: torch.Tensor, labels: torch.Tensor) -> dict:
     """
     Compute F1-score, balanced accuracy, precision, and recall for multi-class classification.
     

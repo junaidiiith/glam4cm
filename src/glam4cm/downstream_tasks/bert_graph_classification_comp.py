@@ -22,7 +22,6 @@ from glam4cm.data_loading.encoding import EncodingDataset
 from glam4cm.models.hf import get_model
 
 
-
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
@@ -49,13 +48,15 @@ def get_parser():
     parser.add_argument('--ckpt', type=str, default=None)
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--k', type=int, default=10)
+    parser.add_argument('--limit', type=int, default=-1)
+    parser.add_argument('--trust_remote_code', action='store_true')
 
     parser.add_argument('--num_epochs', type=int, default=10)
 
     parser.add_argument('--warmup_steps', type=int, default=500)
-    parser.add_argument('--num_log_steps', type=int, default=50)
-    parser.add_argument('--num_eval_steps', type=int, default=50)
-    parser.add_argument('--num_save_steps', type=int, default=50)
+    parser.add_argument('--num_log_steps', type=int, default=500)
+    parser.add_argument('--num_eval_steps', type=int, default=500)
+    parser.add_argument('--num_save_steps', type=int, default=500)
     parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=1e-5)
@@ -66,8 +67,7 @@ def get_parser():
 def run(args):
     dataset_name = args.dataset_name
     model_name = args.model_name
-
-
+    
     texts = [
         (g['txt'], g['labels'])
         for file_name in os.listdir(f'datasets/{dataset_name}')
@@ -75,6 +75,9 @@ def run(args):
         if 'ecore' in file_name and file_name.endswith('.jsonl')
     ]
     shuffle(texts)
+    limit = args.limit if args.limit > 0 else len(texts)
+    texts = texts[:limit]
+        
     labels = [y for _, y in texts]
     y_map = {label: i for i, label in enumerate(set(y for y in labels))}
     y = [y_map[y] for y in labels]
@@ -84,7 +87,7 @@ def run(args):
 
     num_labels = len(y_map)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=args.trust_remote_code)
     k = args.k
     kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=args.seed)
 
@@ -101,22 +104,23 @@ def run(args):
 
         print(f'Train: {len(train_texts)}, Test: {len(test_texts)}', num_labels)
 
-        train_dataset = EncodingDataset(tokenizer, train_texts, train_y)
-        test_dataset = EncodingDataset(tokenizer, test_texts, test_y)
+        train_dataset = EncodingDataset(tokenizer, train_texts, train_y, max_length=args.max_length)
+        test_dataset = EncodingDataset(tokenizer, test_texts, test_y, max_length=args.max_length)
+        # import code; code.interact(local=locals())
 
-        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer))
+        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)
 
         print("Training model")
         output_dir = os.path.join(
             'results',
             dataset_name,
-            'graph_cls_comp',
+            f'graph_cls_comp_{i+1}',
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
-            'graph_cls_comp',
+            f'graph_cls_comp_{i+1}',
         )
 
         print("Running epochs: ", args.num_epochs)
@@ -131,8 +135,9 @@ def run(args):
             warmup_steps=500,
             weight_decay=0.01,
             logging_dir=logs_dir,
-            logging_steps=10,
-            eval_steps=10,
+            logging_steps=args.num_log_steps,
+            eval_steps=args.num_eval_steps,
+            save_steps=args.num_save_steps,
             save_total_limit=2,
             load_best_model_at_end=True,
             fp16=True

@@ -58,8 +58,7 @@ class EcoreNxG(LangGraph):
             for f in structural_features:
                 if f['type'] == 'ecore:EAttribute':
                     name = f['name']
-                    attr_type = f['ref'] if f['ref'] else ''
-                    attributes.append((name, attr_type))
+                    attributes.append(name)
 
             self.add_node(
                 classifier_name, 

@@ -5,7 +5,11 @@ from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
 from glam4cm.utils import merge_argument_parsers, set_seed
-from glam4cm.downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
+from glam4cm.downstream_tasks.common_args import (
+    get_common_args_parser, 
+    get_config_params, 
+    get_gnn_args_parser
+)
 
 
 def get_parser():

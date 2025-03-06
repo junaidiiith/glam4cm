@@ -1,12 +1,17 @@
+import numpy as np
 from glam4cm.models.hf import get_model
-from glam4cm.downstream_tasks.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
+from glam4cm.downstream_tasks.common_args import (
+    get_bert_args_parser, 
+    get_common_args_parser, 
+    get_config_params
+)
 import os
 from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.data_loading.utils import oversample_dataset
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
-
+from sklearn.model_selection import StratifiedKFold
 
 from sklearn.metrics import (
     accuracy_score, 
@@ -73,90 +78,104 @@ def run(args):
 
     graph_data_params = get_config_params(args)
     print("Loading graph dataset")
-    graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
-    print("Loaded graph dataset")
-
-    assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node_{args.node_cls_label} attribute"
-    num_labels = getattr(graph_dataset, f"num_nodes_{args.node_cls_label}")
-
-    model_name = args.model_name
-    tokenizer = get_tokenizer(model_name, use_special_tokens=args.use_special_tokens)
-
-    print("Getting node classification data")
-    bert_dataset = graph_dataset.get_node_classification_lm_data(
-        label=args.node_cls_label,
-        tokenizer=tokenizer,
-        distance=distance,
-    )
-
-    # exit(0)
-
-    if args.oversampling_ratio != -1:
-        ind_w_oversamples = oversample_dataset(bert_dataset['train'])
-        bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
-
-    model = get_model(
-        args.ckpt if args.ckpt else model_name, 
-        num_labels=2, 
-        len_tokenizer=len(tokenizer)
-    )
-
-    if args.freeze_pretrained_weights:
-        for param in model.base_model.parameters():
-            param.requires_grad = False
-
     
-    print("Training model")
-    output_dir = os.path.join(
-        'results',
-        dataset_name,
-        'node_cls',
-        f'{args.node_cls_label}',
-        f"{graph_dataset.config_hash}",
-    )
+    k = int(1 / args.test_ratio)
+    
+    for i in range(k):
+        set_seed(np.random.randint(0, 1000))
+        graph_dataset = GraphNodeDataset(dataset, reload=True, **graph_data_params)
+        print("Loaded graph dataset")
 
-    logs_dir = os.path.join(
-        'logs',
-        dataset_name,
-        'node_cls',
-        f'{args.node_cls_label}',
-        f"{graph_dataset.config_hash}",
-    )
+        assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node_{args.node_cls_label} attribute"
+        num_labels = getattr(graph_dataset, f"num_nodes_{args.node_cls_label}")
 
-    print("Output Dir: ", output_dir)
-    print("Logs Dir: ", logs_dir)
-    print("Len Train Dataset: ", len(bert_dataset['train']))
-    print("Len Test Dataset: ", len(bert_dataset['test']))
+        model_name = args.model_name
+        tokenizer = get_tokenizer(model_name, use_special_tokens=args.use_special_tokens)
 
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        num_train_epochs=args.num_epochs,
-        per_device_train_batch_size=args.train_batch_size,
-        per_device_eval_batch_size=args.eval_batch_size,
-        weight_decay=0.01,
-        logging_dir=logs_dir,
-        logging_steps=args.num_log_steps,
-        eval_strategy='steps',
-        eval_steps=args.num_eval_steps,
-        save_steps=args.num_save_steps,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        fp16=True,
-    )
+        print("Getting node classification data")
+        bert_dataset = graph_dataset.get_node_classification_lm_data(
+            label=args.node_cls_label,
+            tokenizer=tokenizer,
+            distance=distance,
+        )
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=bert_dataset['train'],
-        eval_dataset=bert_dataset['test'],
-        compute_metrics=compute_metrics
-    )
+        # exit(0)
 
-    trainer.train()
-    results = trainer.evaluate()
-    print(results)
+        if args.oversampling_ratio != -1:
+            ind_w_oversamples = oversample_dataset(bert_dataset['train'])
+            bert_dataset['train'].inputs = bert_dataset['train'][ind_w_oversamples]
+        
+        
+        model = get_model(
+            args.ckpt if args.ckpt else model_name, 
+            num_labels=num_labels, 
+            len_tokenizer=len(tokenizer), 
+            trust_remote_code=args.trust_remote_code
+        )
 
-    trainer.save_model()
+        if args.freeze_pretrained_weights:
+            for param in model.base_model.parameters():
+                param.requires_grad = False
+
+        
+        print("Training model")
+        output_dir = os.path.join(
+            'results',
+            dataset_name,
+            f'node_cls',
+            f'{args.node_cls_label}',
+            # f"{graph_dataset.config_hash}",
+        )
+
+        logs_dir = os.path.join(
+            'logs',
+            dataset_name,
+            'node_cls',
+            f'{args.node_cls_label}',
+            f"{graph_dataset.config_hash}_{i}",
+        )
+
+        print("Output Dir: ", output_dir)
+        print("Logs Dir: ", logs_dir)
+        print("Len Train Dataset: ", len(bert_dataset['train']))
+        print("Len Test Dataset: ", len(bert_dataset['test']))
+        
+        print("Num epochs: ", args.num_epochs)
+
+        training_args = TrainingArguments(
+            output_dir=output_dir,
+            num_train_epochs=args.num_epochs,
+            per_device_train_batch_size=args.train_batch_size,
+            per_device_eval_batch_size=args.eval_batch_size,
+            weight_decay=0.01,
+            logging_dir=logs_dir,
+            logging_steps=args.num_log_steps,
+            eval_strategy='steps',
+            eval_steps=args.num_eval_steps,
+            save_steps=args.num_save_steps,
+            save_total_limit=2,
+            load_best_model_at_end=True,
+            fp16=True,
+        )
+
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=bert_dataset['train'],
+            eval_dataset=bert_dataset['test'],
+            compute_metrics=compute_metrics
+        )
+
+        trainer.train()
+        results = trainer.evaluate()
+        
+        # with open(os.path.join(output_dir, 'results.txt'), 'a') as f:
+        #     f.write(str(results))
+        #     f.write('\n')
+        
+        print(results)
+
+        # trainer.save_model()
 
 
 if __name__ == '__main__':

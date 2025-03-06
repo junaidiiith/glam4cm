@@ -199,6 +199,7 @@ class TorchGraph:
             distance = self.distance
 
         subgraph = create_graph_from_edge_index(self.graph, edge_index)
+
         return get_node_texts(
             subgraph, 
             distance,
@@ -304,9 +305,7 @@ class TorchEdgeGraph(TorchGraph):
         self.validate_data()
         self.set_graph_label()
 
-        
 
-    
     def get_pyg_data(self):
         
         d = GraphData()

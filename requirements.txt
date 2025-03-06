@@ -3,7 +3,7 @@ scikit-learn
 scipy
 torch
 numpy
-transformers
+transformers[torch]
 sentence-transformers
 tqdm
 networkx
@@ -16,3 +16,5 @@ setuptools
 wheel
 twine
 fasttext
+torch-tb-profiler
+xformers
