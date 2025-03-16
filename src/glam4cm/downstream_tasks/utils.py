@@ -1,6 +1,7 @@
 from glam4cm.data_loading.models_dataset import (
     ArchiMateDataset, 
-    EcoreDataset
+    EcoreDataset,
+    OntoUMLDataset
 )
 
 
@@ -8,7 +9,8 @@ dataset_to_metamodel = {
     'modelset': 'ecore',
     'ecore_555': 'ecore',
     'mar-ecore-github': 'ecore',
-    'eamodelset': 'ea'
+    'eamodelset': 'ea',
+    'ontouml': 'ontouml',
 }
 
 
@@ -22,6 +24,8 @@ def get_model_dataset_class(dataset_name):
         dataset_class = ArchiMateDataset
     elif dataset_type == 'ecore':
         dataset_class = EcoreDataset
+    elif dataset_type == 'ontouml':
+        dataset_class = OntoUMLDataset
     else:
         raise ValueError(f"Unknown dataset type: {dataset_type}")
     return dataset_class

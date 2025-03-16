@@ -91,7 +91,7 @@ def run(args):
             'logs',
             dataset_name,
             f'graph_cls_',
-            f"{graph_dataset.config_hash}"
+            f"{graph_dataset.config_hash}_{fold_id}"
         )
 
         model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)

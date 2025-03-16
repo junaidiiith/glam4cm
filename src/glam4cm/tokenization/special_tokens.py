@@ -19,4 +19,8 @@ escape_keywords = [
     "ETypeParameter",
     "EAnnotation",
     "stereotype",
+    EDGE_START,
+    EDGE_END,
+    NODE_BEGIN,
+    NODE_END
 ]

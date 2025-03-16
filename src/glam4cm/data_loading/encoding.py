@@ -1,6 +1,12 @@
 from torch.utils.data import Dataset
 import torch
 
+def get_max_length(tokenizer):
+    tokenizer_name = tokenizer.name_or_path.lower()
+    if 'modernbert' in tokenizer_name:
+        return 8000
+    return 512
+
 # Create your dataset
 class EncodingDataset(Dataset):
     def __init__(
@@ -11,6 +17,8 @@ class EncodingDataset(Dataset):
             max_length=512,
             remove_duplicates=False
         ):
+        
+        max_length = get_max_length(tokenizer)
 
         if remove_duplicates:
             # print(f'Dataset with {len(texts)} samples before removing duplicates')
@@ -29,7 +37,10 @@ class EncodingDataset(Dataset):
         )
 
         if labels is not None:
-            self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels is not None else None
+            self.label_encoder = {label: i for i, label in enumerate(set(labels))}
+            self.label_decoder = {i: label for label, i in self.label_encoder.items()}
+            encoded_labels = [self.label_encoder[label] for label in labels]
+            self.inputs['labels'] = torch.tensor(encoded_labels, dtype=torch.long) if labels is not None else None
 
         print("Encoding Dataset created with {} samples".format(len(self.inputs['input_ids'])))
         # print("\n".join([f"Label: {l}, Text: {i}" for i, l in zip(texts, labels)]))

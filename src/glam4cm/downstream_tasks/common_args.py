@@ -17,6 +17,8 @@ def get_config_params(args):
         use_edge_types=args.use_edge_types,
         use_edge_label=args.use_edge_label,
         no_labels=args.no_labels,
+        
+        node_topk=args.node_topk,
 
         use_special_tokens=args.use_special_tokens,
 
@@ -72,6 +74,8 @@ def get_common_args_parser():
 
     parser.add_argument('--node_cls_label', type=str, default=None)
     parser.add_argument('--edge_cls_label', type=str, default=None)
+    
+    parser.add_argument('--node_topk', type=int, default=-1)
 
 
     parser.add_argument('--limit', type=int, default=-1)

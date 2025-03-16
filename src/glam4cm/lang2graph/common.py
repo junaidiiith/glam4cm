@@ -157,6 +157,10 @@ def format_path(
             use_node_attributes, 
             metadata.node_attributes
         ) if not no_labels else ''
+        
+        if node_cls_label == 'stereotype':
+            node_label = graph.nodes[node]['type'] + " " + node_label
+        
         if preprocessor:
             node_label = preprocessor(node_label)
         
@@ -367,7 +371,8 @@ def get_node_name(
     if use_attributes and attribute_labels in node_data:
         attributes_str = "(" + get_attribute_labels(node_data, attribute_labels) + ")"
     else:
-        attributes_str = ''
+        attributes_str = ''    
+    
     node_label = node_data.get(label, '') if node_data.get(label, '') else ''
     node_label = '' if node_label and node_label.lower() in ['null', 'none'] else node_label
     return f"{node_label}{attributes_str}".strip()

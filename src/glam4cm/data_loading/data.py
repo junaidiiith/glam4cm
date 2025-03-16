@@ -108,6 +108,8 @@ class TorchGraph:
             no_labels=False,
             node_cls_label=None,
             edge_cls_label='type',
+            
+            node_topk: List[Union[str, int]]=None,
             fp='test_graph.pkl'
         ):
 
@@ -125,6 +127,8 @@ class TorchGraph:
 
         self.node_cls_label = node_cls_label
         self.edge_cls_label = edge_cls_label
+        
+        self.node_topk = node_topk
         
         self.distance = distance
         self.test_ratio = test_ratio
@@ -269,18 +273,20 @@ class TorchEdgeGraph(TorchGraph):
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: Union[EcoreMetaData, ArchimateMetaData],
-            distance = 1,
-            test_ratio=0.2,
-            add_negative_train_samples=False,
-            neg_samples_ratio=1,
-            use_edge_types=False,
-            use_node_types=False,
-            use_edge_label=False,
-            use_attributes=False,
-            use_special_tokens=False,
-            node_cls_label=None,
-            edge_cls_label='type',
-            no_labels=False,
+            distance: int  = 1,
+            test_ratio: float =0.2,
+            add_negative_train_samples: bool =False,
+            neg_samples_ratio: int =1,
+            use_edge_types: bool =False,
+            use_node_types: bool =False,
+            use_edge_label: bool =False,
+            use_attributes: bool =False,
+            use_special_tokens: bool =False,
+            node_cls_label: str =None,
+            edge_cls_label: str ='type',
+            no_labels: bool =False,
+            
+            node_topk: List[Union[str, int]]=None,
             fp: str = 'test_graph.pkl'
         ):
 
@@ -297,6 +303,7 @@ class TorchEdgeGraph(TorchGraph):
             no_labels=no_labels,
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
+            node_topk=node_topk,
             fp=fp
         )
         self.add_negative_train_samples = add_negative_train_samples
@@ -430,16 +437,19 @@ class TorchNodeGraph(TorchGraph):
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: dict,
-            distance = 1,
-            test_ratio=0.2,
-            use_node_types=False,
-            use_edge_types=False,
-            use_edge_label=False,
-            use_attributes=False,
-            use_special_tokens=False,
-            no_labels=False,
-            node_cls_label=None,
-            edge_cls_label='type',
+            distance: int = 1,
+            test_ratio: float =0.2,
+            use_node_types: bool =False,
+            use_edge_types: bool =False,
+            use_edge_label: bool =False,
+            use_attributes: bool =False,
+            use_special_tokens: bool =False,
+            no_labels: bool =False,
+            node_cls_label: str =None,
+            edge_cls_label: str ='type',
+            
+            node_topk: List[Union[str, int]]=None,
+            
             fp='test_graph.pkl'
         ):
 
@@ -456,6 +466,8 @@ class TorchNodeGraph(TorchGraph):
             no_labels=no_labels,
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
+            
+            node_topk=node_topk,
             fp=fp
         )
         
@@ -474,8 +486,17 @@ class TorchNodeGraph(TorchGraph):
             random_state=42
         )
 
+        def get_node_label(node):
+            if self.node_cls_label in self.graph.numbered_graph.nodes[node]\
+                and self.graph.numbered_graph.nodes[node][self.node_cls_label] is not None:
+                return self.graph.numbered_graph.nodes[node][self.node_cls_label]
+            return None
+        
         nx.set_node_attributes(self.graph.numbered_graph, {node: False for node in train_nodes}, 'masked')
-        nx.set_node_attributes(self.graph.numbered_graph, {node: True for node in test_nodes}, 'masked')
+        nx.set_node_attributes(self.graph.numbered_graph, {
+            node: get_node_label(node) in self.node_topk 
+            for node in test_nodes
+        }, 'masked')
 
         train_idx = torch.tensor(train_nodes, dtype=torch.long)
         test_idx = torch.tensor(test_nodes, dtype=torch.long)

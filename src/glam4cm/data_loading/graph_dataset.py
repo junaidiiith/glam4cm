@@ -103,6 +103,8 @@ class GraphDataset(torch.utils.data.Dataset):
         use_node_types=False,
         use_edge_label=False,
         no_labels=False,
+        
+        node_topk=-1,
 
         node_cls_label=None,
         edge_cls_label=None,
@@ -120,7 +122,7 @@ class GraphDataset(torch.utils.data.Dataset):
         randomize_ee=False,
         random_embed_dim=128,
         
-        exclude_labels: list = [None, ''],
+        exclude_labels: List = None,
     ):
         if isinstance(models_dataset, EcoreDataset):
             self.metadata = EcoreMetaData()
@@ -142,17 +144,40 @@ class GraphDataset(torch.utils.data.Dataset):
         self.use_edge_label = use_edge_label
         self.no_labels = no_labels
         
+        
         self.add_negative_train_samples = add_negative_train_samples
         self.neg_sampling_ratio = neg_sampling_ratio
 
         self.test_ratio = test_ratio
 
-        self.no_shuffle = no_shuffle
-        self.exclude_labels = exclude_labels
-
         self.use_special_tokens = use_special_tokens
         self.node_cls_label = node_cls_label
         self.edge_cls_label = edge_cls_label
+        
+        self.node_topk = node_topk
+        
+        
+        self.no_shuffle = no_shuffle
+        
+        all_labels = [
+            i[0] for i in sorted(
+                dict(Counter(
+                    sum(
+                        [
+                            [
+                                v for v in list(dict(model.numbered_graph.nodes(data=node_cls_label)).values()) if v
+                            ] 
+                            for model in models_dataset], 
+                        []
+                    )
+                )).items(), 
+                key=lambda x: x[1], 
+                reverse=True
+            )
+        ]
+        
+        self.node_topk = all_labels[:node_topk] if node_topk > 0 else all_labels
+        self.exclude_labels = (all_labels[node_topk+1:] if node_topk > 0 else []) + [None, '']
 
         self.randomize_ne = randomize_ne
         self.randomize_ee = randomize_ee
@@ -235,7 +260,8 @@ class GraphDataset(torch.utils.data.Dataset):
             use_special_tokens=self.use_special_tokens,
             no_labels=self.no_labels,
             node_cls_label=self.node_cls_label,
-            edge_cls_label=self.edge_cls_label
+            edge_cls_label=self.edge_cls_label,
+            node_topk=self.node_topk,
         )
         def create_node_graph(graph: LangGraph, fp: str) -> TorchNodeGraph:
             node_params = {
@@ -306,7 +332,8 @@ class GraphDataset(torch.utils.data.Dataset):
                 return np.concatenate([a, b], axis=1)
             
             prefix_cls = getattr(self, f"{prefix}_cls_label")
-            num_classes = getattr(self, f"num_{prefix}s_{prefix_cls}") + 1
+            num_classes = getattr(self, f"{prefix}_label_map_{prefix_cls}").classes_.shape[0]
+            
             # print(f"Number of {prefix} types: {num_classes}")
             for g in self.graphs:
                 types = np.eye(num_classes)[getattr(g.data, f"{prefix}_{prefix_cls}")]
@@ -407,7 +434,6 @@ class GraphDataset(torch.utils.data.Dataset):
             node_label_map = LabelEncoder()
             node_label_map.fit_transform([j for i in label_values for j in i])
             label_values = [node_label_map.transform(i) for i in label_values]
-            print(node_label_map.classes_)
             
             for torch_graph, node_classes in zip(self.graphs, label_values):
                 setattr(torch_graph.data, f"node_{cls_label}", np.array(node_classes))
@@ -580,6 +606,8 @@ class GraphEdgeDataset(GraphDataset):
             use_node_types=False,
             no_labels=False,
             
+            node_topk = -1,
+            
             use_embeddings=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
@@ -608,8 +636,9 @@ class GraphEdgeDataset(GraphDataset):
             use_edge_types=use_edge_types,
             use_edge_label=use_edge_label,
             use_attributes=use_attributes,
-            no_labels=no_labels,
-
+            no_labels=no_labels,            
+            node_topk = node_topk,
+            
             add_negative_train_samples=add_negative_train_samples,
             neg_sampling_ratio=neg_sampling_ratio,
             
@@ -748,6 +777,7 @@ class GraphNodeDataset(GraphDataset):
         use_node_types=False,
         use_edge_label=False,
         use_special_tokens=False,
+        node_topk=-1,
 
         use_embeddings=False,
         embed_model_name='bert-base-uncased',
@@ -777,6 +807,8 @@ class GraphNodeDataset(GraphDataset):
 
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
+            
+            node_topk=node_topk,
 
             use_embeddings=use_embeddings,
             embed_model_name=embed_model_name,

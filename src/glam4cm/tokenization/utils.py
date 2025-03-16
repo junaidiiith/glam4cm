@@ -1,4 +1,5 @@
 from re import finditer
+from typing import List
 from glam4cm.tokenization.special_tokens import (
     EDGE_START, EDGE_END, NODE_BEGIN, NODE_END, escape_keywords
 )
@@ -33,23 +34,23 @@ def camel_case_split(identifier) -> list:
 def doc_tokenizer(doc, lower=False) -> str:
     words = doc.split()
     # split _
-    words = [
-        w2 
-        for w1 in words for w2 in w1.split('_') if w2 != '']
+    snake_words: List[str] = list()
+    for w1 in words:
+        if any(ek in w1 for ek in escape_keywords):
+            snake_words.append(w1)
+        else:
+            snake_words.extend([w2 for w2 in w1.split('_') if w2 != ''])
+            
+    
     # camelcase
-    final_words = list()
-    for word in words:
-        if word in escape_keywords:
+    final_words: List[str] = list()
+    for word in snake_words:
+        if any(ek in word for ek in escape_keywords):
             final_words.append(word)
         else:
             final_words.extend(camel_case_split(word))
             
-    words = [
-        w2.lower() 
-        if lower else w2 
-        for w1 in words 
-        for w2 in camel_case_split(w1) 
-        if w2 != ''
-    ]
-    
-    return " ".join(words)
+    if lower:
+        final_words = [w.lower() for w in final_words]
+        
+    return " ".join(final_words)

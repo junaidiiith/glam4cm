@@ -83,7 +83,7 @@ def run(args):
     
     for i in range(k):
         set_seed(np.random.randint(0, 1000))
-        graph_dataset = GraphNodeDataset(dataset, reload=True, **graph_data_params)
+        graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
         print("Loaded graph dataset")
 
         assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node_{args.node_cls_label} attribute"
