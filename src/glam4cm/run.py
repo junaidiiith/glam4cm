@@ -43,8 +43,8 @@ tasks = {
     
     6: 'GNN Graph Classification',
     7: 'GNN Node Classification',
-    8: 'GNN Edge Classification',
-    9: 'GNN Link Prediction',
+    8: 'GNN Link Prediction',
+    9: 'GNN Edge Classification',
     10: 'CM-GPT Causal Modeling',
     11: 'CM-GPT Node Classification',
     12: 'CM-GPT Edge Classification'

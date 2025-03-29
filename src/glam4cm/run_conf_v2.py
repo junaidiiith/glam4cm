@@ -4,10 +4,10 @@ from tqdm.auto import tqdm
 
 
 def get_args():
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--tasks', type=str)
-	args = parser.parse_args()
-	return args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tasks', type=str)
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':
@@ -18,7 +18,7 @@ if __name__ == '__main__':
             "node_cls_label": ["abstract"],
             "edge_cls_label": "type",
             "extra_params": {
-                "num_epochs": 3,
+                "num_epochs": 10,
             }
         },
         'modelset': {

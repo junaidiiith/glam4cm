@@ -19,7 +19,7 @@ from glam4cm.lang2graph.common import (
 
 from scipy.sparse import csr_matrix
 
-from glam4cm.settings import LP_TASK_EDGE_CLS, LP_TASK_LINK_PRED
+from glam4cm.settings import EDGE_CLS_TASK, LINK_PRED_TASK
 from glam4cm.tokenization.special_tokens import *
 from torch_geometric.transforms import RandomLinkSplit
 import torch
@@ -98,6 +98,7 @@ class TorchGraph:
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: Union[EcoreMetaData, ArchimateMetaData],
+            task_type: str,
             distance = 0,
             test_ratio=0.2,
             use_edge_types=False,
@@ -113,6 +114,7 @@ class TorchGraph:
             fp='test_graph.pkl'
         ):
 
+        self.task_type = task_type
         self.fp = fp
         self.graph = graph
         self.metadata = metadata
@@ -235,6 +237,7 @@ class TorchGraph:
                 self.graph.numbered_graph, 
                 (u, v), 
                 d=self.distance, 
+                task_type=self.task_type,
                 metadata=self.metadata, 
                 use_node_attributes=self.use_attributes, 
                 use_node_types=self.use_node_types, 
@@ -254,14 +257,13 @@ class TorchGraph:
     def validate_data(self):
         assert self.data.num_nodes == self.graph.number_of_nodes()
     
+    
     def set_graph_label(self):
         if self.metadata.graph_label is not None and not hasattr(self.graph, self.metadata.graph_label):  #Graph has a label
             text = doc_tokenizer("\n".join(list(self.node_texts.values())))
-            # print("Text:", text)
-            # print("-" * 100)
             setattr(self.graph, self.metadata.graph_label, text)
         
-
+        
     @property
     def name(self):
         return '.'.join(self.graph.graph_id.replace('/', '_').split('.')[:-1])
@@ -273,6 +275,7 @@ class TorchEdgeGraph(TorchGraph):
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: Union[EcoreMetaData, ArchimateMetaData],
+            task_type: str,
             distance: int  = 1,
             test_ratio: float =0.2,
             add_negative_train_samples: bool =False,
@@ -293,6 +296,7 @@ class TorchEdgeGraph(TorchGraph):
         super().__init__(
             graph=graph, 
             metadata=metadata, 
+            task_type=task_type,
             distance=distance, 
             test_ratio=test_ratio, 
             use_node_types=use_node_types,
@@ -390,7 +394,7 @@ class TorchEdgeGraph(TorchGraph):
         train_pos_edge_index = self.data.edge_index
         test_pos_edge_index = self.data.test_pos_edge_label_index
 
-        if task_type == LP_TASK_LINK_PRED:
+        if task_type == LINK_PRED_TASK:
             train_neg_edge_index = self.data.train_neg_edge_label_index
             test_neg_edge_index = self.data.test_neg_edge_label_index
         else:
@@ -420,7 +424,7 @@ class TorchEdgeGraph(TorchGraph):
             data[f'{edge_index_label}_edges'] = edge_strs
 
 
-        if task_type == LP_TASK_EDGE_CLS and not only_texts:
+        if task_type == EDGE_CLS_TASK and not only_texts:
             train_mask = self.data.train_edge_mask
             test_mask = self.data.test_edge_mask
             train_classes, test_classes = getattr(self.data, f'edge_{label}')[train_mask], getattr(self.data, f'edge_{label}')[test_mask]
@@ -437,6 +441,8 @@ class TorchNodeGraph(TorchGraph):
             self, 
             graph: Union[EcoreNxG, ArchiMateNxG], 
             metadata: dict,
+            task_type: str,
+            
             distance: int = 1,
             test_ratio: float =0.2,
             use_node_types: bool =False,
@@ -450,12 +456,13 @@ class TorchNodeGraph(TorchGraph):
             
             node_topk: List[Union[str, int]]=None,
             
-            fp='test_graph.pkl'
+            fp='test_graph.pkl',
         ):
 
         super().__init__(
             graph, 
             metadata=metadata, 
+            task_type=task_type,
             distance=distance, 
             test_ratio=test_ratio, 
             use_node_types=use_node_types,

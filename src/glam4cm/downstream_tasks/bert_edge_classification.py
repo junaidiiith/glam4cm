@@ -2,8 +2,12 @@ import os
 from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.data_loading.utils import oversample_dataset
-from glam4cm.settings import LP_TASK_EDGE_CLS
-from glam4cm.downstream_tasks.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
+from glam4cm.settings import EDGE_CLS_TASK, results_dir
+from glam4cm.downstream_tasks.common_args import (
+    get_bert_args_parser, 
+    get_common_args_parser, 
+    get_config_params
+)
 from glam4cm.models.hf import get_model
 from glam4cm.downstream_tasks.utils import get_models_dataset
 
@@ -63,7 +67,7 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = get_config_params(args)
-    graph_data_params = {**graph_data_params, 'task_type': LP_TASK_EDGE_CLS}
+    graph_data_params = {**graph_data_params, 'task_type': EDGE_CLS_TASK}
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -88,24 +92,28 @@ def run(args):
     print("Training model")
     print(f'Number of labels: {num_labels}')
     
-    model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)
+    model = get_model(
+        args.ckpt if args.ckpt else model_name, 
+        num_labels, 
+        len(tokenizer), 
+        trust_remote_code=args.trust_remote_code
+    )
     
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
             param.requires_grad = False
 
     output_dir = os.path.join(
-        'results',
+        results_dir,
         dataset_name,
-        'edge_cls',
-        # f'{args.edge_cls_label}',
-        # f"{graph_dataset.config_hash}",
+        f"LM_{EDGE_CLS_TASK}",
+        f'{args.edge_cls_label}'
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
-        'edge_cls',
+        f"LM_{EDGE_CLS_TASK}",
         f'{args.edge_cls_label}',
         f"{graph_dataset.config_hash}",
     )
@@ -120,9 +128,9 @@ def run(args):
         logging_steps=args.num_log_steps,
         eval_strategy='steps',
         eval_steps=args.num_eval_steps,
-        save_steps=args.num_save_steps,
-        save_total_limit=2,
-        load_best_model_at_end=True,
+        # save_steps=args.num_save_steps,
+        # save_total_limit=2,
+        # load_best_model_at_end=True,
         fp16=True,
     )
 
@@ -136,7 +144,7 @@ def run(args):
 
     trainer.train()
     print(trainer.evaluate())
-    # trainer.save_model()
+    trainer.save_model()
 
 
 if __name__ == '__main__':

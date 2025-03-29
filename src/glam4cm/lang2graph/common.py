@@ -8,11 +8,15 @@ from glam4cm.data_loading.metadata import GraphMetadata
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.tokenization.utils import doc_tokenizer
 import glam4cm.utils as utils
+from glam4cm.settings import (
+    SUPERTYPE,
+    REFERENCE,
+    CONTAINMENT,
+    
+    EDGE_CLS_TASK,
+    LINK_PRED_TASK,
+)
 
-SEP = ' '
-REFERENCE = 'reference'
-SUPERTYPE = 'supertype'
-CONTAINMENT = 'containment'
 
 
 class LangGraph(nx.DiGraph):
@@ -198,10 +202,12 @@ def format_path(
 
     return " ".join(formatted).strip()
 
+
 def get_edge_texts(
     graph: LangGraph, 
     edge: tuple, 
     d: int, 
+    task_type: str,
     metadata: GraphMetadata, 
     use_node_attributes=False, 
     use_node_types=False, 
@@ -218,18 +224,7 @@ def get_edge_texts(
     if not neg_samples:
         masked = graph.edges[n1, n2].get('masked')
         graph.edges[n1, n2]['masked'] = True
-
-    edge_data = graph.get_edge_data(n1, n2)
-    edge_type = get_edge_data(edge_data, edge_cls_label, metadata.type)
-    edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
-    
-    edge_text = ""
-    if use_edge_types:
-        edge_text += f" {edge_cls_label}: {edge_type} " if not no_labels else ''
         
-    if use_edge_label:
-        edge_text += f" {edge_label} " if not no_labels else ''
-    
     
     n1_text = get_node_text(
         graph=graph,
@@ -263,8 +258,24 @@ def get_edge_texts(
         preprocessor=preprocessor,
         exclude_edges=[edge]
     )
+    
+
+    edge_text = ""    
+    
     if not neg_samples:
         graph.edges[n1, n2]['masked'] = masked or False
+        
+        edge_data = graph.get_edge_data(n1, n2)
+        edge_type = get_edge_data(edge_data, edge_cls_label, metadata.type)
+        edge_label = edge_data.get(metadata.edge_label, '') if use_edge_label and not no_labels else ''
+        
+        if task_type not in [EDGE_CLS_TASK, LINK_PRED_TASK]:
+            if use_edge_types :
+                edge_text += f" {edge_cls_label}: {edge_type} " if not no_labels else ''
+                
+            if use_edge_label:
+                edge_text += f" {edge_label} " if not no_labels else ''
+
     
     return n1_text + EDGE_START + f"{edge_text}" + EDGE_END + n2_text
 

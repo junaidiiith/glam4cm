@@ -10,6 +10,7 @@ from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.data_loading.utils import oversample_dataset
 from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from sklearn.model_selection import StratifiedKFold
 
@@ -76,7 +77,7 @@ def run(args):
 
     print("Loaded dataset")
 
-    graph_data_params = get_config_params(args)
+    graph_data_params = {**get_config_params(args), 'task_type': NODE_CLS_TASK}
     print("Loading graph dataset")
     
     k = int(1 / args.test_ratio)
@@ -120,17 +121,16 @@ def run(args):
         
         print("Training model")
         output_dir = os.path.join(
-            'results',
+            results_dir,
             dataset_name,
-            f'node_cls',
+            f'LM_{NODE_CLS_TASK}',
             f'{args.node_cls_label}',
-            # f"{graph_dataset.config_hash}",
         )
 
         logs_dir = os.path.join(
             'logs',
             dataset_name,
-            'node_cls',
+            f'BERT_{NODE_CLS_TASK}',
             f'{args.node_cls_label}',
             f"{graph_dataset.config_hash}_{i}",
         )
@@ -152,9 +152,9 @@ def run(args):
             logging_steps=args.num_log_steps,
             eval_strategy='steps',
             eval_steps=args.num_eval_steps,
-            save_steps=args.num_save_steps,
-            save_total_limit=2,
-            load_best_model_at_end=True,
+            # save_steps=args.num_save_steps,
+            # save_total_limit=2,
+            # load_best_model_at_end=True,
             fp16=True,
         )
 
@@ -175,7 +175,8 @@ def run(args):
         
         print(results)
 
-        # trainer.save_model()
+        trainer.save_model()
+        break
 
 
 if __name__ == '__main__':

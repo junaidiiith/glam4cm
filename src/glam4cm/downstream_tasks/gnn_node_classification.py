@@ -2,6 +2,7 @@ import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, NodeClassifier
 from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
 from glam4cm.utils import merge_argument_parsers, set_seed
@@ -33,7 +34,10 @@ def run(args):
     dataset_name = args.dataset
 
     dataset = get_models_dataset(dataset_name, **config_params)
-    graph_data_params = get_config_params(args)
+    graph_data_params = {**get_config_params(args), 'task_type': NODE_CLS_TASK}
+    
+    if args.use_embeddings:
+        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.node_cls_label}')
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
@@ -87,7 +91,7 @@ def run(args):
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        "gnn_node_cls",
+        f"GNN_{NODE_CLS_TASK}"
         f"{graph_dataset.config_hash}",
     )
 

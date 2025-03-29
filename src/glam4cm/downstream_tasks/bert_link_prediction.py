@@ -3,8 +3,12 @@ import os
 from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.hf import get_model
-from glam4cm.settings import LP_TASK_LINK_PRED
-from glam4cm.downstream_tasks.common_args import get_bert_args_parser, get_common_args_parser, get_config_params
+from glam4cm.settings import LINK_PRED_TASK, results_dir
+from glam4cm.downstream_tasks.common_args import (
+    get_bert_args_parser, 
+    get_common_args_parser, 
+    get_config_params
+)
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 
@@ -73,7 +77,7 @@ def run(args):
         **graph_data_params, 
         'add_negative_train_samples': True, 
         'neg_sampling_ratio': args.neg_sampling_ratio,
-        'task_type': LP_TASK_LINK_PRED
+        'task_type': LINK_PRED_TASK
     }
     print(graph_data_params)
 
@@ -102,16 +106,15 @@ def run(args):
 
 
     output_dir = os.path.join(
-        'results',
+        results_dir,
         dataset_name,
-        'lp',
-        # f"{graph_dataset.config_hash}",
+        f"LM_{LINK_PRED_TASK}"
     )
 
     logs_dir = os.path.join(
         'logs',
         dataset_name,
-        'lp',
+        f"LM_{LINK_PRED_TASK}",
         f"{graph_dataset.config_hash}",
     )
     
@@ -126,8 +129,8 @@ def run(args):
         eval_strategy='steps',
         eval_steps=200,
         save_steps=200,
-        save_total_limit=2,
-        load_best_model_at_end=True,
+        # save_total_limit=2,
+        # load_best_model_at_end=True,
         fp16=True,
     )
 
@@ -141,4 +144,4 @@ def run(args):
 
     trainer.train()
     print(trainer.evaluate())
-    # trainer.save_model()
+    trainer.save_model()

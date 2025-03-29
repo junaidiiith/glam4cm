@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from glam4cm.settings import (
+    MODERN_BERT,
     BERT_MODEL,
     WORD2VEC_MODEL,
     TFIDF_MODEL
@@ -88,8 +89,8 @@ def get_common_args_parser():
     parser.add_argument(
         '--embed_model_name', 
         type=str, 
-        default='bert-base-uncased', 
-        choices=[BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL]
+        default=MODERN_BERT, 
+        choices=[MODERN_BERT, BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL]
     )
     
     parser.add_argument('--trust_remote_code', action='store_true')

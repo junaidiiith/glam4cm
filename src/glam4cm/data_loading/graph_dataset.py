@@ -11,18 +11,28 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from transformers import AutoTokenizer
 from glam4cm.data_loading.data import TorchEdgeGraph, TorchGraph, TorchNodeGraph
-from glam4cm.data_loading.models_dataset import ArchiMateDataset, EcoreDataset, OntoUMLDataset
+from glam4cm.data_loading.models_dataset import (
+    ArchiMateDataset, 
+    EcoreDataset, 
+    OntoUMLDataset
+)
 from glam4cm.data_loading.encoding import EncodingDataset, GPTTextDataset
 from tqdm.auto import tqdm
 from glam4cm.embeddings.w2v import Word2VecEmbedder
 from glam4cm.embeddings.tfidf import TfidfEmbedder
 from glam4cm.embeddings.common import get_embedding_model
 from glam4cm.lang2graph.common import LangGraph, get_node_data, get_edge_data
-from glam4cm.data_loading.metadata import ArchimateMetaData, EcoreMetaData, OntoUMLMetaData
+from glam4cm.data_loading.metadata import (
+    ArchimateMetaData, 
+    EcoreMetaData, 
+    OntoUMLMetaData
+)
 from glam4cm.settings import seed
 from glam4cm.settings import (
-    LP_TASK_EDGE_CLS,
-    LP_TASK_LINK_PRED,
+    EDGE_CLS_TASK,
+    LINK_PRED_TASK,
+    NODE_CLS_TASK,
+    GRAPH_CLS_TASK
 )
 import glam4cm.utils as utils
 
@@ -94,7 +104,7 @@ class GraphDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         models_dataset: Union[EcoreDataset, ArchiMateDataset],
-        save_dir='datasets/graph_data',
+        task_type: str,
         distance=1,
         add_negative_train_samples=False,
         neg_sampling_ratio=1,
@@ -123,7 +133,10 @@ class GraphDataset(torch.utils.data.Dataset):
         random_embed_dim=128,
         
         exclude_labels: List = None,
+        save_dir='datasets/graph_data',
     ):
+        self.task_type = task_type
+        
         if isinstance(models_dataset, EcoreDataset):
             self.metadata = EcoreMetaData()
         elif isinstance(models_dataset, ArchiMateDataset):
@@ -186,6 +199,8 @@ class GraphDataset(torch.utils.data.Dataset):
         self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
         self.config = dict(
             name=models_dataset.name,
+            task_type=task_type,
+            node_topk=node_topk,
             distance=distance,
             add_negative_train_samples=add_negative_train_samples,
             neg_sampling_ratio=neg_sampling_ratio,
@@ -243,14 +258,12 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def set_torch_graphs(
             self, 
-            task_type: str,
             models_dataset: Union[EcoreDataset, ArchiMateDataset], 
             limit: int =-1
         ):
-        self.config['type'] = task_type
-        
         common_params = dict(
             metadata=self.metadata,
+            task_type=self.task_type,
             distance=self.distance,
             test_ratio=self.test_ratio,
             use_attributes=self.use_attributes,
@@ -288,15 +301,17 @@ class GraphDataset(torch.utils.data.Dataset):
         
         self.set_file_hashes(models_dataset[:models_size])
 
-        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {task_type} graphs'):
+        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
             fp = self.file_paths[graph.hash]
             if not os.path.exists(fp) or self.reload:
-                if task_type == 'node':
+                if self.task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK]:
                     torch_graph: TorchNodeGraph = create_node_graph(graph, fp)
-                elif task_type == 'edge':
+                elif self.task_type in [EDGE_CLS_TASK, LINK_PRED_TASK]:
                     torch_graph: TorchEdgeGraph = create_edge_graph(graph, fp)
-                
+                else:
+                    raise ValueError(f"Invalid task type: {self.task_type}")
                 torch_graph.save()
+
 
     def embed(self):
         for fp in tqdm(self.file_paths.values(), desc='Embedding graphs'):
@@ -592,7 +607,7 @@ class GraphEdgeDataset(GraphDataset):
     def __init__(
             self, 
             models_dataset: Union[EcoreDataset, ArchiMateDataset],
-            save_dir='datasets/graph_data',
+            task_type: str,
             distance=0,
             reload=False,
             test_ratio=0.2,
@@ -623,12 +638,12 @@ class GraphEdgeDataset(GraphDataset):
 
             node_cls_label: str = None,
             edge_cls_label: str = None,
-
-            task_type=LP_TASK_EDGE_CLS
+            save_dir='datasets/graph_data'
         ):
         super().__init__(
             models_dataset=models_dataset,
-            save_dir=save_dir,
+            task_type=task_type,
+            
             distance=distance,
             test_ratio=test_ratio,
 
@@ -659,11 +674,10 @@ class GraphEdgeDataset(GraphDataset):
             randomize_ne=randomize_ne,
             randomize_ee=randomize_ee,
             random_embed_dim=random_embed_dim,
+            save_dir=save_dir
         )
 
-        self.task_type = task_type
-
-        self.set_torch_graphs('edge', models_dataset, limit)
+        self.set_torch_graphs(models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
             texts = self.get_link_prediction_texts(only_texts=True)
@@ -709,8 +723,8 @@ class GraphEdgeDataset(GraphDataset):
             for k, v in graph_data.items():
                 data[k] += v
 
-        print("Train Texts: ", data[f'train_pos_edges'][:20])
-        print("Test Texts: ", data[f'test_pos_edges'][:20])
+        # print("Train Texts: ", data[f'train_pos_edges'][:20])
+        # print("Test Texts: ", data[f'test_pos_edges'][:20])
 
         # print("Train Classes", edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
         # print("Test Classes", edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))
@@ -729,7 +743,7 @@ class GraphEdgeDataset(GraphDataset):
 
 
         print("Tokenizing data")
-        if self.task_type == LP_TASK_EDGE_CLS:
+        if self.task_type == EDGE_CLS_TASK:
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -742,7 +756,7 @@ class GraphEdgeDataset(GraphDataset):
                     data['test_edge_classes']
                 )
             }
-        elif self.task_type == LP_TASK_LINK_PRED:
+        elif self.task_type == LINK_PRED_TASK:
             datasets = {
                 'train': EncodingDataset(
                     tokenizer, 
@@ -767,7 +781,8 @@ class GraphNodeDataset(GraphDataset):
     def __init__(
         self, 
         models_dataset: Union[EcoreDataset, ArchiMateDataset],
-        save_dir='datasets/graph_data',
+        task_type: str,
+        
         distance=0,
         test_ratio=0.2,
         reload=False,
@@ -791,11 +806,14 @@ class GraphNodeDataset(GraphDataset):
         limit: int = -1,
         no_labels=False,
         node_cls_label: str = None,
-        edge_cls_label: str = None
+        edge_cls_label: str = None,
+        
+        save_dir='datasets/graph_data',
     ):
         super().__init__(
             models_dataset=models_dataset,
-            save_dir=save_dir,
+            task_type=task_type,
+            
             distance=distance,
             test_ratio=test_ratio,
             
@@ -822,9 +840,10 @@ class GraphNodeDataset(GraphDataset):
             randomize_ne=randomize_ne,
             randomize_ee=randomize_ee,
             random_embed_dim=random_embed_dim,
+            save_dir=save_dir,
         )
 
-        self.set_torch_graphs('node', models_dataset, limit)
+        self.set_torch_graphs(models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
             texts = self.get_node_classification_texts()
@@ -891,8 +910,8 @@ class GraphNodeDataset(GraphDataset):
             data['test_node_classes'] += test_node_classes
         
 
-        print("\n".join(data['train_nodes']))
-        print("\n".join(data['test_nodes']))
+        # print("\n".join(data['train_nodes']))
+        # print("\n".join(data['test_nodes']))
         if hasattr(self, "node_label_map_type"):
             node_label_map.inverse_transform([i.item() for i in train_node_classes]) == train_node_strs
             node_label_map.inverse_transform([i.item() for i in test_node_classes]) == test_node_strs

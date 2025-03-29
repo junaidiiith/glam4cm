@@ -9,6 +9,7 @@ logger.setLevel(logging.DEBUG)
 
 
 BERT_MODEL = 'bert-base-uncased'
+MODERN_BERT = 'answerdotai/ModernBERT-base'
 WORD2VEC_MODEL = 'word2vec'
 TFIDF_MODEL = 'tfidf'
 FAST_TEXT_MODEL = 'uml-fasttext.bin'
@@ -35,12 +36,21 @@ modelsets_ecore_json_path = os.path.join(datasets_dir, 'modelset/ecore.jsonl')
 
 
 graph_data_dir = 'datasets/graph_data'
+results_dir = 'results'
 
 # Path: settings.py
 
 
-LP_TASK_EDGE_CLS = 'edge_cls'
-LP_TASK_LINK_PRED = 'lp'
+EDGE_CLS_TASK = 'edge_cls'
+LINK_PRED_TASK = 'lp'
+NODE_CLS_TASK = 'node_cls'
+GRAPH_CLS_TASK = 'graph_cls'
+
+
+SEP = ' '
+REFERENCE = 'reference'
+SUPERTYPE = 'supertype'
+CONTAINMENT = 'containment'
 
 
 EPOCH = 'epoch'
@@ -52,3 +62,5 @@ TEST_ACC = 'test_acc'
 TRAINING_PHASE = 'train'
 VALIDATION_PHASE = 'val'
 TESTING_PHASE = 'test'
+
+

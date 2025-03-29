@@ -5,7 +5,9 @@ from typing import List, Union
 import torch
 from glam4cm.settings import (
     WORD2VEC_MODEL,
-    TFIDF_MODEL
+    TFIDF_MODEL,
+    MODERN_BERT, 
+    BERT_MODEL
 )
 
 
@@ -30,7 +32,7 @@ def get_embedding_model(
     if ckpt:
         model_name = json.load(open(os.path.join(ckpt, 'config.json')))['_name_or_path']
         
-    if 'bert' in model_name:
+    if model_name in [MODERN_BERT, BERT_MODEL]:
         from glam4cm.embeddings.bert import BertEmbedder
         return BertEmbedder(model_name, ckpt)
     elif WORD2VEC_MODEL in model_name:

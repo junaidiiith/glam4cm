@@ -1,6 +1,7 @@
 import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, GraphClassifer
+from glam4cm.settings import GRAPH_CLS_TASK, results_dir
 from glam4cm.trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
 from glam4cm.downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 from glam4cm.utils import merge_argument_parsers, set_seed
@@ -31,7 +32,9 @@ def run(args):
 
     dataset = get_models_dataset(dataset_name, **config_params)
 
-    graph_data_params = get_config_params(args)
+    graph_data_params = {**get_config_params(args), 'task_type': GRAPH_CLS_TASK}
+    if args.use_embeddings:
+        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.cls_label}')
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
@@ -57,10 +60,11 @@ def run(args):
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        "gnn_graph_cls",
+        f"GNN_{GRAPH_CLS_TASK}",
         f"{graph_dataset.config_hash}",
     )
 
+    fold_id = 0
     for datasets in graph_dataset.get_kfold_gnn_graph_classification_data():
 
         edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.num_heads else None
@@ -94,7 +98,7 @@ def run(args):
             num_epochs=args.num_epochs,
             batch_size=args.batch_size,
             use_edge_attrs=args.use_edge_attrs,
-            logs_dir=logs_dir
+            logs_dir=logs_dir + f"_{fold_id}",
         )
 
         trainer.run()

@@ -1,7 +1,7 @@
 import os
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.gnn_layers import GNNConv, EdgeClassifer
-from glam4cm.settings import LP_TASK_EDGE_CLS
+from glam4cm.settings import EDGE_CLS_TASK, results_dir
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
@@ -36,7 +36,10 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
 
     graph_data_params = get_config_params(args)
-    graph_data_params = {**graph_data_params, 'task_type': LP_TASK_EDGE_CLS}
+    graph_data_params = {**graph_data_params, 'task_type': EDGE_CLS_TASK}
+    
+    if args.use_embeddings:
+        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.edge_cls_label}')
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -66,7 +69,8 @@ def run(args):
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        "gnn_edge_cls",
+        f"GNN_{EDGE_CLS_TASK}",
+        f"{args.edge_cls_label}",
         f"{graph_dataset.config_hash}",
     )
 

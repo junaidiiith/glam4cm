@@ -1,7 +1,7 @@
 import os
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.gnn_layers import GNNConv, EdgeClassifer
-from glam4cm.settings import LP_TASK_LINK_PRED
+from glam4cm.settings import LINK_PRED_TASK, results_dir
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
@@ -46,6 +46,10 @@ def run(args):
     aggregation = args.aggregation
 
     graph_data_params = get_config_params(args)
+    
+    if args.use_embeddings:
+        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f"LM_{LINK_PRED_TASK}")
+    
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
         dataset, 
@@ -53,7 +57,7 @@ def run(args):
             **graph_data_params, 
             add_negative_train_samples=args.add_negative_train_samples, 
             neg_sampling_ratio=args.neg_sampling_ratio,
-            task=LP_TASK_LINK_PRED
+            task=LINK_PRED_TASK
     ))
 
     input_dim = graph_dataset[0].data.x.shape[1]
@@ -82,7 +86,7 @@ def run(args):
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        "gnn_lp",
+        f"GNN_{LINK_PRED_TASK}",
         f'{graph_dataset.config_hash}',
     )
 

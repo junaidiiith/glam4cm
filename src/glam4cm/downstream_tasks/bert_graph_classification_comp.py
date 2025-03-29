@@ -20,7 +20,7 @@ from transformers import (
 
 from glam4cm.data_loading.encoding import EncodingDataset
 from glam4cm.models.hf import get_model
-
+from glam4cm.settings import results_dir
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -108,11 +108,16 @@ def run(args):
         test_dataset = EncodingDataset(tokenizer, test_texts, test_y, max_length=args.max_length)
         # import code; code.interact(local=locals())
 
-        model = get_model(args.ckpt if args.ckpt else model_name, num_labels, len(tokenizer), trust_remote_code=args.trust_remote_code)
+        model = get_model(
+            args.ckpt if args.ckpt else model_name, 
+            num_labels, 
+            len(tokenizer), 
+            trust_remote_code=args.trust_remote_code
+        )
 
         print("Training model")
         output_dir = os.path.join(
-            'results',
+            results_dir,
             dataset_name,
             f'graph_cls_comp_{i+1}',
         )

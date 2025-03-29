@@ -11,6 +11,8 @@ from torch_geometric.data import Data
 import hashlib
 import networkx as nx
 from collections import deque
+import struct
+from tensorboardX.proto import event_pb2
 
 
 
@@ -192,3 +194,170 @@ def count_total_lines_of_code(directory):
 
 def snake_to_title(snake_str: str):
     return snake_str.replace("_", " ").title()
+
+
+def parse_event_file(filepath):
+    """
+    Generator that yields `Event` protocol buffer messages
+    from a single TensorBoard event file, using TFRecord-like
+    parsing without TensorFlow.
+    """
+    with open(filepath, 'rb') as f:
+        while True:
+            # 1) Read the length of the next record (8 bytes, little-endian).
+            header = f.read(8)
+            if len(header) < 8:
+                break  # no more data
+
+            record_length = struct.unpack('Q', header)[0]
+
+            # 2) Skip the 4-byte length CRC (unused here).
+            _ = f.read(4)
+
+            # 3) Read the actual record data.
+            record_data = f.read(record_length)
+
+            # 4) Skip the 4-byte data CRC.
+            _ = f.read(4)
+
+            if len(record_data) < record_length:
+                # Incomplete record at end of file
+                break
+
+            # Parse the record into an Event proto.
+            event = event_pb2.Event()
+            event.ParseFromString(record_data)
+            yield event
+
+
+def get_max_scalars_with_step_epoch(logdir, epoch_tag="eval/epoch"):
+    """
+    Scans all `events.out.tfevents.*` files in `logdir` and returns a dict:
+        {
+          scalar_tag: {
+            "max_value": float,
+            "step": int or None,
+            "epoch": int or float or None
+          },
+          ...
+        }
+    By default, it looks for an 'eval/epoch' scalar to determine the epoch.
+    If that scalar isn't found, epoch will be None.
+    """
+    max_scalars = {}
+
+    # Gather all event files in the directory
+    event_files = [
+        os.path.join(logdir, f)
+        for f in os.listdir(logdir)
+        if f.startswith("events.out.tfevents")
+    ]
+
+    for filepath in event_files:
+        for event in parse_event_file(filepath):
+            # In proto3, "step" is always present as an int64.
+            # If it's not explicitly set, it'll be 0.
+            step = event.step
+            if step == 0:
+                step = None  # treat zero as "no step logged"
+
+            # Try to find an epoch value in the same event (if you're logging it).
+            epoch_val = None
+            if event.summary and event.summary.value:
+                # First pass: see if there's a dedicated epoch tag in this event
+                for v in event.summary.value:
+                    if v.tag == epoch_tag and v.HasField("simple_value"):
+                        epoch_val = v.simple_value
+                        break
+
+                # Second pass: for each scalar, update the max if we see a bigger value
+                for v in event.summary.value:
+                    if v.HasField('simple_value'):
+                        tag = v.tag
+                        val = v.simple_value
+
+                        # Ignore the epoch tag itself; we only want other scalar tags
+                        if tag == epoch_tag:
+                            continue
+
+                        # Update if this tag is new or if we found a bigger value
+                        if (tag not in max_scalars) or (val > max_scalars[tag]["max_value"]):
+                            max_scalars[tag] = {
+                                "max_value": val,
+                                "step": step,
+                                "epoch": epoch_val
+                            }
+
+    return max_scalars
+
+
+def update_config_results(logs_dir='logs'):
+    
+    logs_dir = "logs"
+    
+    def is_tf_dir(dir_path):
+        return any([f.startswith("events.out.tfevents") for f in os.listdir(dir_path)])
+    
+    graph_data_dir = "datasets/graph_data"
+    dataset_config = dict()
+
+    for dataset_dir in os.listdir(graph_data_dir):
+        if dataset_dir not in ['ecore_555', 'eamodelset', 'modelset', 'ontouml']:
+            continue
+        with open(os.path.join(graph_data_dir, dataset_dir, 'configs.json')) as f:
+            dataset_config[dataset_dir] = json.load(f)
+    
+
+    for dataset_dir in os.listdir(logs_dir):
+        if dataset_dir not in ['ecore_555', 'eamodelset', 'modelset', 'ontouml']:
+            continue
+        for task in os.listdir(os.path.join(logs_dir, dataset_dir)):
+            task_dir = os.path.join(logs_dir, dataset_dir, task)
+            if not os.path.isdir(task_dir) or "_comp_" in task:
+                continue
+            
+            for root, dirs, _ in os.walk(task_dir):
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    if is_tf_dir(dir_path):
+                        
+                        config_id = dir_name.split(os.sep)[-1]
+                        
+                        if "_" in config_id:
+                            config_id = config_id.split("_")[0]
+                            
+                        
+                        assert config_id in dataset_config[dataset_dir], f"Config {config_id} not found in {dataset_dir}"
+                        config = dataset_config[dataset_dir][config_id]
+                        config_results = get_max_scalars_with_step_epoch(dir_path)
+                        
+                        if 'results' not in config:
+                            config['results'] = list()
+                        
+                        config['results'].append(config_results)
+                        config['task'] = task
+                        
+        
+    for dataset_dir in os.listdir(graph_data_dir):
+        if dataset_dir not in ['ecore_555', 'eamodelset', 'modelset', 'ontouml']:
+            continue
+        with open(os.path.join(graph_data_dir, dataset_dir, 'configs.json'), 'w') as f:
+             json.dump(dataset_config[dataset_dir], f)
+    
+
+
+def set_encoded_labels(train_ds, test_ds):
+    train_labels = train_ds.inputs['labels']
+    test_labels = test_ds.inputs['labels']
+    all_labels = torch.cat([train_labels, test_labels])
+    unique_labels = torch.unique(all_labels)
+    label_to_encoded = dict()
+    encoded_to_label = dict()
+    for i, label in enumerate(unique_labels):
+        label_to_encoded[label.item()] = i
+        encoded_to_label[i] = label.item()
+    
+    train_ds.inputs['labels'] = torch.tensor([label_to_encoded[label.item()] for label in train_labels])
+    test_ds.inputs['labels'] = torch.tensor([label_to_encoded[label.item()] for label in test_labels])
+    
+    
