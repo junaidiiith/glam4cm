@@ -22,7 +22,7 @@ from sklearn.metrics import (
 )
 
 from glam4cm.tokenization.utils import get_tokenizer
-from glam4cm.utils import merge_argument_parsers, set_seed
+from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
 
 
 
@@ -140,6 +140,11 @@ def run(args):
         print("Len Train Dataset: ", len(bert_dataset['train']))
         print("Len Test Dataset: ", len(bert_dataset['test']))
         
+        train_dataset = bert_dataset['train']
+        test_dataset = bert_dataset['test']
+        set_encoded_labels(train_dataset, test_dataset)
+
+        
         print("Num epochs: ", args.num_epochs)
 
         training_args = TrainingArguments(
@@ -176,7 +181,7 @@ def run(args):
         print(results)
 
         trainer.save_model()
-        break
+        # break
 
 
 if __name__ == '__main__':

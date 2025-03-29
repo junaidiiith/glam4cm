@@ -20,7 +20,7 @@ from sklearn.metrics import (
 )
 
 from glam4cm.tokenization.utils import get_tokenizer
-from glam4cm.utils import merge_argument_parsers, set_seed
+from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
 
 
 def compute_metrics(pred):
@@ -73,7 +73,7 @@ def run(args):
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
 
-    assert hasattr(graph_dataset, f'num_edges_{args.edge_cls_label}'), f"Dataset does not have node_{args.edge_cls_label} attribute"
+    assert hasattr(graph_dataset, f'num_edges_{args.edge_cls_label}'), f"Dataset does not have edge_{args.edge_cls_label} attribute"
     num_labels = getattr(graph_dataset, f"num_edges_{args.edge_cls_label}")
 
 
@@ -82,6 +82,11 @@ def run(args):
 
     print("Getting Edge Classification data")
     bert_dataset = graph_dataset.get_link_prediction_lm_data(tokenizer=tokenizer)
+    
+    train_dataset = bert_dataset['train']
+    test_dataset = bert_dataset['test']
+    set_encoded_labels(train_dataset, test_dataset)
+
 
     # exit(0)
     

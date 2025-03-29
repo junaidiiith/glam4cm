@@ -5,7 +5,7 @@ from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
-from glam4cm.utils import merge_argument_parsers, set_seed
+from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_labels
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
@@ -42,8 +42,11 @@ def run(args):
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
-
+    
+    
     graph_torch_data = graph_dataset.get_torch_dataset()
+    exclude_labels = getattr(graph_dataset, f"node_exclude_{args.node_cls_label}")
+    set_torch_encoding_labels(graph_torch_data, f"node_{args.node_cls_label}", exclude_labels)
 
     num_nodes_label = f"num_nodes_{args.node_cls_label}"
     assert hasattr(graph_dataset, num_nodes_label), f"Graph dataset does not have attribute {num_nodes_label}"
@@ -100,7 +103,7 @@ def run(args):
         mlp_predictor, 
         graph_torch_data,
         cls_label=args.node_cls_label,
-        exclude_labels=getattr(graph_dataset, f"node_exclude_{args.node_cls_label}"),
+        exclude_labels=[-1],
         lr=args.lr,
         num_epochs=args.num_epochs,
         use_edge_attrs=args.use_edge_attrs,

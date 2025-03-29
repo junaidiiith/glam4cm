@@ -360,4 +360,23 @@ def set_encoded_labels(train_ds, test_ds):
     train_ds.inputs['labels'] = torch.tensor([label_to_encoded[label.item()] for label in train_labels])
     test_ds.inputs['labels'] = torch.tensor([label_to_encoded[label.item()] for label in test_labels])
     
+
+def set_torch_encoding_labels(dataset: list, cls_label, exclude_labels: List[str] = None):
+    print(f"Setting encoding labels for {cls_label}")
+    labels = [getattr(data, cls_label) for data in dataset]
+    all_labels = torch.cat(labels)
+    unique_labels = [label for label in torch.unique(all_labels) if label not in exclude_labels]
+    label_to_encoded = dict()
+    encoded_to_label = dict()
+    for i, label in enumerate(unique_labels):
+        label_to_encoded[label.item()] = i
+        encoded_to_label[i] = label.item()
+            
+    for i, data in enumerate(dataset):
+        setattr(
+            data, 
+            cls_label, 
+            torch.tensor([label_to_encoded.get(label.item(), -1) for label in getattr(data, cls_label)])
+        )
     
+    print(f"Set encoding labels for {cls_label}")

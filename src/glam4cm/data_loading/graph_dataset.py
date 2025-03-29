@@ -717,7 +717,7 @@ class GraphEdgeDataset(GraphDataset):
         assert label is not None, "No edge label found in data. Please define edge label in metadata"
 
         data = defaultdict(list)
-        for torch_graph in tqdm(self.graphs, desc='Getting Graph Texts'):
+        for torch_graph in tqdm(self.graphs, desc=f'Getting {self.task_type} Texts'):
             # torch_graph: TorchEdgeGraph = TorchGraph.load(fp)
             graph_data = torch_graph.get_link_prediction_texts(label, self.task_type, only_texts)
             for k, v in graph_data.items():
@@ -780,7 +780,7 @@ class GraphEdgeDataset(GraphDataset):
 class GraphNodeDataset(GraphDataset):
     def __init__(
         self, 
-        models_dataset: Union[EcoreDataset, ArchiMateDataset],
+        models_dataset: Union[EcoreDataset, ArchiMateDataset, OntoUMLDataset],
         task_type: str,
         
         distance=0,

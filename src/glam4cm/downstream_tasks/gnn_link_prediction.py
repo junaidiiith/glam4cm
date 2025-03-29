@@ -5,7 +5,7 @@ from glam4cm.settings import LINK_PRED_TASK, results_dir
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
-from glam4cm.utils import merge_argument_parsers, set_seed
+from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_labels
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
@@ -52,12 +52,12 @@ def run(args):
     
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
-        dataset, 
-        dict(
+        dataset,
+        task_type=LINK_PRED_TASK, 
+        **dict(
             **graph_data_params, 
             add_negative_train_samples=args.add_negative_train_samples, 
             neg_sampling_ratio=args.neg_sampling_ratio,
-            task=LINK_PRED_TASK
     ))
 
     input_dim = graph_dataset[0].data.x.shape[1]
@@ -100,11 +100,14 @@ def run(args):
         bias=False,
     )
 
+    graph_torch_data = graph_dataset.get_torch_dataset()
+    # exclude_labels = getattr(graph_dataset, f"node_exclude_{args.node_cls_label}")
+    # set_torch_encoding_labels(graph_torch_data, f"node_{args.node_cls_label}", exclude_labels)
     
     trainer = Trainer(
-        gnn_conv_model, 
-        mlp_predictor, 
-        graph_dataset.get_torch_dataset(),
+        model=gnn_conv_model, 
+        predictor=mlp_predictor, 
+        dataset=graph_torch_data,
         lr=args.lr,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,

@@ -5,7 +5,7 @@ from glam4cm.settings import EDGE_CLS_TASK, results_dir
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
-from glam4cm.utils import set_seed, merge_argument_parsers
+from glam4cm.utils import set_seed, merge_argument_parsers, set_torch_encoding_labels
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
@@ -46,6 +46,8 @@ def run(args):
     print("Loaded graph dataset")
 
     graph_torch_data = graph_dataset.get_torch_dataset()
+    exclude_labels = getattr(graph_dataset, f"edge_exclude_{args.edge_cls_label}")
+    set_torch_encoding_labels(graph_torch_data, f"edge_{args.edge_cls_label}", exclude_labels)
 
     input_dim = graph_torch_data[0].x.shape[1]
 

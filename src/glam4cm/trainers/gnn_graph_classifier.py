@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import torch
 from collections import defaultdict
 from torch_geometric.loader import DataLoader
@@ -22,7 +22,7 @@ class GNNGraphClassificationTrainer(Trainer):
             self, 
             model: GNNConv, 
             predictor: GraphClassifer,
-            dataset: List[Tuple[Data, Data]],
+            dataset: Dict[str, List[Data]],
             cls_label='label',
             lr=1e-4,
             num_epochs=100,

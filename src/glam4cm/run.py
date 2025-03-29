@@ -60,8 +60,8 @@ tasks_handler_map = {
     5: (bert_edge_classification.run, bert_ec_parse_args),
     6: (gnn_graph_cls.run, gnn_parse_args),
     7: (gnn_node_classification.run, gnn_nc_parse_args),
-    8: (gnn_edge_classification.run, gnn_ec_parse_args),
-    9: (gnn_link_prediction.run, gnn_lp_parse_args),
+    8: (gnn_link_prediction.run, gnn_lp_parse_args),
+    9: (gnn_edge_classification.run, gnn_ec_parse_args),
     10: (cm_gpt_pretraining.run, cm_gpt_parse_args),
     11: (cm_gpt_node_classification.run, cm_gpt_nc_parse_args),
     12: (cm_gpt_edge_classification.run, cm_gpt_ec_parse_args)
