@@ -11,16 +11,11 @@ from glam4cm.settings import (
     results_dir
 )
 
-
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tasks', type=str)
     args = parser.parse_args()
     return args
-
-
-if __name__ == '__main__':
-    tasks = [int(i) for i in get_args().tasks.split(',')]
 
 
 def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
@@ -41,7 +36,29 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
     
     return model_name
 
-def main():
+def execute_configs(run_configs, tasks_str: str):
+    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
+    if os.path.exists(log_file):
+        df = pd.read_csv(log_file)
+    else:
+        df = pd.DataFrame(columns=['Config', 'Status'])
+
+    print(f"Total number of configurations in logs: {len(df)}")
+
+    remaining_configs = [c for c in run_configs if c not in df['Config'].values.tolist()]
+
+    for script_command in tqdm(remaining_configs, desc='Running tasks'):
+        print(f'Running {script_command}')
+        result = subprocess.run(f'python glam_test.py {script_command}', shell=True)
+
+        status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
+        print(f"✅ finished running command: {script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
+        
+        df.loc[len(df)] = [script_command, status]
+        df.to_csv(log_file, index=False)
+
+
+def get_run_configs(tasks):
     dataset_confs = {
         'ecore_555': {
             "node_cls_label": ["abstract"],
@@ -187,30 +204,17 @@ def main():
                                             gnn_params_str += f' --ckpt={get_embed_model_name(dataset, gnn_task_id, node_cls_label, edge_cls_label)} ' 
                                         
                                         run_configs.append(f"{gnn_task_config_str} {dataset_conf_str.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")} {labels_conf_str} {distance_config_str} {config_task_str} {gnn_config_str} {gnn_params_str}")
-                            
+
     print(f"Total number of configurations: {len(run_configs)}")
+    return run_configs
 
-    df = pd.read_csv('logs/run_configs.csv') \
-        if os.path.exists('logs/run_configs.csv') \
-        else pd.DataFrame(columns=['Config', 'Status'])
-    print(f"Total number of configurations in logs: {len(df)}")
-    
-    remaining_configs = [c for c in run_configs if c not in df['Config'].values.tolist()]
 
-    for script_command in tqdm(remaining_configs, desc='Running tasks'):
-        print(f'Running {script_command}')
-        result = subprocess.run(f'python glam_test.py {script_command}', shell=True)
-
-        if result.returncode == 0:
-            ## Add the config to the dataframe
-            print(f"✅ finished running command: {script_command}")
-            df.loc[len(df)] = [script_command, 'success']
-            
-        else:
-            print(f"❌ failed with error:\n{result.stderr}")
-            df.loc[len(df)] = [script_command, f'❌ {result.stderr}']
-        
-        df.to_csv('logs/run_configs.csv', index=False)
+def main():
+    tasks = [int(i) for i in get_args().tasks.split(',')]
+    run_configs = get_run_configs(tasks)
+    # Execute the configurations
+    execute_configs(run_configs, tasks_str="_".join([str(i) for i in tasks]))
+    # Save the configurations to a CSV file
         
 if __name__ == '__main__':
     main()
