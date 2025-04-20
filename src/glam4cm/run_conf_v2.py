@@ -38,18 +38,9 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
 
 
 def execute_configs(run_configs, tasks_str: str):
-    # print(f"Total number of configurations in logs: {len(df)}")
-
-    # remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values.tolist()}
-    
-    
-    # rem_conf = get_remaining_configs(tasks_str, run_configs=run_configs)
-    # df = rem_conf['df']
-    # remaining_configs = rem_conf['configs']
-    # log_file = rem_conf['log_file']
     df = pd.DataFrame(columns=['Config', 'Status'])
-    log_file = f"logs/run_configs_tasks_{tasks_str}_ecore_555_d2.csv"
-    remaining_configs = {c['lm']: c['gnn'] for c in run_configs if 'ecore_555' in c['lm'] and '--distance=2' in c['lm']}
+    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
+    remaining_configs = {c['lm']: c['gnn'] for c in run_configs}
     print("\n".join([r for r in remaining_configs]))
     print("Total number of configurations to run: ", len(remaining_configs))
     
@@ -179,33 +170,43 @@ def get_run_configs(tasks):
 
     run_configs = list()
     for task_id in tasks: 
-        bert_task_config_str = f'--task_id={task_id} ' + ' '.join([f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()])
+        bert_task_config_str = [f'--task_id={task_id}'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()]
         
         for distance in range(4):
-            distance_config_str = f' --distance={distance} '
+            distance_config_str = [f'--distance={distance}']
             
             for i in range(len(dataset_updates)):
-                config_task_str = ' '.join([f'--{u}' if u else '' for u in [x for x in dataset_updates[:i+1]]])
+                config_task_str = [f'--{u}' if u else '' for u in [x for x in dataset_updates[:i+1]]]
                     
                 
                 for dataset, dataset_conf in dataset_confs.items():
                     
-                    # if dataset == 'ontouml':
-                    #     config_task_str = config_task_str.replace("--use_edge_label", "").replace("--use_edge_types", "")
+                    if dataset == 'ontouml':
+                        if "--use_edge_label" in config_task_str:
+                            config_task_str.remove("--use_edge_label")
+                    if dataset == 'eamodelset':
+                        if "--use_edge_label" in config_task_str:
+                            config_task_str.remove("--use_edge_label")
+                        if "--use_attributes" in config_task_str:
+                            config_task_str.remove("--use_attributes")
                     
                     if (task_id == 2 and dataset not in ['ecore_555', 'modelset'])\
                         or (task_id in [4, 5] and dataset in ['ontouml']):
                         continue
                     
-                    dataset_conf_str = f' --dataset={dataset} ' + ' '.join([f'--{k}={v}' for k, v in dataset_conf['extra_params'].items()]) + ' --min_edges=10 '
+                    dataset_conf_str = [f'--dataset={dataset}'] + [f'--{k}={v}' for k, v in dataset_conf['extra_params'].items()] + ['--min_edges=10']
                     
                     node_cls_labels = dataset_conf['node_cls_label'] if isinstance(dataset_conf['node_cls_label'], list) else [dataset_conf['node_cls_label']]
                     edge_cls_labels = (dataset_conf['edge_cls_label'] if isinstance(dataset_conf['edge_cls_label'], list) else [dataset_conf['edge_cls_label']]) if 'edge_cls_label' in dataset_conf else []
                     for node_cls_label in node_cls_labels:
                         for edge_cls_label in edge_cls_labels:
-                            labels_conf_str = f'--node_cls_label={node_cls_label} --edge_cls_label={edge_cls_label} '
+                            labels_conf_str = [f'--node_cls_label={node_cls_label}', f'--edge_cls_label={edge_cls_label}']
                             
-                            bert_config = f"{bert_task_config_str} {dataset_conf_str} {labels_conf_str} {config_task_str} {distance_config_str}"
+                            bert_config = " ".join(bert_task_config_str + \
+                                dataset_conf_str + \
+                                labels_conf_str + \
+                                config_task_str + \
+                                distance_config_str)
                             
                             if distance > 1:
                                 bert_config = bert_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
@@ -216,15 +217,25 @@ def get_run_configs(tasks):
                                 gnn_configs = list()
                                 for gnn_model in gnn_models:
                                     for j in range(len((gnn_updates))):
-                                        gnn_task_config_str = ' '.join([f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()])
-                                        gnn_config_str = ' '.join([f'--{u}' if u else '' for u in [i for i in gnn_updates[:j+1]]])
-                                        gnn_params_str = f' --gnn_conv_model={gnn_model["name"]} ' + ' '.join([f'--{k}={v}' for k, v in gnn_model['params'].items()]) + ' ' + ' '.join([f'--{k}={v}' for k, v in gnn_conf.items()]) + ' '
+                                        gnn_task_config_str = [f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()]
+                                        gnn_config_str = [f'--{u}' if u else '' for u in [i for i in gnn_updates[:j+1]]]
+                                        gnn_params_str = [f'--gnn_conv_model={gnn_model["name"]}'] + \
+                                            [f'--{k}={v}' for k, v in gnn_model['params'].items()] + \
+                                            [f'--{k}={v}' for k, v in gnn_conf.items()]
                                         
                                         if "use_embeddings" in gnn_updates[:j+1]:
                                             gnn_task_id = task_configs[task_id]['gnn_config']['task_id']
-                                            gnn_params_str += f' --ckpt={get_embed_model_name(dataset, gnn_task_id, node_cls_label, edge_cls_label)} ' 
+                                            gnn_params_str += [f'--ckpt={get_embed_model_name(dataset, gnn_task_id, node_cls_label, edge_cls_label)}']
                                         
-                                        gnn_config = f"{gnn_task_config_str} {dataset_conf_str.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")} {labels_conf_str} {distance_config_str} {config_task_str} {gnn_config_str} {gnn_params_str}"
+                                        gnn_config = " ".join(gnn_task_config_str + \
+                                            gnn_config_str + \
+                                            gnn_params_str + \
+                                            dataset_conf_str + \
+                                            labels_conf_str + \
+                                            config_task_str + \
+                                            distance_config_str)
+                                        gnn_config = gnn_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
+                                        gnn_config = gnn_config.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")
                                         gnn_configs.append(gnn_config)
                                 
                                 run_configs[-1]['gnn'] = gnn_configs

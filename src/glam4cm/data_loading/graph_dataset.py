@@ -371,10 +371,10 @@ class GraphDataset(torch.utils.data.Dataset):
             assert all(g.data.edge_attr.shape[1] == edge_dim for g in self.graphs), "Edge types not added correctly"
 
 
-        if self.use_node_types and self.node_cls_label:
+        if self.use_node_types and self.node_cls_label and self.task_type not in [NODE_CLS_TASK]:
             set_types('node')
         
-        if self.use_edge_types and self.edge_cls_label:
+        if self.use_edge_types and self.edge_cls_label and self.task_type not in [EDGE_CLS_TASK, LINK_PRED_TASK]:
             set_types('edge')
 
     def __len__(self):
