@@ -313,8 +313,12 @@ class GraphDataset(torch.utils.data.Dataset):
                 torch_graph.save()
 
 
-    def embed(self):
-        for fp in tqdm(self.file_paths.values(), desc='Embedding graphs'):
+    def embed(self, models_dataset, limit):
+        models_size = len(models_dataset) \
+            if (limit == -1 or limit > len(models_dataset)) else limit
+        print("Limit: ", limit)
+        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
+            fp = self.file_paths[graph.hash]
             torch_graph = TorchGraph.load(fp)
             torch_graph.embed(
                 self.embedder, 
@@ -686,7 +690,7 @@ class GraphEdgeDataset(GraphDataset):
             self.embedder.train(texts)
             print(f"Trained {self.embedder.name} Embedder")
         
-        self.embed()
+        self.embed(models_dataset, limit)
 
         train_count, test_count = dict(), dict()
         for g in self.graphs:
@@ -852,7 +856,7 @@ class GraphNodeDataset(GraphDataset):
             self.embedder.train(texts)
             print(f"Trained {self.embedder.name} Embedder")
         
-        self.embed()
+        self.embed(models_dataset, limit)
 
         node_labels = self.metadata.node_cls
         if isinstance(node_labels, str):

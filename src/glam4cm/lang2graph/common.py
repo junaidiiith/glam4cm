@@ -150,7 +150,6 @@ def format_path(
             if use_node_types and not masked and node_cls_label else ''    
         
         if node_type != '':
-            node_type = node_type.title()
             if isinstance(graph.nodes[node].get(f'{node_cls_label}'), bool):
                 node_type = node_cls_label.title() if graph.nodes[node].get(f'{node_cls_label}') else ''
                 
@@ -162,8 +161,6 @@ def format_path(
             metadata.node_attributes
         ) if not no_labels else ''
         
-        if node_cls_label == 'stereotype':
-            node_label = graph.nodes[node]['type'] + " " + node_label
         
         if preprocessor:
             node_label = preprocessor(node_label)
@@ -190,8 +187,9 @@ def format_path(
         
         return edge_label.strip()
 
+    # import code; code.interact(local=locals())
     assert len(path) > 0, "Path must contain at least one node."
-    formatted = [get_node_label(path[0])]
+    formatted = []
     for i in range(1, len(path)):
         n1 = path[i - 1]
         n2 = path[i]
@@ -200,7 +198,11 @@ def format_path(
             formatted.append(get_edge_label(n1, n2))
         formatted.append(get_node_label(n2))
 
-    return " ".join(formatted).strip()
+    node_str = get_node_label(path[0])
+    if len(formatted) > 0:
+        node_str += " | " + " ".join(formatted).strip()
+    
+    return node_str
 
 
 def get_edge_texts(
@@ -298,28 +300,39 @@ def get_node_text(
 ):
     masked = graph.nodes[node].get('masked')
     graph.nodes[node]['masked'] = True
-    raw_paths = utils.bfs(graph=graph, start_node=node, d=d, exclude_edges=exclude_edges)
-    unique_paths = utils.remove_subsets(list_of_lists=raw_paths)
-    text = "\n".join([
-        format_path(
-            graph=graph, 
-            path=path, 
-            metadata=metadata, 
-            use_node_attributes=use_node_attributes, 
-            use_node_types=use_node_types, 
-            use_edge_types=use_edge_types, 
-            use_edge_label=use_edge_label,
-            node_cls_label=node_cls_label,
-            edge_cls_label=edge_cls_label,
-            use_special_tokens=use_special_tokens,
-            no_labels=no_labels,
-            preprocessor=preprocessor, 
-            neg_sample=False
-        )
-        for path in unique_paths
-    ])
+    # raw_paths = utils.bfs(graph=graph, start_node=node, d=d, exclude_edges=exclude_edges)
+    # unique_paths = utils.remove_subsets(list_of_lists=raw_paths)
+    node_neighbour_texts = list()
+    node_neighbours = utils.get_node_neighbours(graph, node, d, exclude_edges=exclude_edges)
+    for neighbour in node_neighbours:
+        unique_paths = [p for p in nx.all_simple_paths(graph, node, neighbour, cutoff=d)]
+
+        node_neighbour_texts.extend([
+            format_path(
+                graph=graph, 
+                path=path, 
+                metadata=metadata, 
+                use_node_attributes=use_node_attributes, 
+                use_node_types=use_node_types, 
+                use_edge_types=use_edge_types, 
+                use_edge_label=use_edge_label,
+                node_cls_label=node_cls_label,
+                edge_cls_label=edge_cls_label,
+                use_special_tokens=use_special_tokens,
+                no_labels=no_labels,
+                preprocessor=preprocessor, 
+                neg_sample=False
+            )
+            for path in unique_paths
+        ])
+    
     graph.nodes[node]['masked'] = masked or False
-    return text
+    node_str = "\n".join(node_neighbour_texts).strip() if node_neighbour_texts else ''
+    
+    if node_cls_label == 'stereotype':
+        node_str = graph.nodes[node]['type'].title() + " " + node_str
+    
+    return node_str.strip()
 
 
 def get_node_texts(
@@ -382,10 +395,13 @@ def get_node_name(
     if use_attributes and attribute_labels in node_data:
         attributes_str = "(" + get_attribute_labels(node_data, attribute_labels) + ")"
     else:
-        attributes_str = ''    
+        attributes_str = ''
     
     node_label = node_data.get(label, '') if node_data.get(label, '') else ''
     node_label = '' if node_label and node_label.lower() in ['null', 'none'] else node_label
+    # if attributes_str:
+    #     print(f"Node label: {node_label} | Attributes: {attributes_str}")
+        
     return f"{node_label}{attributes_str}".strip()
 
 
@@ -443,7 +459,10 @@ def get_uml_edge_data(edge_data: dict, edge_label: str):
         raise ValueError(f"Unknown edge label: {edge_label}")
 
 def get_ontouml_edge_data(edge_data: dict, edge_label: str):
-    return edge_data.get(edge_label)
+    try:
+        return {'rel': "relates", "gen": "generalizes"}[edge_data.get(edge_label)]
+    except KeyError:
+        raise ValueError(f"Unknown edge label: {edge_label}")
 
 def get_uml_edge_type(edge_data):
     edge_type = edge_data.get('type')

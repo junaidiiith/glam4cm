@@ -36,7 +36,7 @@ class BertEmbedder(Embedder):
         print("Number of Texts: ", len(text))
 
         dataset = EncodingDataset(self.tokenizer, texts=text, remove_duplicates=False)
-        loader = DataLoader(dataset, batch_size=256)
+        loader = DataLoader(dataset, batch_size=64)
 
         embeddings = list()
         with torch.no_grad():

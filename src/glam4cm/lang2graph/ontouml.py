@@ -76,6 +76,7 @@ class OntoUMLNxG(LangGraph):
                             ontouml_id2obj(item)
 
         def create_nxg():
+
             for k, v in id2obj_map.items():
                 node_name = v.get('name', '')
                 
@@ -85,8 +86,8 @@ class OntoUMLNxG(LangGraph):
                         self.nodes[k][prop] = v[prop] if prop in v else False
 
                     logger.info(f"Node: {node_name} type: {v[ONTOUML_ELEMENT_TYPE]}")
-                else:
-                    continue
+                # else:
+                #     continue
                 
                 logger.info(f"Node: {node_name} type: {v[ONTOUML_ELEMENT_TYPE]}")
                 if ONTOUML_STEREOTYPE in v and v[ONTOUML_STEREOTYPE] is not None:

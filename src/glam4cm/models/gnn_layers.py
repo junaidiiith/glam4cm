@@ -123,19 +123,33 @@ class GNNConv(torch.nn.Module):
                 h = self.dropout(h)
             return h
 
+        edge_attr_val = isinstance(edge_attr, torch.Tensor) and self.is_headed_model()
         h = in_feat
-        h = self.conv_layers[0](h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else self.conv_layers[0](h, edge_index)
+        h = self.conv_layers[0](h, edge_index, edge_attr) \
+        if edge_attr_val else self.conv_layers[0](h, edge_index)
         activate(h)
 
         for conv in self.conv_layers[1:-1]:
-            nh = conv(h, edge_index, edge_attr) if isinstance(edge_attr, torch.Tensor) else conv(h, edge_index)
+            nh = conv(h, edge_index, edge_attr) if edge_attr_val else conv(h, edge_index)
             h = nh if not self.residual else nh + h
             activate(h)
         
         h = self.conv_layers[-1](h, edge_index)
         activate(h)
         return h
-  
+
+    def is_headed_model(self):
+        """"
+        Returns True if the model is a headed model
+        Checks if the model name is in the supported_conv_models dictionary
+        and if the model requires num_heads
+        """
+        headed = self.num_heads is not None
+        model_name = self.conv_layers[0].__class__.__name__
+        if model_name in supported_conv_models:
+            return supported_conv_models[model_name] and headed
+        return False
+        
 
 class EdgeClassifer(nn.Module):
 

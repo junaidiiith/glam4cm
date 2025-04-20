@@ -94,7 +94,7 @@ def run(args):
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        f"GNN_{NODE_CLS_TASK}"
+        f"GNN_{NODE_CLS_TASK}",
         f"{graph_dataset.config_hash}",
     )
 

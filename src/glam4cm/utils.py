@@ -1,11 +1,11 @@
 from argparse import ArgumentParser
+from ast import Dict
 import random
 import numpy as np
 import torch
 import os
 import fnmatch
 import json
-from typing import List
 import xmltodict
 from torch_geometric.data import Data
 import hashlib
@@ -13,6 +13,11 @@ import networkx as nx
 from collections import deque
 import struct
 from tensorboardX.proto import event_pb2
+from collections import deque
+from typing import Any, List, Tuple, Optional, Set
+import networkx as nx
+
+
 
 
 
@@ -380,3 +385,73 @@ def set_torch_encoding_labels(dataset: list, cls_label, exclude_labels: List[str
         )
     
     print(f"Set encoding labels for {cls_label}")
+    
+
+def find_nodes_within_distance(
+    graph: nx.DiGraph,
+    start_node: Any,
+    distance: int,
+    exclude_edges: Optional[List[Tuple[Any, Any]]] = None
+) -> List[Tuple[Any, int]]:
+    """
+    Find all nodes reachable from start_node within a given distance,
+    optionally excluding specified edges.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Directed graph to traverse.
+    start_node : Any
+        Node from which to start the search.
+    distance : int
+        Maximum graph distance (number of edges) to traverse.
+    exclude_edges : Optional[List[Tuple[Any, Any]]]
+        List of directed edges to exclude, each as a (u, v) tuple.
+
+    Returns
+    -------
+    List[Tuple[Any, int]]
+        Sorted list of (node, distance) pairs.
+    """
+    # Normalize exclude_edges to a set for fast lookups
+    excluded: Set[Tuple[Any, Any]] = set(exclude_edges or [])
+
+    # BFS initialization
+    queue = deque([(start_node, 0)])
+    visited: Dict[Any, int] = {}
+
+    while queue:
+        node, dist = queue.popleft()
+        # Only process within the allowed distance
+        if dist > distance:
+            continue
+
+        # Record the shortest distance to this node
+        if node not in visited or dist < visited[node]:
+            visited[node] = dist
+
+        # Explore neighbors if we haven't reached max distance yet
+        if dist < distance:
+            for nbr in graph.neighbors(node):
+                # Skip self-loops
+                if nbr == node:
+                    continue
+                # Skip if edge is excluded
+                if (node, nbr) in excluded:
+                    continue
+                # Skip already-visited nodes at shorter or equal distance
+                if nbr in visited and visited[nbr] <= dist + 1:
+                    continue
+                queue.append((nbr, dist + 1))
+
+    # Return nodes sorted by distance
+    return sorted(visited.items(), key=lambda x: x[1])
+
+
+
+
+def get_node_neighbours(graph, start_node, distance, exclude_edges: List[str] = None):
+    neighbours = find_nodes_within_distance(graph, start_node, distance, exclude_edges)
+    max_distance = max(distance for _, distance in neighbours)
+    distance = min(distance, max_distance)
+    return [node for node, d in neighbours if d == distance]

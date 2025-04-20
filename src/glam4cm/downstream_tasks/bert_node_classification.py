@@ -181,7 +181,7 @@ def run(args):
         print(results)
 
         trainer.save_model()
-        # break
+        break
 
 
 if __name__ == '__main__':

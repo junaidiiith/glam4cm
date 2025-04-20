@@ -56,7 +56,7 @@ def run(args):
         task_type=LINK_PRED_TASK, 
         **dict(
             **graph_data_params, 
-            add_negative_train_samples=args.add_negative_train_samples, 
+            add_negative_train_samples=True, 
             neg_sampling_ratio=args.neg_sampling_ratio,
     ))
 

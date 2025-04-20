@@ -76,7 +76,7 @@ class OntoUMLMetaData(GraphMetadata):
             "attributes": "properties"
         }
         self.edge = {
-            "cls": "stereotype"
+            "cls": ['type']
         }
 
         self.graph = {

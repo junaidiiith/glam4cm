@@ -36,26 +36,43 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
     
     return model_name
 
+
 def execute_configs(run_configs, tasks_str: str):
-    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
-    if os.path.exists(log_file):
-        df = pd.read_csv(log_file)
-    else:
-        df = pd.DataFrame(columns=['Config', 'Status'])
+    # print(f"Total number of configurations in logs: {len(df)}")
 
-    print(f"Total number of configurations in logs: {len(df)}")
-
-    remaining_configs = [c for c in run_configs if c not in df['Config'].values.tolist()]
-
-    for script_command in tqdm(remaining_configs, desc='Running tasks'):
-        print(f'Running {script_command}')
-        result = subprocess.run(f'python glam_test.py {script_command}', shell=True)
+    # remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values.tolist()}
+    
+    
+    # rem_conf = get_remaining_configs(tasks_str, run_configs=run_configs)
+    # df = rem_conf['df']
+    # remaining_configs = rem_conf['configs']
+    # log_file = rem_conf['log_file']
+    df = pd.DataFrame(columns=['Config', 'Status'])
+    log_file = f"logs/run_configs_tasks_{tasks_str}_ecore_555_d2.csv"
+    remaining_configs = {c['lm']: c['gnn'] for c in run_configs if 'ecore_555' in c['lm'] and '--distance=2' in c['lm']}
+    print("\n".join([r for r in remaining_configs]))
+    print("Total number of configurations to run: ", len(remaining_configs))
+    
+    for lm_script_command in tqdm(remaining_configs, desc='Running tasks'):
+        print(f'Running LM --> {lm_script_command}')
+        result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
 
         status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
-        print(f"✅ finished running command: {script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
+        print(f"✅ finished running command: {lm_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
         
-        df.loc[len(df)] = [script_command, status]
+        df.loc[len(df)] = [lm_script_command, status]
         df.to_csv(log_file, index=False)
+        
+        # if 'gnn' in remaining_configs[lm_script_command]:
+        for gnn_script_command in tqdm(remaining_configs[lm_script_command], desc='Running GNN'):
+            print(f'Running GNN --> {gnn_script_command}')
+            result = subprocess.run(f'python glam_test.py {gnn_script_command}', shell=True)
+
+            status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
+            print(f"✅ finished running command: {gnn_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
+
+            df.loc[len(df)] = [gnn_script_command, status]
+            df.to_csv(log_file, index=False)
 
 
 def get_run_configs(tasks):
@@ -173,8 +190,8 @@ def get_run_configs(tasks):
                 
                 for dataset, dataset_conf in dataset_confs.items():
                     
-                    if dataset == 'ontouml':
-                        config_task_str = config_task_str.replace("--use_edge_label", "").replace("--use_edge_types", "")
+                    # if dataset == 'ontouml':
+                    #     config_task_str = config_task_str.replace("--use_edge_label", "").replace("--use_edge_types", "")
                     
                     if (task_id == 2 and dataset not in ['ecore_555', 'modelset'])\
                         or (task_id in [4, 5] and dataset in ['ontouml']):
@@ -190,9 +207,13 @@ def get_run_configs(tasks):
                             
                             bert_config = f"{bert_task_config_str} {dataset_conf_str} {labels_conf_str} {config_task_str} {distance_config_str}"
                             
-                            run_configs.append(bert_config)
+                            if distance > 1:
+                                bert_config = bert_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
+                                
+                            run_configs.append({'lm': bert_config})
                             
                             if gnn_train:
+                                gnn_configs = list()
                                 for gnn_model in gnn_models:
                                     for j in range(len((gnn_updates))):
                                         gnn_task_config_str = ' '.join([f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()])
@@ -203,10 +224,75 @@ def get_run_configs(tasks):
                                             gnn_task_id = task_configs[task_id]['gnn_config']['task_id']
                                             gnn_params_str += f' --ckpt={get_embed_model_name(dataset, gnn_task_id, node_cls_label, edge_cls_label)} ' 
                                         
-                                        run_configs.append(f"{gnn_task_config_str} {dataset_conf_str.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")} {labels_conf_str} {distance_config_str} {config_task_str} {gnn_config_str} {gnn_params_str}")
+                                        gnn_config = f"{gnn_task_config_str} {dataset_conf_str.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")} {labels_conf_str} {distance_config_str} {config_task_str} {gnn_config_str} {gnn_params_str}"
+                                        gnn_configs.append(gnn_config)
+                                
+                                run_configs[-1]['gnn'] = gnn_configs
+
 
     print(f"Total number of configurations: {len(run_configs)}")
     return run_configs
+
+
+def get_remaining_configs(tasks_str, run_configs):
+
+    def change_batch_size(conf: str):
+        if "distance=2" in conf or "distance=3" in conf:
+            conf.replace("--batch_size=64", "--batch_size=8")\
+                .replace("--batch_size=32", "--batch_size=8")\
+                .replace("--batch_size=16", "--batch_size=8")
+        return conf
+
+    
+    os.makedirs('logs', exist_ok=True)
+    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
+    if os.path.exists(log_file):
+        df = pd.read_csv(log_file)
+    else:
+        df = pd.DataFrame(columns=['Config', 'Status'])
+        return {
+            'df': df,
+            'configs': run_configs,
+            'log_file': log_file
+        }
+
+    # your data
+    v = df['Config'].apply(lambda x: int(x.split('--task_id=')[1].split()[0]))
+    parent_child = {2: 6, 3: 7, 4: 8, 5: 9}
+    parent_idxs = [i for i, val in enumerate(v) if val in parent_child]
+
+    mapping = []
+    
+    for idx, pidx in enumerate(parent_idxs):
+        start = pidx + 1
+        end   = parent_idxs[idx+1] if idx+1 < len(parent_idxs) else len(v)
+
+        child_val = parent_child[v[pidx]]
+        children = [j for j in range(start, end) if v[j] == child_val]
+
+        mapping.append({pidx: children})
+
+    rem_configs = dict()
+    to_delete = []
+    num_gnn = 0
+    for mapping in mapping:
+        lm_idx = list(mapping.keys())[0]
+        gnn_indices = mapping[lm_idx]
+        lm_config = change_batch_size(df.iloc[lm_idx]['Config'])
+        if any(df.iloc[i]['Status'] != "success" for i in gnn_indices):
+            rem_configs[lm_config] = [df.iloc[i]['Config'] for i in gnn_indices]
+            num_gnn = len(rem_configs[lm_config])
+            to_delete.append(lm_idx)
+            to_delete.extend(gnn_indices)
+    print(f"Total number of configurations to run: {len(rem_configs)*num_gnn}")
+    df = df.drop(to_delete)
+    df = df.reset_index(drop=True)
+    
+    return {
+        'df': df,
+        'configs': rem_configs,
+        'log_file': log_file
+    }
 
 
 def main():
