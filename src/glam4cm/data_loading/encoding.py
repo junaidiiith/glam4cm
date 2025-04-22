@@ -26,7 +26,7 @@ class EncodingDataset(Dataset):
             texts = list(texts_to_id.keys())
             labels = [labels[i] for i in texts_to_id.values()] if labels else None            
         
-        print(f'Encoding started with {len(texts)} samples')
+        # print(f'Encoding started with {len(texts)} samples')
 
         self.inputs = tokenizer(
             texts, 
@@ -39,8 +39,8 @@ class EncodingDataset(Dataset):
         if labels is not None:
             self.inputs['labels'] = torch.tensor(labels, dtype=torch.long) if labels is not None else None
 
-        print("Embedding shape: ", self.inputs['input_ids'].shape)
-        print("Encoding Dataset created with {} samples".format(len(self.inputs['input_ids'])))
+        # print("Embedding shape: ", self.inputs['input_ids'].shape)
+        # print("Encoding Dataset created with {} samples".format(len(self.inputs['input_ids'])))
         # print("\n".join([f"Label: {l}, Text: {i}" for i, l in zip(texts, labels)]))
         # import code; code.interact(local=locals())
         

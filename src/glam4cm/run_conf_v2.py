@@ -38,9 +38,14 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
 
 
 def execute_configs(run_configs, tasks_str: str):
-    df = pd.DataFrame(columns=['Config', 'Status'])
+    
     log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
-    remaining_configs = {c['lm']: c['gnn'] for c in run_configs}
+    if os.path.exists(log_file):
+        df = pd.read_csv(log_file)
+    else:
+        df = pd.DataFrame(columns=['Config', 'Status'])
+    
+    remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values}
     print("\n".join([r for r in remaining_configs]))
     print("Total number of configurations to run: ", len(remaining_configs))
     
@@ -68,6 +73,13 @@ def execute_configs(run_configs, tasks_str: str):
 
 def get_run_configs(tasks):
     dataset_confs = {
+        'eamodelset': {
+            "node_cls_label": ["type", "layer"],
+            "edge_cls_label": "type",
+            "extra_params": {
+                "num_epochs": 5,
+            }
+        },
         'ecore_555': {
             "node_cls_label": ["abstract"],
             "edge_cls_label": "type",
@@ -79,14 +91,7 @@ def get_run_configs(tasks):
             "node_cls_label": ["abstract"],
             "edge_cls_label": "type",
             "extra_params": {
-                "num_epochs": 10,
-            }
-        },
-        'eamodelset': {
-            "node_cls_label": ["type", "layer"],
-            "edge_cls_label": "type",
-            "extra_params": {
-                "num_epochs": 15,
+                "num_epochs": 5,
             }
         },
         'ontouml': {
@@ -180,7 +185,8 @@ def get_run_configs(tasks):
                     
                 
                 for dataset, dataset_conf in dataset_confs.items():
-                    
+                    # if dataset != 'ontouml':
+                    #     continue
                     if dataset == 'ontouml':
                         if "--use_edge_label" in config_task_str:
                             config_task_str.remove("--use_edge_label")

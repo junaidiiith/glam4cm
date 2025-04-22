@@ -168,13 +168,13 @@ class TorchGraph:
 
         def generate_embeddings():
             if randomize_ne or embedder is None:
-                print("Randomizing node embeddings")
+                # print("Randomizing node embeddings")
                 self.data.x = np.random.randn(self.graph.number_of_nodes(), random_embed_dim)
             else:
                 self.data.x = embedder.embed(list(self.node_texts.values()))
             
             if randomize_ee or embedder is None:
-                print("Randomizing edge embeddings")
+                # print("Randomizing edge embeddings")
                 self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
             else:
                 self.data.edge_attr = embedder.embed(list(self.edge_texts.values()))

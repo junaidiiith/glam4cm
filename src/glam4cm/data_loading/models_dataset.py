@@ -30,7 +30,8 @@ class ModelDataset:
         min_edges: int = -1,
         min_enr: float = -1,
         timeout=-1,
-        preprocess_graph_text: callable = None
+        preprocess_graph_text: callable = None,
+        include_dummies=False
     ):
         self.name = dataset_name
         self.dataset_dir = dataset_dir
@@ -41,6 +42,7 @@ class ModelDataset:
         self.min_enr = min_enr
         self.timeout = timeout
         self.preprocess_graph_text = preprocess_graph_text
+        self.include_dummies = include_dummies
 
         self.graphs: List[LangGraph] = []
 
@@ -114,7 +116,8 @@ class ModelDataset:
     
     def save(self):
         print(f'Saving {self.name} to pickle')
-        with open(os.path.join(self.save_dir, f'{self.name}.pkl'), 'wb') as f:
+        pkl_file = f'{self.name}{"_with_dummies" if self.include_dummies else ''}.pkl'
+        with open(os.path.join(self.save_dir, pkl_file), 'wb') as f:
             pickle.dump(self.graphs, f)
         print(f'Saved {self.name} to pickle')
 
@@ -137,7 +140,8 @@ class ModelDataset:
 
     def load(self):
         print(f'Loading {self.name} from pickle')
-        with open(os.path.join(self.save_dir, f'{self.name}.pkl'), 'rb') as f:
+        pkl_file = f'{self.name}{"_with_dummies" if self.include_dummies else ''}.pkl'
+        with open(os.path.join(self.save_dir, pkl_file), 'rb') as f:
             self.graphs = pickle.load(f)
         
         self.filter_graphs()
@@ -172,7 +176,8 @@ class EcoreDataset(ModelDataset):
             remove_duplicates=False,
             min_edges: int = -1,
             min_enr: float = -1,
-            preprocess_graph_text: callable = None
+            preprocess_graph_text: callable = None,
+            include_dummies=False
         ):
         super().__init__(
             dataset_name, 
@@ -180,22 +185,34 @@ class EcoreDataset(ModelDataset):
             save_dir=save_dir, 
             min_edges=min_edges, 
             min_enr=min_enr,
-            preprocess_graph_text=preprocess_graph_text
+            preprocess_graph_text=preprocess_graph_text,
+            include_dummies=include_dummies
         )
         os.makedirs(save_dir, exist_ok=True)
 
         dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
         if reload or not dataset_exists:
+
+            
             self.graphs: List[EcoreNxG] = []
             data_path = os.path.join(dataset_dir, dataset_name)
-            for file in os.listdir(data_path):
-                if file.endswith('.jsonl') and file.startswith('ecore'):
-                    json_objects = json.load(open(os.path.join(data_path, file)))
-                    for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
-                        if remove_duplicates and g['is_duplicated']:
-                            continue
-                        nxg = EcoreNxG(g)
-                        self.graphs.append(nxg)
+            file_name = os.path.join(data_path, 'ecore.jsonl') if not include_dummies\
+                else os.path.join(data_path, 'ecore-with-dummy.jsonl')
+            
+            # for file in os.listdir(data_path):
+            #     if file.endswith('.jsonl') and file.startswith("ecore"):
+            json_objects = json.load(open(file_name))
+            for g in tqdm(json_objects, desc=f'Loading {dataset_name.title()}'):
+                
+                if remove_duplicates and g['is_duplicated']:
+                    continue
+                
+                if not include_dummies and g['labels'] == 'dummy':
+                    print(f"Skipping dummy graph {g['ids']}")
+                    continue
+                
+                nxg = EcoreNxG(g)
+                self.graphs.append(nxg)
 
             print(f'Loaded Total {self.name} with {len(self.graphs)} graphs')
             print("Filtering...")

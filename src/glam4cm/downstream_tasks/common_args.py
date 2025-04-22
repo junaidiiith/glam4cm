@@ -9,6 +9,7 @@ from glam4cm.settings import (
 
 def get_config_params(args):
     common_params = dict(
+        
         distance=args.distance,
         reload=args.reload,
         test_ratio=args.test_ratio,
@@ -61,6 +62,7 @@ def get_common_args_parser():
         ]
     )
     parser.add_argument('--remove_duplicates', action='store_true')
+    parser.add_argument('--include_dummies', action='store_true')
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--min_enr', type=float, default=-1.0)
     parser.add_argument('--min_edges', type=int, default=-1)

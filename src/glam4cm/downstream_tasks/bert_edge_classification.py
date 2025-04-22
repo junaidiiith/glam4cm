@@ -55,6 +55,7 @@ def run(args):
     set_seed(args.seed)
 
     config_params = dict(
+        include_dummies = args.include_dummies,
         min_enr = args.min_enr,
         min_edges = args.min_edges,
         remove_duplicates = args.remove_duplicates,
