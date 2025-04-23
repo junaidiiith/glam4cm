@@ -48,6 +48,7 @@ extra_properties = [
 class OntoUMLNxG(LangGraph):
     def __init__(self, json_obj: dict, rel_as_node=True):
         super().__init__()
+        self.graph_id = json_obj['id']
         self.json_obj = json_obj
         self.rel_as_node = rel_as_node
         self.__create_graph()
