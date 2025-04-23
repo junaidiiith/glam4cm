@@ -250,7 +250,8 @@ class ArchiMateDataset(ModelDataset):
             min_enr: float = -1,
             timeout=-1,
             language=None,
-            preprocess_graph_text: callable = None
+            preprocess_graph_text: callable = None,
+            include_dummies=False
         ):
         super().__init__(
             dataset_name, 
@@ -259,7 +260,8 @@ class ArchiMateDataset(ModelDataset):
             min_edges=min_edges, 
             min_enr=min_enr,
             timeout=timeout,
-            preprocess_graph_text=preprocess_graph_text
+            preprocess_graph_text=preprocess_graph_text,
+            include_dummies=include_dummies
         )
         os.makedirs(save_dir, exist_ok=True)
         
@@ -322,7 +324,8 @@ class OntoUMLDataset(ModelDataset):
             min_edges: int = -1,
             min_enr: float = -1,
             timeout=-1,
-            preprocess_graph_text: callable = None
+            preprocess_graph_text: callable = None,
+            include_dummies=False
         ):
         super().__init__(
             dataset_name, 
@@ -331,7 +334,8 @@ class OntoUMLDataset(ModelDataset):
             min_edges=min_edges, 
             min_enr=min_enr,
             timeout=timeout,
-            preprocess_graph_text=preprocess_graph_text
+            preprocess_graph_text=preprocess_graph_text,
+            include_dummies=include_dummies
         )
         os.makedirs(save_dir, exist_ok=True)
         

@@ -45,6 +45,7 @@ EDGE_CLS_TASK = 'edge_cls'
 LINK_PRED_TASK = 'lp'
 NODE_CLS_TASK = 'node_cls'
 GRAPH_CLS_TASK = 'graph_cls'
+DUMMY_GRAPH_CLS_TASK = 'dummy_graph_cls'
 
 
 SEP = ' '

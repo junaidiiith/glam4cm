@@ -32,7 +32,8 @@ from glam4cm.settings import (
     EDGE_CLS_TASK,
     LINK_PRED_TASK,
     NODE_CLS_TASK,
-    GRAPH_CLS_TASK
+    GRAPH_CLS_TASK,
+    DUMMY_GRAPH_CLS_TASK
 )
 import glam4cm.utils as utils
 

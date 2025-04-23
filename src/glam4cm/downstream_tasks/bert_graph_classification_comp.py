@@ -50,6 +50,8 @@ def get_parser():
     parser.add_argument('--k', type=int, default=10)
     parser.add_argument('--limit', type=int, default=-1)
     parser.add_argument('--trust_remote_code', action='store_true')
+    parser.add_argument('--include_dummies', action='store_true')
+    parser.add_argument('--task_type', type=str, default='dd')
 
     parser.add_argument('--num_epochs', type=int, default=10)
 
@@ -67,13 +69,17 @@ def get_parser():
 def run(args):
     dataset_name = args.dataset_name
     model_name = args.model_name
+    include_dummies = args.include_dummies
     
+    file_name = 'ecore.jsonl' if include_dummies and dataset_name == 'modelset' else 'ecore-with-dummy.jsonl'
     texts = [
         (g['txt'], g['labels'])
-        for file_name in os.listdir(f'datasets/{dataset_name}')
         for g in json.load(open(f'datasets/{dataset_name}/{file_name}'))
-        if 'ecore' in file_name and file_name.endswith('.jsonl')
     ]
+    if args.task_type == 'dd':
+        print("Task type: DD")
+        texts = [(t, 0 if l in 'dummy' else 1) for t, l in texts]
+        
     shuffle(texts)
     limit = args.limit if args.limit > 0 else len(texts)
     texts = texts[:limit]
@@ -163,4 +169,4 @@ def run(args):
         print(results)
 
         i += 1
-        
+        break
