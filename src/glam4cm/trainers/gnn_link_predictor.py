@@ -58,6 +58,12 @@ class GNNLinkPredictionTrainer(Trainer):
         all_preds, all_labels = list(), list()
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
+        
+        total_pos_edges = sum([data.train_pos_edge_label_index.size(1) for data in self.dataloader.dataset])
+        total_neg_edges = sum([data.train_neg_edge_label_index.size(1) for data in self.dataloader.dataset])
+        print(f"Total positive edges: {total_pos_edges}")
+        print(f"Total negative edges: {total_neg_edges}")
+        
         for data in tqdm(self.dataloader, desc='Training Batches'):
             self.optimizer.zero_grad()
             self.model.zero_grad()
@@ -103,14 +109,23 @@ class GNNLinkPredictionTrainer(Trainer):
             for data in tqdm(self.dataloader, desc='Testing Batches'):
                 
                 x = data.x
+                
+                train_edge_index = torch.cat([
+                    data.train_pos_edge_label_index,
+                    data.train_neg_edge_label_index
+                ], dim=1)
+                train_edge_attr = (
+                    data.edge_attr[data.train_edge_mask]
+                    if self.use_edge_attrs else None
+                )
+                
+                h = self.get_logits(x, train_edge_index, train_edge_attr)
+                
                 pos_edge_index =  data.test_pos_edge_label_index
                 neg_edge_index = data.test_neg_edge_label_index
                 test_mask = data.test_edge_mask
                 edge_attr = data.edge_attr[test_mask] if self.use_edge_attrs else None
 
-
-                h = self.get_logits(x, pos_edge_index, edge_attr)
-                # h = x
                 pos_score = self.get_prediction_score(h, pos_edge_index, edge_attr)
                 neg_score = self.get_prediction_score(h, neg_edge_index, edge_attr)
 

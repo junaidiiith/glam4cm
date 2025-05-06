@@ -99,11 +99,16 @@ class GNNEdgeClassificationTrainer(Trainer):
             epoch_metrics = defaultdict(float)
             for data in self.dataloader:
                 x = data.x
+                train_edge_index =  data.train_pos_edge_label_index
+                train_mask = data.train_edge_mask
+                train_edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
+                
                 edge_index =  data.test_pos_edge_label_index
                 test_mask = data.test_edge_mask
                 edge_attr = data.edge_attr[test_mask] if self.use_edge_attrs else None
                 
-                h = self.get_logits(x, edge_index, edge_attr)
+                h = self.get_logits(x, train_edge_index, train_edge_attr)
+                
                 scores = self.get_prediction_score(h, edge_index, edge_attr)
                 labels = getattr(data, f"edge_{self.cls_label}")[test_mask]
                 all_preds.append(scores.detach().cpu())

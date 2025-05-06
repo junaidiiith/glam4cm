@@ -1,0 +1,108 @@
+Running GLAM4CM with: {'task_id': 8, 'th': False}
+Loading eamodelset from pickle
+Loaded eamodelset with 936 graphs
+Loaded eamodelset with 936 graphs
+Graphs: 936
+Loading graph dataset
+Number of duplicate graphs:  17
+Limit:  -1
+Setting num_nodes_ type 63
+Setting num_nodes_ layer 7
+Edge Classes:  ['Access' 'Aggregation' 'Assignment' 'Association' 'Composition' 'Flow'
+ 'Influence' 'Realization' 'Serving' 'Specialization' 'Triggering']
+Train classes: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+Test classes: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+Number of classes in training set: 11
+Number of classes in test set: 11
+Graphs saved
+Train edge classes: {10: 8272, 2: 9585, 7: 12976, 4: 21129, 5: 6139, 8: 10841, 3: 15921, 1: 9445, 0: 7807, 6: 2292, 9: 2389}
+Test edge classes: {3: 3825, 5: 1520, 4: 5188, 2: 2379, 10: 2065, 8: 2612, 7: 3207, 1: 2332, 0: 1930, 9: 575, 6: 595}
+GNN Trainer initialized.
+GNN Trainer initialized.
+Training GNN Link Prediction model
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 1
+{'f1_macro': 0.5147223293821628, 'f1_weighted': 0.5147223293821627, 'balanced_accuracy': np.float64(0.5209890193686137), 'precision_macro': 0.522132248913612, 'precision_weighted': 0.522132248913612, 'recall_macro': 0.5209890193686137, 'recall_weighted': 0.5209890193686137, 'loss': 23.547606229782104, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 2
+{'f1_macro': 0.5377081294334676, 'f1_weighted': 0.5377081294334676, 'balanced_accuracy': np.float64(0.5388897361598293), 'precision_macro': 0.5392914480851461, 'precision_weighted': 0.539291448085146, 'recall_macro': 0.5388897361598293, 'recall_weighted': 0.5388897361598292, 'loss': 27.72497707605362, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 3
+{'f1_macro': 0.5371619735997762, 'f1_weighted': 0.5371619735997762, 'balanced_accuracy': np.float64(0.5433696812566723), 'precision_macro': 0.545828328557562, 'precision_weighted': 0.5458283285575621, 'recall_macro': 0.5433696812566723, 'recall_weighted': 0.5433696812566723, 'loss': 46.738253712654114, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 4
+{'f1_macro': 0.5388547179987038, 'f1_weighted': 0.5388547179987038, 'balanced_accuracy': np.float64(0.5489934421229221), 'precision_macro': 0.5537175728753112, 'precision_weighted': 0.5537175728753112, 'recall_macro': 0.5489934421229221, 'recall_weighted': 0.5489934421229221, 'loss': 59.98778545856476, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 5
+{'f1_macro': 0.5299045378049704, 'f1_weighted': 0.5299045378049704, 'balanced_accuracy': np.float64(0.5485931066036297), 'precision_macro': 0.5577814800467602, 'precision_weighted': 0.5577814800467602, 'recall_macro': 0.5485931066036297, 'recall_weighted': 0.5485931066036297, 'loss': 68.56548464298248, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 6
+{'f1_macro': 0.5365593038981087, 'f1_weighted': 0.5365593038981087, 'balanced_accuracy': np.float64(0.5508426109501297), 'precision_macro': 0.5579918826806403, 'precision_weighted': 0.5579918826806404, 'recall_macro': 0.5508426109501297, 'recall_weighted': 0.5508426109501297, 'loss': 68.09905230998993, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 7
+{'f1_macro': 0.5374113539060575, 'f1_weighted': 0.5374113539060575, 'balanced_accuracy': np.float64(0.5508807381424432), 'precision_macro': 0.5575879912308113, 'precision_weighted': 0.5575879912308114, 'recall_macro': 0.5508807381424432, 'recall_weighted': 0.5508807381424432, 'loss': 69.16161727905273, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 8
+{'f1_macro': 0.5351628098385783, 'f1_weighted': 0.5351628098385783, 'balanced_accuracy': np.float64(0.5500800671038585), 'precision_macro': 0.5574553479533901, 'precision_weighted': 0.5574553479533901, 'recall_macro': 0.5500800671038585, 'recall_weighted': 0.5500800671038585, 'loss': 70.39996099472046, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 9
+{'f1_macro': 0.5349404163680133, 'f1_weighted': 0.5349404163680134, 'balanced_accuracy': np.float64(0.550728229373189), 'precision_macro': 0.5586990798028553, 'precision_weighted': 0.5586990798028553, 'recall_macro': 0.550728229373189, 'recall_weighted': 0.550728229373189, 'loss': 72.7618682384491, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 10
+{'f1_macro': 0.5360190845487214, 'f1_weighted': 0.5360190845487215, 'balanced_accuracy': np.float64(0.5518911087387525), 'precision_macro': 0.5601171432113872, 'precision_weighted': 0.5601171432113872, 'recall_macro': 0.5518911087387525, 'recall_weighted': 0.5518911087387525, 'loss': 77.28202378749847, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 11
+{'f1_macro': 0.528393667598716, 'f1_weighted': 0.528393667598716, 'balanced_accuracy': np.float64(0.5510523105078542), 'precision_macro': 0.563197841411897, 'precision_weighted': 0.563197841411897, 'recall_macro': 0.5510523105078542, 'recall_weighted': 0.5510523105078542, 'loss': 85.70731806755066, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 12
+{'f1_macro': 0.5279306317918899, 'f1_weighted': 0.52793063179189, 'balanced_accuracy': np.float64(0.5513192008540491), 'precision_macro': 0.5640033204454366, 'precision_weighted': 0.5640033204454366, 'recall_macro': 0.5513192008540491, 'recall_weighted': 0.5513192008540491, 'loss': 90.56102800369263, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 13
+{'f1_macro': 0.5317461799125396, 'f1_weighted': 0.5317461799125397, 'balanced_accuracy': np.float64(0.550461339026994), 'precision_macro': 0.5600638642187646, 'precision_weighted': 0.5600638642187646, 'recall_macro': 0.550461339026994, 'recall_weighted': 0.550461339026994, 'loss': 81.25123691558838, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 14
+{'f1_macro': 0.5313765857083401, 'f1_weighted': 0.53137658570834, 'balanced_accuracy': np.float64(0.551414518834833), 'precision_macro': 0.5620226608276546, 'precision_weighted': 0.5620226608276546, 'recall_macro': 0.551414518834833, 'recall_weighted': 0.5514145188348331, 'loss': 95.44408798217773, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 15
+{'f1_macro': 0.5380002672843346, 'f1_weighted': 0.5380002672843346, 'balanced_accuracy': np.float64(0.5513954552386763), 'precision_macro': 0.5581380584488091, 'precision_weighted': 0.5581380584488091, 'recall_macro': 0.5513954552386763, 'recall_weighted': 0.5513954552386762, 'loss': 82.57845103740692, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 16
+{'f1_macro': 0.5299121427607607, 'f1_weighted': 0.5299121427607607, 'balanced_accuracy': np.float64(0.5551319200854049), 'precision_macro': 0.5701956449379639, 'precision_weighted': 0.5701956449379639, 'recall_macro': 0.5551319200854049, 'recall_weighted': 0.5551319200854049, 'loss': 100.91040349006653, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 17
+{'f1_macro': 0.5302936816344433, 'f1_weighted': 0.5302936816344433, 'balanced_accuracy': np.float64(0.5546172029891718), 'precision_macro': 0.5688861510603058, 'precision_weighted': 0.5688861510603057, 'recall_macro': 0.5546172029891718, 'recall_weighted': 0.5546172029891718, 'loss': 101.98405504226685, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 18
+{'f1_macro': 0.5243024262326268, 'f1_weighted': 0.5243024262326267, 'balanced_accuracy': np.float64(0.5540834222967821), 'precision_macro': 0.5721515937366968, 'precision_weighted': 0.5721515937366968, 'recall_macro': 0.5540834222967821, 'recall_weighted': 0.5540834222967821, 'loss': 108.78374028205872, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 19
+{'f1_macro': 0.5225015060124926, 'f1_weighted': 0.5225015060124926, 'balanced_accuracy': np.float64(0.554598139393015), 'precision_macro': 0.5746767005631341, 'precision_weighted': 0.5746767005631341, 'recall_macro': 0.554598139393015, 'recall_weighted': 0.554598139393015, 'loss': 114.71325254440308, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 20
+{'f1_macro': 0.5234409305315937, 'f1_weighted': 0.5234409305315938, 'balanced_accuracy': np.float64(0.5546553301814855), 'precision_macro': 0.574058528184236, 'precision_weighted': 0.574058528184236, 'recall_macro': 0.5546553301814855, 'recall_weighted': 0.5546553301814854, 'loss': 117.43299269676208, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796
+Test Epoch: 21
+{'f1_macro': 0.5230136360814216, 'f1_weighted': 0.5230136360814216, 'balanced_accuracy': np.float64(0.554521885008388), 'precision_macro': 0.5741015702933037, 'precision_weighted': 0.5741015702933037, 'recall_macro': 0.554521885008388, 'recall_weighted': 0.554521885008388, 'loss': 116.45735049247742, 'phase': 'test'}
+Total positive edges: 106796
+Total negative edges: 106796

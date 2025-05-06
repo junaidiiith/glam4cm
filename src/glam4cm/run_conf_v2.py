@@ -11,6 +11,7 @@ from glam4cm.settings import (
     results_dir
 )
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tasks', type=str)
@@ -38,16 +39,16 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
 
 
 def execute_configs(run_configs, tasks_str: str):
-    
+    print("total number of configurations: ", len(run_configs))
     log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
     if os.path.exists(log_file):
         df = pd.read_csv(log_file)
     else:
         df = pd.DataFrame(columns=['Config', 'Status'])
-    
     remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values}
     print("\n".join([r for r in remaining_configs]))
-    print("Total number of configurations to run: ", len(remaining_configs))
+    print(f"Total number of configurations: {len(remaining_configs)}")
+    print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
     
     for lm_script_command in tqdm(remaining_configs, desc='Running tasks'):
         print(f'Running LM --> {lm_script_command}')
@@ -143,9 +144,9 @@ def get_run_configs(tasks):
         "",
         "use_attributes", 
         "use_node_types", 
-        "use_edge_label", 
-        "use_edge_types", 
-        "use_special_tokens"
+        # "use_edge_label", 
+        # "use_edge_types", 
+        # "use_special_tokens"
     ]
 
     gnn_conf = {
@@ -155,7 +156,7 @@ def get_run_configs(tasks):
     gnn_updates = [
         "",
         "use_embeddings",
-        "use_edge_attrs"   
+        # "use_edge_attrs"   
     ]
 
     gnn_models = [
@@ -181,32 +182,28 @@ def get_run_configs(tasks):
             distance_config_str = [f'--distance={distance}']
             
             for i in range(len(dataset_updates)):
-                config_task_str = [f'--{u}' if u else '' for u in [x for x in dataset_updates[:i+1]]]
-                    
-                
                 for dataset, dataset_conf in dataset_confs.items():
-                    # if dataset != 'ontouml':
-                    #     continue
-                    if dataset == 'ontouml':
-                        if "--use_edge_label" in config_task_str:
-                            config_task_str.remove("--use_edge_label")
-                    if dataset == 'eamodelset':
-                        if "--use_edge_label" in config_task_str:
-                            config_task_str.remove("--use_edge_label")
-                        if "--use_attributes" in config_task_str:
-                            config_task_str.remove("--use_attributes")
-                    
                     if (task_id == 2 and dataset not in ['ecore_555', 'modelset'])\
                         or (task_id in [4, 5] and dataset in ['ontouml']):
                         continue
-                    
                     dataset_conf_str = [f'--dataset={dataset}'] + [f'--{k}={v}' for k, v in dataset_conf['extra_params'].items()] + ['--min_edges=10']
-                    
                     node_cls_labels = dataset_conf['node_cls_label'] if isinstance(dataset_conf['node_cls_label'], list) else [dataset_conf['node_cls_label']]
                     edge_cls_labels = (dataset_conf['edge_cls_label'] if isinstance(dataset_conf['edge_cls_label'], list) else [dataset_conf['edge_cls_label']]) if 'edge_cls_label' in dataset_conf else []
                     for node_cls_label in node_cls_labels:
                         for edge_cls_label in edge_cls_labels:
                             labels_conf_str = [f'--node_cls_label={node_cls_label}', f'--edge_cls_label={edge_cls_label}']
+                            
+                            config_task_str = [f'--{u}' if u else '' for u in [x for x in dataset_updates[:i+1]]]
+                            # if dataset == 'eamodelset':
+                            #     continue
+                            if dataset == 'ontouml':
+                                if "--use_edge_label" in config_task_str:
+                                    config_task_str.remove("--use_edge_label")
+                            if dataset == 'eamodelset':
+                                if "--use_edge_label" in config_task_str:
+                                    config_task_str.remove("--use_edge_label")
+                                if "--use_attributes" in config_task_str:
+                                    config_task_str.remove("--use_attributes")
                             
                             bert_config = " ".join(bert_task_config_str + \
                                 dataset_conf_str + \
@@ -247,7 +244,7 @@ def get_run_configs(tasks):
                                 run_configs[-1]['gnn'] = gnn_configs
 
 
-    print(f"Total number of configurations: {len(run_configs)}")
+    
     return run_configs
 
 
