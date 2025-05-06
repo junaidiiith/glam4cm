@@ -39,7 +39,7 @@ def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
 
 
 def execute_configs(run_configs, tasks_str: str):
-    print("total number of configurations: ", len(run_configs))
+    
     log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
     if os.path.exists(log_file):
         df = pd.read_csv(log_file)
@@ -47,7 +47,9 @@ def execute_configs(run_configs, tasks_str: str):
         df = pd.DataFrame(columns=['Config', 'Status'])
     remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values}
     print("\n".join([r for r in remaining_configs]))
-    print(f"Total number of configurations: {len(remaining_configs)}")
+    
+    print("Total number of configurations: ", len(run_configs))
+    print(f"Total number of remaining configurations: {len(remaining_configs)}")
     print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
     
     for lm_script_command in tqdm(remaining_configs, desc='Running tasks'):
@@ -78,7 +80,7 @@ def get_run_configs(tasks):
             "node_cls_label": ["type", "layer"],
             "edge_cls_label": "type",
             "extra_params": {
-                "num_epochs": 5,
+                "num_epochs": 3,
             }
         },
         'ecore_555': {
@@ -92,7 +94,7 @@ def get_run_configs(tasks):
             "node_cls_label": ["abstract"],
             "edge_cls_label": "type",
             "extra_params": {
-                "num_epochs": 5,
+                "num_epochs": 3,
             }
         },
         'ontouml': {
@@ -146,7 +148,6 @@ def get_run_configs(tasks):
         "use_node_types", 
         # "use_edge_label", 
         # "use_edge_types", 
-        # "use_special_tokens"
     ]
 
     gnn_conf = {
@@ -182,6 +183,9 @@ def get_run_configs(tasks):
             distance_config_str = [f'--distance={distance}']
             
             for i in range(len(dataset_updates)):
+                if distance == 0 and i > 1:
+                    continue
+                
                 for dataset, dataset_conf in dataset_confs.items():
                     if (task_id == 2 and dataset not in ['ecore_555', 'modelset'])\
                         or (task_id in [4, 5] and dataset in ['ontouml']):
@@ -209,11 +213,12 @@ def get_run_configs(tasks):
                                 dataset_conf_str + \
                                 labels_conf_str + \
                                 config_task_str + \
-                                distance_config_str)
+                                distance_config_str
+                            )
                             
                             if distance > 1:
                                 bert_config = bert_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
-                                
+                            
                             run_configs.append({'lm': bert_config})
                             
                             if gnn_train:

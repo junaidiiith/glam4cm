@@ -1,5 +1,7 @@
+from typing import List, Union
 from torch.utils.data import Dataset
 import torch
+from transformers import AutoTokenizer
 
 def get_max_length(tokenizer):
     tokenizer_name = tokenizer.name_or_path.lower()
@@ -11,9 +13,9 @@ def get_max_length(tokenizer):
 class EncodingDataset(Dataset):
     def __init__(
             self, 
-            tokenizer, 
-            texts, 
-            labels=None, 
+            tokenizer: AutoTokenizer, 
+            texts: List[str], 
+            labels:List[Union[str, int]]=None, 
             max_length=512,
             remove_duplicates=False
         ):
