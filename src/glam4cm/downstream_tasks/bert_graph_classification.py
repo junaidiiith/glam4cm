@@ -17,7 +17,7 @@ from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params
 )
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
 from glam4cm.settings import GRAPH_CLS_TASK, results_dir
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
@@ -115,6 +115,13 @@ def run(args):
             for param in model.base_model.parameters():
                 param.requires_grad = False
 
+
+        logging_steps = get_logging_steps(
+            len(train_dataset), 
+            args.num_epochs, 
+            args.train_batch_size
+        )
+#         
         # Training arguments
         training_args = TrainingArguments(
             output_dir=output_dir,
@@ -126,8 +133,8 @@ def run(args):
             weight_decay=0.01,
             learning_rate=5e-5,
             logging_dir=logs_dir,
-            logging_steps=args.num_log_steps,
-            eval_steps=args.num_eval_steps,
+            logging_steps=logging_steps,
+            eval_steps=logging_steps,
             # save_steps=args.num_save_steps,
             # save_total_limit=2,
             # load_best_model_at_end=True,

@@ -43,8 +43,14 @@ class GNNGraphClassificationTrainer(Trainer):
 
         self.cls_label = cls_label
         self.dataloaders = dict()
-        self.dataloaders['train'] = DataLoader(dataset['train'], batch_size=batch_size, shuffle=True)
-        self.dataloaders['test'] = DataLoader(dataset['test'], batch_size=batch_size, shuffle=False)
+        self.dataloaders['train'] = DataLoader(
+            [g for g in dataset['train'] if len(g.edge_index) != 0], 
+            batch_size=batch_size, shuffle=True
+        )
+        self.dataloaders['test'] = DataLoader(
+            [g for g in dataset['test'] if len(g.edge_index) != 0], 
+            batch_size=batch_size, shuffle=False
+        )
 
         self.results = list()
 
@@ -121,3 +127,4 @@ class GNNGraphClassificationTrainer(Trainer):
         print(f"Epoch: {len(self.results)//2} {' | '.join([f'{s2t(k)}: {v:.4f}' for k, v in epoch_metrics.items() if k != 'phase'])}")
 
         return epoch_metrics
+    

@@ -9,7 +9,7 @@ from glam4cm.downstream_tasks.common_args import (
     get_config_params
 )
 from glam4cm.models.hf import get_model
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
 
 
 from sklearn.metrics import (
@@ -124,6 +124,12 @@ def run(args):
         f"{graph_dataset.config_hash}",
     )
 
+    logging_steps = get_logging_steps(
+        len(train_dataset), 
+        args.num_epochs, 
+        args.train_batch_size
+    )
+
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.num_epochs,
@@ -131,9 +137,9 @@ def run(args):
         per_device_eval_batch_size=args.eval_batch_size,
         weight_decay=0.01,
         logging_dir=logs_dir,
-        logging_steps=args.num_log_steps,
+        logging_steps=logging_steps,
         eval_strategy='steps',
-        eval_steps=args.num_eval_steps,
+        eval_steps=logging_steps,
         # save_steps=args.num_save_steps,
         # save_total_limit=2,
         # load_best_model_at_end=True,

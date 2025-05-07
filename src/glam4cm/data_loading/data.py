@@ -19,7 +19,7 @@ from glam4cm.lang2graph.common import (
 
 from scipy.sparse import csr_matrix
 
-from glam4cm.settings import EDGE_CLS_TASK, LINK_PRED_TASK
+from glam4cm.settings import DUMMY_GRAPH_CLS_TASK, EDGE_CLS_TASK, LINK_PRED_TASK
 from glam4cm.tokenization.special_tokens import *
 from torch_geometric.transforms import RandomLinkSplit
 import torch
@@ -177,7 +177,8 @@ class TorchGraph:
                 # print("Randomizing edge embeddings")
                 self.data.edge_attr = np.random.randn(self.graph.number_of_edges(), random_embed_dim)
             else:
-                self.data.edge_attr = embedder.embed(list(self.edge_texts.values()))
+                edge_texts = list(self.edge_texts.values())
+                self.data.edge_attr = embedder.embed(edge_texts) if len(edge_texts) > 0 else np.empty((self.graph.number_of_edges(), random_embed_dim))
 
         if os.path.exists(f"{self.fp}") and not reload:
             with open(f"{self.fp}", 'rb') as f:
@@ -486,12 +487,16 @@ class TorchNodeGraph(TorchGraph):
     
     def get_pyg_data(self):
         d = GraphData()
-        train_nodes, test_nodes = train_test_split(
-            list(self.graph.numbered_graph.nodes), 
-            test_size=self.test_ratio, 
-            shuffle=True, 
-            random_state=42
-        )
+        if self.task_type == DUMMY_GRAPH_CLS_TASK:
+            train_nodes = list(self.graph.numbered_graph.nodes)
+            test_nodes = list()
+        else:
+            train_nodes, test_nodes = train_test_split(
+                list(self.graph.numbered_graph.nodes), 
+                test_size=self.test_ratio, 
+                shuffle=True, 
+                random_state=42
+            )
 
         def get_node_label(node):
             if self.node_cls_label in self.graph.numbered_graph.nodes[node]\

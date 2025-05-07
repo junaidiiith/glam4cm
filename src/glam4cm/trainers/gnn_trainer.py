@@ -111,9 +111,11 @@ class Trainer:
 
 
     def run(self):
+        all_metrics = list()
         for epoch in tqdm(range(self.num_epochs), desc="Running Epochs"):
             train_metrics = self.train()
             test_metrics = self.test()
+            all_metrics.append(test_metrics)
 
             for k, v in train_metrics.items():
                 if k != 'phase':
@@ -124,6 +126,12 @@ class Trainer:
                     self.writer.add_scalar(f"test/{k}", v, epoch)
     
         self.writer.close()
+        print("Training complete.")
+        best_metrics = sorted(all_metrics, key=lambda x: x['balanced_accuracy'], reverse=True)[0]
+        
+        s2t = lambda x: x.replace("_", " ").title()
+        print(f"Best: {' | '.join([f'{s2t(k)}: {v:.4f}' for k, v in best_metrics.items() if k != 'phase'])}")
+        
     
     def compute_metrics(self, all_preds, all_labels):
         return compute_classification_metrics(all_preds, all_labels)

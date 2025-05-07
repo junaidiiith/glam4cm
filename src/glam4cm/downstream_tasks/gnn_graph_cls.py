@@ -1,7 +1,7 @@
 import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, GraphClassifer
-from glam4cm.settings import GRAPH_CLS_TASK, results_dir
+from glam4cm.settings import GRAPH_CLS_TASK, DUMMY_GRAPH_CLS_TASK, results_dir
 from glam4cm.trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
 from glam4cm.downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
 from glam4cm.utils import merge_argument_parsers, set_seed
@@ -32,10 +32,10 @@ def run(args):
     dataset_name = args.dataset
 
     dataset = get_models_dataset(dataset_name, **config_params)
-
-    graph_data_params = {**get_config_params(args), 'task_type': GRAPH_CLS_TASK}
-    if args.use_embeddings:
-        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.cls_label}')
+    
+    graph_data_params = {**get_config_params(args), 'task_type': GRAPH_CLS_TASK if not args.include_dummies else DUMMY_GRAPH_CLS_TASK}
+    # if args.use_embeddings:
+    #     graph_data_params['ckpt'] = os.path.join(results_dir, dataset_name, f'{args.cls_label}')
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
@@ -44,8 +44,16 @@ def run(args):
     cls_label = f"num_graph_{args.cls_label}"
     assert hasattr(graph_dataset, cls_label), f"Dataset does not have attribute {cls_label}"
     num_classes = getattr(graph_dataset, cls_label)
-
     print(f"Number of classes: {num_classes}")
+    
+    if args.include_dummies:
+        import numpy as np
+        dummy_class = int(graph_dataset.graph_label_map_label.transform(['dummy'])[0])
+        for g, l in zip(graph_dataset, [int(g.data.graph_label[0]) == dummy_class for g in graph_dataset]):
+            setattr(g.data, f"graph_{args.cls_label}", np.array([int(l)]))
+        num_classes = 2
+        
+    
     model_name = args.gnn_conv_model
     hidden_dim = args.hidden_dim
     output_dim = args.output_dim

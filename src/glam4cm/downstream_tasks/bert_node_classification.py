@@ -9,7 +9,7 @@ import os
 from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.data_loading.utils import oversample_dataset
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from sklearn.model_selection import StratifiedKFold
@@ -147,6 +147,12 @@ def run(args):
 
         
         print("Num epochs: ", args.num_epochs)
+        
+        logging_steps = get_logging_steps(
+            len(train_dataset), 
+            args.num_epochs, 
+            args.train_batch_size
+        )
 
         training_args = TrainingArguments(
             output_dir=output_dir,
@@ -155,9 +161,9 @@ def run(args):
             per_device_eval_batch_size=args.eval_batch_size,
             weight_decay=0.01,
             logging_dir=logs_dir,
-            logging_steps=args.num_log_steps,
+            logging_steps=logging_steps,
             eval_strategy='steps',
-            eval_steps=args.num_eval_steps,
+            eval_steps=logging_steps,
             # save_steps=args.num_save_steps,
             # save_total_limit=2,
             # load_best_model_at_end=True,

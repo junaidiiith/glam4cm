@@ -305,7 +305,7 @@ class GraphDataset(torch.utils.data.Dataset):
         for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
             fp = self.file_paths[graph.hash]
             if not os.path.exists(fp) or self.reload:
-                if self.task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK]:
+                if self.task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK, DUMMY_GRAPH_CLS_TASK]:
                     torch_graph: TorchNodeGraph = create_node_graph(graph, fp)
                 elif self.task_type in [EDGE_CLS_TASK, LINK_PRED_TASK]:
                     torch_graph: TorchEdgeGraph = create_edge_graph(graph, fp)
@@ -422,8 +422,9 @@ class GraphDataset(torch.utils.data.Dataset):
                 assert torch_graph.data.overall_edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
                 f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
             else:
-                assert torch_graph.data.edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
-                f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
+                if len(torch_graph.data.edge_index.shape) > 1:
+                    assert torch_graph.data.edge_index.shape[1] == torch_graph.graph.number_of_edges(), \
+                    f"Number of edges mismatch, {torch_graph.data.edge_index.shape[1]} != {torch_graph.graph.number_of_edges()}"
 
 
 

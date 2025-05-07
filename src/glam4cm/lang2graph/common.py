@@ -116,13 +116,14 @@ def create_graph_from_edge_index(graph, edge_index: np.ndarray):
     subgraph.id_to_node_label = graph.id_to_node_label
     subgraph.edge_label_to_id = graph.edge_label_to_id
     subgraph.id_to_edge_label = graph.id_to_edge_label
-    try:
-        assert subgraph.number_of_edges() == edge_index.shape[1]
-    except AssertionError as e:
-        print(f"Number of edges mismatch {subgraph.number_of_edges()} != {edge_index.size(1)}")
-        import pickle
-        pickle.dump([graph, edge_index], open("subgraph.pkl", "wb"))
-        raise e
+    if len(edge_index) > 0:
+        try:
+            assert subgraph.number_of_edges() == edge_index.shape[1]
+        except AssertionError as e:
+            print(f"Number of edges mismatch {subgraph.number_of_edges()} != {edge_index.size(1)}")
+            import pickle
+            pickle.dump([graph, edge_index], open("subgraph.pkl", "wb"))
+            raise e
 
     return subgraph
 
