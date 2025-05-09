@@ -177,7 +177,7 @@ def get_run_configs(tasks):
 
     run_configs = list()
     for task_id in tasks: 
-        bert_task_config_str = [f'--task_id={task_id}'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()]
+        bert_task_config_str = [f'--task_id={task_id} --reload'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()]
         
         for distance in range(4):
             distance_config_str = [f'--distance={distance}']
