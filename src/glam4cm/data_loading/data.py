@@ -23,8 +23,8 @@ from glam4cm.settings import DUMMY_GRAPH_CLS_TASK, EDGE_CLS_TASK, LINK_PRED_TASK
 from glam4cm.tokenization.special_tokens import *
 from torch_geometric.transforms import RandomLinkSplit
 import torch
-from torch_geometric.data import Data, Dataset
-from typing import List, Optional, Sequence, Union
+from torch_geometric.data import Data
+from typing import List, Union
 from glam4cm.tokenization.utils import doc_tokenizer
 
 
@@ -388,6 +388,9 @@ class TorchEdgeGraph(TorchGraph):
         node_texts, edge_texts = self.get_node_edge_strings(
             edge_index=edge_index.numpy(),
         )
+        
+        # print("Node texts: ", list(node_texts.values())[:5])
+        # print("Edge texts: ", list(edge_texts.values())[:5])
 
         setattr(d, 'num_nodes', self.graph.number_of_nodes())
         setattr(d, 'num_edges', self.graph.number_of_edges())

@@ -110,7 +110,7 @@ def run(args):
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         use_edge_attrs=args.use_edge_attrs,
-        logs_dir=logs_dir
+        logs_dir=logs_dir,
     )
 
     print("Training GNN Edge Classification model")

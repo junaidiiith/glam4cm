@@ -51,8 +51,8 @@ def execute_configs(run_configs, tasks_str: str):
     print("Total number of configurations: ", len(run_configs))
     print(f"Total number of remaining configurations: {len(remaining_configs)}")
     print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
-    
-    for lm_script_command in tqdm(remaining_configs, desc='Running tasks'):
+    lm_script_commands = [lm_script_command for lm_script_command in remaining_configs.keys()][::-1]
+    for lm_script_command in tqdm(lm_script_commands, desc='Running tasks'):
         print(f'Running LM --> {lm_script_command}')
         result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
 
@@ -146,8 +146,8 @@ def get_run_configs(tasks):
         "",
         "use_attributes", 
         "use_node_types", 
-        # "use_edge_label", 
-        # "use_edge_types", 
+        "use_edge_label", 
+        "use_edge_types", 
     ]
 
     gnn_conf = {
@@ -157,7 +157,7 @@ def get_run_configs(tasks):
     gnn_updates = [
         "",
         "use_embeddings",
-        # "use_edge_attrs"   
+        "use_edge_attrs"
     ]
 
     gnn_models = [
@@ -203,6 +203,7 @@ def get_run_configs(tasks):
                             if dataset == 'ontouml':
                                 if "--use_edge_label" in config_task_str:
                                     config_task_str.remove("--use_edge_label")
+                                    
                             if dataset == 'eamodelset':
                                 if "--use_edge_label" in config_task_str:
                                     config_task_str.remove("--use_edge_label")
@@ -225,7 +226,7 @@ def get_run_configs(tasks):
                                 gnn_configs = list()
                                 for gnn_model in gnn_models:
                                     for j in range(len((gnn_updates))):
-                                        gnn_task_config_str = [f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()]
+                                        gnn_task_config_str = ['--reload'] + [f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()]
                                         gnn_config_str = [f'--{u}' if u else '' for u in [i for i in gnn_updates[:j+1]]]
                                         gnn_params_str = [f'--gnn_conv_model={gnn_model["name"]}'] + \
                                             [f'--{k}={v}' for k, v in gnn_model['params'].items()] + \

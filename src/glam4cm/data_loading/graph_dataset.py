@@ -730,8 +730,8 @@ class GraphEdgeDataset(GraphDataset):
                 data[k] += v
 
 
-        # print("Train Texts: ", data[f'train_pos_edges'][:20])
-        # print("Test Texts: ", data[f'test_pos_edges'][:20])
+        print("Train Texts: ", data[f'train_pos_edges'][:20])
+        print("Test Texts: ", data[f'test_pos_edges'][:20])
 
         # print("Train Classes", edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
         # print("Test Classes", edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))

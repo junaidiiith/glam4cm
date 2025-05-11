@@ -157,7 +157,6 @@ def get_bert_args_parser():
 def get_gpt_args_parser():
     parser = ArgumentParser()
     parser.add_argument('--model_name', type=str, default='gpt2')
-    parser.add_argument('--use_special_tokens', action='store_true')
 
     parser.add_argument('--warmup_steps', type=int, default=200)
     parser.add_argument('--blocks', type=int, default=6)

@@ -168,6 +168,7 @@ def run(args):
             # save_total_limit=2,
             # load_best_model_at_end=True,
             fp16=True,
+            save_strategy="no"
         )
 
         trainer = Trainer(

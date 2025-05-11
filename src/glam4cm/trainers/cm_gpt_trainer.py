@@ -52,7 +52,7 @@ class CMGPTTrainer:
             self.compute_metrics = compute_metrics
         
         print(f"Number of parameters: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)/ 1000000:.3f}M")
-
+        print(f"Logging to: {log_dir}")
 
     def step(self, batch, idx=None):
         # B, T = batch['input_ids'].shape
