@@ -15,7 +15,8 @@ from glam4cm.models.hf import get_model
 from glam4cm.downstream_tasks.common_args import (
     get_bert_args_parser, 
     get_common_args_parser, 
-    get_config_params
+    get_config_params,
+    get_config_str
 )
 from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
 from glam4cm.settings import GRAPH_CLS_TASK, results_dir
@@ -93,6 +94,7 @@ def run(args):
             dataset_name,
             f"LM_{GRAPH_CLS_TASK}",
             f'{args.cls_label}',
+            get_config_str(args)
         )
 
         logs_dir = os.path.join(

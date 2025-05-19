@@ -3,7 +3,8 @@ from glam4cm.models.hf import get_model
 from glam4cm.downstream_tasks.common_args import (
     get_bert_args_parser, 
     get_common_args_parser, 
-    get_config_params
+    get_config_params,
+    get_config_str
 )
 import os
 from transformers import TrainingArguments, Trainer
@@ -126,6 +127,7 @@ def run(args):
             dataset_name,
             f'LM_{NODE_CLS_TASK}',
             f'{args.node_cls_label}',
+            get_config_str(args)
         )
 
         logs_dir = os.path.join(

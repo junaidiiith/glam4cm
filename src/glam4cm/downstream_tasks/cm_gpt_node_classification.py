@@ -9,7 +9,7 @@ from glam4cm.models.cmgpt import CMGPT, CMGPTClassifier
 from glam4cm.downstream_tasks.utils import get_models_dataset
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.trainers.cm_gpt_trainer import CMGPTTrainer
-from glam4cm.utils import merge_argument_parsers, set_seed
+from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 
 
@@ -37,6 +37,8 @@ def run(args):
         distance=args.distance,
         reload = args.reload,
         task_type=NODE_CLS_TASK,
+        node_topk=args.node_topk,
+        node_cls_label=args.node_cls_label,
     )
 
     models_dataset = get_models_dataset(args.dataset, **models_dataset_params)
@@ -47,8 +49,10 @@ def run(args):
     node_label_dataset = graph_dataset.get_node_classification_lm_data(
         args.node_cls_label,
         tokenizer=tokenizer,
-        distance=1,
+        distance=args.distance,
     )
+    
+    set_encoded_labels(node_label_dataset['train'], node_label_dataset['test'])
 
     print("Training model")
     output_dir = os.path.join(

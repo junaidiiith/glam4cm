@@ -1,3 +1,4 @@
+from collections import Counter
 import os
 import json
 from argparse import ArgumentParser
@@ -51,7 +52,7 @@ def get_parser():
     parser.add_argument('--limit', type=int, default=-1)
     parser.add_argument('--trust_remote_code', action='store_true')
     parser.add_argument('--include_dummies', action='store_true')
-    parser.add_argument('--task_type', type=str, default='dd')
+    parser.add_argument('--task_type', type=str, default='graph_cls')
 
     parser.add_argument('--num_epochs', type=int, default=10)
 
@@ -75,6 +76,12 @@ def run(args):
     texts = [
         (g['txt'], g['labels'])
         for g in json.load(open(f'datasets/{dataset_name}/{file_name}'))
+        if g['labels'] not in ['dummy', 'unknown']
+    ]
+    allowed_labels = [label for label, _ in dict(Counter([t[1] for t in texts]).most_common(48)).items()]
+    texts = [
+        (t, l) for t, l in texts
+        if l in allowed_labels
     ]
     if args.task_type == 'dd':
         print("Task type: DD")
@@ -130,7 +137,7 @@ def run(args):
 
         logs_dir = os.path.join(
             'logs',
-            dataset_name,
+            f"{dataset_name}_{args.model_name if args.ckpt is None else args.ckpt.split('/')[-1]}",
             f'graph_cls_comp_{i+1}',
         )
 
@@ -148,9 +155,6 @@ def run(args):
             logging_dir=logs_dir,
             logging_steps=args.num_log_steps,
             eval_steps=args.num_eval_steps,
-            save_steps=args.num_save_steps,
-            save_total_limit=2,
-            load_best_model_at_end=True,
             fp16=True,
             save_strategy="no"
         )
@@ -170,4 +174,3 @@ def run(args):
         print(results)
 
         i += 1
-        break

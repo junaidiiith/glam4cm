@@ -127,15 +127,15 @@ class GNNConv(torch.nn.Module):
         h = in_feat
         h = self.conv_layers[0](h, edge_index, edge_attr) \
         if edge_attr_val else self.conv_layers[0](h, edge_index)
-        activate(h)
+        h = activate(h)
 
         for conv in self.conv_layers[1:-1]:
             nh = conv(h, edge_index, edge_attr) if edge_attr_val else conv(h, edge_index)
             h = nh if not self.residual else nh + h
-            activate(h)
+            h = activate(h)
         
         h = self.conv_layers[-1](h, edge_index)
-        activate(h)
+        h = activate(h)
         return h
 
     def is_headed_model(self):

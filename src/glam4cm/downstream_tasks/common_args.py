@@ -6,6 +6,26 @@ from glam4cm.settings import (
     TFIDF_MODEL
 )
 
+def get_config_str(args):
+    if args.use_attributes:
+        config_str += "_attrs"
+    if args.use_edge_label:
+        config_str += "_el"
+    if args.use_edge_types:
+        config_str += "_et"
+    if args.use_node_types:
+        config_str += "_nt"
+    if args.use_special_tokens:
+        config_str += "_st"
+    if args.no_labels:
+        config_str += "_nolb"
+    if args.node_cls_label:
+        config_str += f"_{args.node_cls_label}"
+    if args.edge_cls_label:
+        config_str += f"_{args.edge_cls_label}"
+
+    return config_str
+
 
 def get_config_params(args):
     common_params = dict(

@@ -12,7 +12,7 @@ from glam4cm.downstream_tasks.common_args import (
     get_gnn_args_parser
 )
 
-
+ 
 def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()

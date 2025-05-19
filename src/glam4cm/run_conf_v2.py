@@ -12,27 +12,163 @@ from glam4cm.settings import (
 )
 
 
+dataset_confs = {
+    'eamodelset': {
+        "node_cls_label": ["type", "layer"],
+        "edge_cls_label": "type",
+        "extra_params": {
+            "num_epochs": 3,
+        }
+    },
+    'ecore_555': {
+        "node_cls_label": ["abstract"],
+        "edge_cls_label": "type",
+        "extra_params": {
+            "num_epochs": 3,
+        }
+    },
+    'modelset': {
+        "node_cls_label": ["abstract"],
+        "edge_cls_label": "type",
+        "extra_params": {
+            "num_epochs": 3,
+        }
+    },
+    'ontouml': {
+        "node_cls_label": ["stereotype"],
+        "edge_cls_label": "type",
+        "extra_params": {
+            "num_epochs": 15,
+            'node_topk': 20
+        }
+    },
+}
+
+task_configs = {
+    2: {
+        "bert_config": {
+            "train_batch_size": 2,
+        },
+        "gnn_config": {
+            "task_id": 6,
+        },
+    },
+    3: {
+        "bert_config": {
+            "train_batch_size": 32,
+        },
+        "gnn_config": {
+            "task_id": 7,
+        },
+    },
+    4: {
+        "bert_config": {
+            "train_batch_size": 64,
+        },
+        "gnn_config": {
+            "task_id": 8,
+        },
+    },
+    5: {
+        "bert_config": {
+            "train_batch_size": 64,
+        },
+        "gnn_config": {
+            "task_id": 9,
+        },
+    }
+}
+
+dataset_updates = [
+    "",
+    "use_attributes", 
+    "use_node_types", 
+    "use_edge_label", 
+    "use_edge_types", 
+]
+
+gnn_conf = {
+    "lr": 1e-3
+}
+
+gnn_updates = [
+    "",
+    "use_embeddings",
+    "use_edge_attrs"
+]
+
+gnn_models = [
+    {
+        "name": "SAGEConv",
+        "params": {}
+    },
+    {
+        "name": "GATv2Conv",
+        "params": {
+            "num_heads": 4
+        }
+    }
+]
+
+gnn_train = True
+
+
+def cmd_to_dict(command_line):
+    return {
+        i.split('=')[0].replace('--', ''): True if '=' not in i else i.split('=')[1] 
+        for i in command_line.split()
+    }
+
+
+def get_config_str(command_line):
+    args = cmd_to_dict(command_line)
+    config_str = ""
+    if 'use_attributes' in args:
+        config_str += "_attrs"
+    if 'use_edge_label' in args:
+        config_str += "_el"
+    if 'use_edge_types' in args:
+        config_str += "_et"
+    if 'use_node_types' in args:
+        config_str += "_nt"
+    if 'use_special_tokens' in args:
+        config_str += "_st"
+    if 'no_labels' in args:
+        config_str += "_nolb"
+    if "node_cls_label" in args:
+        config_str += f"_{args['node_cls_label']}"
+    if "edge_cls_label" in args:
+        config_str += f"_{args['edge_cls_label']}"
+
+    return config_str
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tasks', type=str)
     args = parser.parse_args()
     return args
 
+    
 
-def get_embed_model_name(dataset_name, task_id, node_cls_label, edge_cls_label):
+def get_embed_model_name(command_line):
+    args = cmd_to_dict(command_line)
+    task_id = int(args['task_id'])
+    
     if task_id == 6:
         label = f'LM_{GRAPH_CLS_TASK}/label'
     elif task_id == 7:
-        label = f"LM_{NODE_CLS_TASK}/{node_cls_label}"
+        label = f"LM_{NODE_CLS_TASK}/{args['node_cls_label']}"
     elif task_id == 8:
         label = f"LM_{LINK_PRED_TASK}"
     elif task_id == 9:
-        label = f"LM_{EDGE_CLS_TASK}/{edge_cls_label}"
+        label = f"LM_{EDGE_CLS_TASK}/{args['edge_cls_label']}"
         
     model_name = os.path.join(
         results_dir,
-        dataset_name,
-        label
+        args['dataset'],
+        label,
+        get_config_str(command_line)
     )
     
     return model_name
@@ -46,12 +182,22 @@ def execute_configs(run_configs, tasks_str: str):
     else:
         df = pd.DataFrame(columns=['Config', 'Status'])
     remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values}
+    
+    lm_script_commands = [lm_script_command for lm_script_command in remaining_configs.keys()]
+    
+    for lm_script_command in lm_script_commands:
+        remaining_configs[lm_script_command] = [
+            gnn_script_command + ' --ckpt=' + get_embed_model_name(gnn_script_command) if 'use_embeddings' in gnn_script_command else gnn_script_command
+            for gnn_script_command in remaining_configs[lm_script_command]
+        ]
+    
     print("\n".join([r for r in remaining_configs]))
     
     print("Total number of configurations: ", len(run_configs))
     print(f"Total number of remaining configurations: {len(remaining_configs)}")
     print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
-    lm_script_commands = [lm_script_command for lm_script_command in remaining_configs.keys()][::-1]
+    print(remaining_configs)
+    
     for lm_script_command in tqdm(lm_script_commands, desc='Running tasks'):
         print(f'Running LM --> {lm_script_command}')
         result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
@@ -65,6 +211,7 @@ def execute_configs(run_configs, tasks_str: str):
         # if 'gnn' in remaining_configs[lm_script_command]:
         for gnn_script_command in tqdm(remaining_configs[lm_script_command], desc='Running GNN'):
             print(f'Running GNN --> {gnn_script_command}')
+            
             result = subprocess.run(f'python glam_test.py {gnn_script_command}', shell=True)
 
             status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
@@ -75,105 +222,6 @@ def execute_configs(run_configs, tasks_str: str):
 
 
 def get_run_configs(tasks):
-    dataset_confs = {
-        'eamodelset': {
-            "node_cls_label": ["type", "layer"],
-            "edge_cls_label": "type",
-            "extra_params": {
-                "num_epochs": 3,
-            }
-        },
-        'ecore_555': {
-            "node_cls_label": ["abstract"],
-            "edge_cls_label": "type",
-            "extra_params": {
-                "num_epochs": 3,
-            }
-        },
-        'modelset': {
-            "node_cls_label": ["abstract"],
-            "edge_cls_label": "type",
-            "extra_params": {
-                "num_epochs": 3,
-            }
-        },
-        'ontouml': {
-            "node_cls_label": ["stereotype"],
-            "edge_cls_label": "type",
-            "extra_params": {
-                "num_epochs": 15,
-                'node_topk': 20
-            }
-        },
-    }
-
-    task_configs = {
-        2: {
-            "bert_config": {
-                "train_batch_size": 2,
-            },
-            "gnn_config": {
-                "task_id": 6,
-            },
-        },
-        3: {
-            "bert_config": {
-                "train_batch_size": 32,
-            },
-            "gnn_config": {
-                "task_id": 7,
-            },
-        },
-        4: {
-            "bert_config": {
-                "train_batch_size": 64,
-            },
-            "gnn_config": {
-                "task_id": 8,
-            },
-        },
-        5: {
-            "bert_config": {
-                "train_batch_size": 64,
-            },
-            "gnn_config": {
-                "task_id": 9,
-            },
-        }
-    }
-
-    dataset_updates = [
-        "",
-        "use_attributes", 
-        "use_node_types", 
-        "use_edge_label", 
-        "use_edge_types", 
-    ]
-
-    gnn_conf = {
-        "lr": 1e-3
-    }
-
-    gnn_updates = [
-        "",
-        "use_embeddings",
-        "use_edge_attrs"
-    ]
-
-    gnn_models = [
-        {
-            "name": "SAGEConv",
-            "params": {}
-        },
-        {
-            "name": "GATv2Conv",
-            "params": {
-                "num_heads": 4
-            }
-        }
-    ]
-
-    gnn_train = True
 
     run_configs = list()
     for task_id in tasks: 
@@ -231,10 +279,6 @@ def get_run_configs(tasks):
                                         gnn_params_str = [f'--gnn_conv_model={gnn_model["name"]}'] + \
                                             [f'--{k}={v}' for k, v in gnn_model['params'].items()] + \
                                             [f'--{k}={v}' for k, v in gnn_conf.items()]
-                                        
-                                        if "use_embeddings" in gnn_updates[:j+1]:
-                                            gnn_task_id = task_configs[task_id]['gnn_config']['task_id']
-                                            gnn_params_str += [f'--ckpt={get_embed_model_name(dataset, gnn_task_id, node_cls_label, edge_cls_label)}']
                                         
                                         gnn_config = " ".join(gnn_task_config_str + \
                                             gnn_config_str + \

@@ -7,7 +7,8 @@ from glam4cm.settings import LINK_PRED_TASK, results_dir
 from glam4cm.downstream_tasks.common_args import (
     get_bert_args_parser, 
     get_common_args_parser, 
-    get_config_params
+    get_config_params,
+    get_config_str
 )
 from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
 from glam4cm.tokenization.special_tokens import *
@@ -109,11 +110,12 @@ def run(args):
         for param in model.base_model.parameters():
             param.requires_grad = False
 
-
+    
     output_dir = os.path.join(
         results_dir,
         dataset_name,
-        f"LM_{LINK_PRED_TASK}"
+        f"LM_{LINK_PRED_TASK}",
+        get_config_str(args)
     )
 
     logs_dir = os.path.join(

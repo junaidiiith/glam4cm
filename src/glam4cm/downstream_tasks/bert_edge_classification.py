@@ -6,7 +6,8 @@ from glam4cm.settings import EDGE_CLS_TASK, results_dir
 from glam4cm.downstream_tasks.common_args import (
     get_bert_args_parser, 
     get_common_args_parser, 
-    get_config_params
+    get_config_params,
+    get_config_str
 )
 from glam4cm.models.hf import get_model
 from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
@@ -113,7 +114,8 @@ def run(args):
         results_dir,
         dataset_name,
         f"LM_{EDGE_CLS_TASK}",
-        f'{args.edge_cls_label}'
+        f'{args.edge_cls_label}',
+        get_config_str(args)
     )
 
     logs_dir = os.path.join(
