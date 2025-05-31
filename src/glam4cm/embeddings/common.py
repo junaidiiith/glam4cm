@@ -29,8 +29,9 @@ def get_embedding_model(
         model_name: str,
         ckpt: str = None
     ) -> Embedder:
-    if ckpt:
-        model_name = json.load(open(os.path.join(ckpt, 'config.json')))['_name_or_path']
+    # if ckpt:
+    #     model_name = json.load(open(os.path.join(ckpt, 'config.json')))['_name_or_path']
+    #     print("Model name:", model_name)
         
     if model_name in [MODERN_BERT, BERT_MODEL]:
         from glam4cm.embeddings.bert import BertEmbedder

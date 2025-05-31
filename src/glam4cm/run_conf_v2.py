@@ -11,6 +11,20 @@ from glam4cm.settings import (
     results_dir
 )
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tasks', type=str)
+    parser.add_argument('--start', type=int, default=-1)
+    parser.add_argument('--end', type=int, default=-1)
+    parser.add_argument('--reload', action='store_true')
+    parser.add_argument('--run_lm', action='store_true')
+    parser.add_argument('--run_gnn', action='store_true')
+    
+    args = parser.parse_args()
+    return args
+
+args = get_args()
+
 
 dataset_confs = {
     'eamodelset': {
@@ -143,13 +157,6 @@ def get_config_str(command_line):
     return config_str
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--tasks', type=str)
-    args = parser.parse_args()
-    return args
-
-    
 
 def get_embed_model_name(command_line):
     args = cmd_to_dict(command_line)
@@ -170,62 +177,66 @@ def get_embed_model_name(command_line):
         label,
         get_config_str(command_line)
     )
-    
+    if not os.path.exists(model_name):
+        print(model_name, os.path.exists(model_name), " does not exi")
     return model_name
 
 
 def execute_configs(run_configs, tasks_str: str):
     
-    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
+    log_file = f"logs/run_configs_tasks_{tasks_str}_lm.csv"
     if os.path.exists(log_file):
         df = pd.read_csv(log_file)
     else:
         df = pd.DataFrame(columns=['Config', 'Status'])
     remaining_configs = {c['lm']: c['gnn'] for c in run_configs if c['lm'] not in df['Config'].values}
     
-    lm_script_commands = [lm_script_command for lm_script_command in remaining_configs.keys()]
-    
+    start = 0 if args.start == -1 else args.start
+    end = len(remaining_configs) if args.end == -1 else args.end
+    lm_script_commands = [lm_script_command for lm_script_command in remaining_configs.keys()][start:end]
+
     for lm_script_command in lm_script_commands:
         remaining_configs[lm_script_command] = [
-            gnn_script_command + ' --ckpt=' + get_embed_model_name(gnn_script_command) if 'use_embeddings' in gnn_script_command else gnn_script_command
+            gnn_script_command + ' --ckpt=' + get_embed_model_name(gnn_script_command) 
+            if 'use_embeddings' in gnn_script_command 
+            else gnn_script_command
             for gnn_script_command in remaining_configs[lm_script_command]
         ]
-    
     print("\n".join([r for r in remaining_configs]))
-    
     print("Total number of configurations: ", len(run_configs))
     print(f"Total number of remaining configurations: {len(remaining_configs)}")
     print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
     print(remaining_configs)
     
-    for lm_script_command in tqdm(lm_script_commands, desc='Running tasks'):
-        print(f'Running LM --> {lm_script_command}')
-        result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
-
-        status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
-        print(f"✅ finished running command: {lm_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
-        
-        df.loc[len(df)] = [lm_script_command, status]
-        df.to_csv(log_file, index=False)
-        
-        # if 'gnn' in remaining_configs[lm_script_command]:
-        for gnn_script_command in tqdm(remaining_configs[lm_script_command], desc='Running GNN'):
-            print(f'Running GNN --> {gnn_script_command}')
-            
-            result = subprocess.run(f'python glam_test.py {gnn_script_command}', shell=True)
+    for lm_script_command in tqdm(lm_script_commands, desc=f'Running tasks: {start}-{end-1}'):
+        if args.run_lm:
+            print(f'Running LM --> {lm_script_command}')
+            result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
 
             status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
-            print(f"✅ finished running command: {gnn_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
-
-            df.loc[len(df)] = [gnn_script_command, status]
+            print(f"✅ finished running command: {lm_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
+            
+            df.loc[len(df)] = [lm_script_command, status]
             df.to_csv(log_file, index=False)
+        
+        if args.run_gnn:
+            for gnn_script_command in tqdm(remaining_configs[lm_script_command], desc='Running GNN'):
+                print(f'Running GNN --> {gnn_script_command}')
+                
+                result = subprocess.run(f'python glam_test.py {gnn_script_command}', shell=True)
+
+                status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
+                print(f"✅ finished running command: {gnn_script_command}" if result.returncode == 0 else f"❌ failed with error:\n{result.stderr}")
+
+                df.loc[len(df)] = [gnn_script_command, status]
+                df.to_csv(log_file, index=False)
 
 
 def get_run_configs(tasks):
 
     run_configs = list()
     for task_id in tasks: 
-        bert_task_config_str = [f'--task_id={task_id} --reload'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()]
+        bert_task_config_str = [f'--task_id={task_id}'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()] + (['--reload'] if args.reload else [])
         
         for distance in range(4):
             distance_config_str = [f'--distance={distance}']
@@ -274,19 +285,21 @@ def get_run_configs(tasks):
                                 gnn_configs = list()
                                 for gnn_model in gnn_models:
                                     for j in range(len((gnn_updates))):
-                                        gnn_task_config_str = ['--reload'] + [f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()]
+                                        gnn_task_config_str = [f'--{u}={v}' if u else '' for u, v in task_configs[task_id]['gnn_config'].items()] + (['--reload'] if args.reload else [])
                                         gnn_config_str = [f'--{u}' if u else '' for u in [i for i in gnn_updates[:j+1]]]
                                         gnn_params_str = [f'--gnn_conv_model={gnn_model["name"]}'] + \
                                             [f'--{k}={v}' for k, v in gnn_model['params'].items()] + \
                                             [f'--{k}={v}' for k, v in gnn_conf.items()]
                                         
-                                        gnn_config = " ".join(gnn_task_config_str + \
+                                        gnn_config = " ".join(
+                                            gnn_task_config_str + \
                                             gnn_config_str + \
                                             gnn_params_str + \
                                             dataset_conf_str + \
                                             labels_conf_str + \
                                             config_task_str + \
-                                            distance_config_str)
+                                            distance_config_str
+                                        )
                                         gnn_config = gnn_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
                                         gnn_config = gnn_config.replace(f"--num_epochs={dataset_conf['extra_params']['num_epochs']}", "--num_epochs=200")
                                         gnn_configs.append(gnn_config)
@@ -360,7 +373,8 @@ def get_remaining_configs(tasks_str, run_configs):
 
 
 def main():
-    tasks = [int(i) for i in get_args().tasks.split(',')]
+    tasks = [int(i) for i in args.tasks.split(',')]
+    
     run_configs = get_run_configs(tasks)
     # Execute the configurations
     execute_configs(run_configs, tasks_str="_".join([str(i) for i in tasks]))

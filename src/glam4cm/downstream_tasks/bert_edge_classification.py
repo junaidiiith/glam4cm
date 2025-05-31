@@ -99,17 +99,7 @@ def run(args):
     print("Training model")
     print(f'Number of labels: {num_labels}')
     
-    model = get_model(
-        args.ckpt if args.ckpt else model_name, 
-        num_labels, 
-        len(tokenizer), 
-        trust_remote_code=args.trust_remote_code
-    )
     
-    if args.freeze_pretrained_weights:
-        for param in model.base_model.parameters():
-            param.requires_grad = False
-
     output_dir = os.path.join(
         results_dir,
         dataset_name,
@@ -117,6 +107,28 @@ def run(args):
         f'{args.edge_cls_label}',
         get_config_str(args)
     )
+    if os.path.exists(output_dir):
+        model = get_model(
+            output_dir, 
+            num_labels, 
+            len(tokenizer), 
+            trust_remote_code=args.trust_remote_code
+        )
+        args.num_epochs = 1
+        # print(f"Output directory {output_dir} already exists. Exiting.")
+        # exit(0)
+    else:
+        model = get_model(
+            args.ckpt if args.ckpt else model_name, 
+            num_labels, 
+            len(tokenizer), 
+            trust_remote_code=args.trust_remote_code
+        )
+    
+    if args.freeze_pretrained_weights:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+
 
     logs_dir = os.path.join(
         'logs',

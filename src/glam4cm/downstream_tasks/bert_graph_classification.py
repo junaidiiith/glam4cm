@@ -96,6 +96,9 @@ def run(args):
             f'{args.cls_label}',
             get_config_str(args)
         )
+        if os.path.exists(output_dir):
+            print(f"Output directory {output_dir} already exists. Exiting.")
+            exit(0)
 
         logs_dir = os.path.join(
             'logs',

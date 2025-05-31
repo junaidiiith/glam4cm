@@ -39,8 +39,8 @@ def run(args):
     graph_data_params = get_config_params(args)
     graph_data_params = {**graph_data_params, 'task_type': EDGE_CLS_TASK}
     
-    if args.use_embeddings:
-        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.edge_cls_label}')
+    # if args.use_embeddings:
+    #     graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.edge_cls_label}')
 
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
@@ -69,13 +69,16 @@ def run(args):
 
     edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.use_edge_attrs else None
 
+    ue = "" if not args.use_edge_attrs else "_ue"
+    
     logs_dir = os.path.join(
         "logs",
         dataset_name,
         f"GNN_{EDGE_CLS_TASK}",
-        f"{args.edge_cls_label}",
+        f"{args.edge_cls_label}{ue}",
         f"{graph_dataset.config_hash}",
     )
+    
 
     gnn_conv_model = GNNConv(
         model_name=model_name,

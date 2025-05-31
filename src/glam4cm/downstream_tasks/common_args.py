@@ -7,6 +7,7 @@ from glam4cm.settings import (
 )
 
 def get_config_str(args):
+    config_str = ""
     if args.use_attributes:
         config_str += "_attrs"
     if args.use_edge_label:

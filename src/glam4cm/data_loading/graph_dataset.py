@@ -158,7 +158,6 @@ class GraphDataset(torch.utils.data.Dataset):
         self.use_edge_label = use_edge_label
         self.no_labels = no_labels
         
-        
         self.add_negative_train_samples = add_negative_train_samples
         self.neg_sampling_ratio = neg_sampling_ratio
 
@@ -250,18 +249,18 @@ class GraphDataset(torch.utils.data.Dataset):
         self.config_hash = self.get_config_hash()
         os.makedirs(os.path.join(self.save_dir, self.config_hash), exist_ok=True)
         self.file_paths = {
-            graph.hash: os.path.join(self.save_dir, self.config_hash, f'{graph.hash}', 'data.pkl') 
+            graph.hash: os.path.join(
+                self.save_dir, 
+                self.config_hash, 
+                f'{graph.hash}_{self.get_string_gen_params_hash()}', 
+                'data.pkl'
+            ) 
             for graph in models_dataset
         }
 
         print("Number of duplicate graphs: ", len(models_dataset) - len(self.file_paths))
 
-
-    def set_torch_graphs(
-            self, 
-            models_dataset: Union[EcoreDataset, ArchiMateDataset], 
-            limit: int =-1
-        ):
+    def get_common_params(self):
         common_params = dict(
             metadata=self.metadata,
             task_type=self.task_type,
@@ -277,6 +276,30 @@ class GraphDataset(torch.utils.data.Dataset):
             edge_cls_label=self.edge_cls_label,
             node_topk=self.node_topk,
         )
+        return common_params
+    
+    def get_string_gen_params_hash(self):
+        string_gen_params = f"""
+        distance={self.distance},
+        use_attributes={self.use_attributes},
+        use_node_types={self.use_node_types},
+        use_edge_types={self.use_edge_types},
+        use_edge_label={self.use_edge_label},
+        use_special_tokens={self.use_special_tokens},
+        no_labels={self.no_labels},
+        node_cls_label={self.node_cls_label},
+        edge_cls_label={self.edge_cls_label},
+        node_topk={self.node_topk}
+        """
+        return utils.md5_hash(string_gen_params)
+    
+    def set_torch_graphs(
+            self, 
+            models_dataset: Union[EcoreDataset, ArchiMateDataset], 
+            limit: int =-1
+        ):
+        
+        common_params = self.get_common_params()
         def create_node_graph(graph: LangGraph, fp: str) -> TorchNodeGraph:
             node_params = {
                 **common_params,
@@ -294,7 +317,6 @@ class GraphDataset(torch.utils.data.Dataset):
             }
             torch_graph = TorchEdgeGraph(graph, **edge_params)
             return torch_graph
-        
         
         
         models_size = len(models_dataset) \
@@ -817,6 +839,60 @@ class GraphNodeDataset(GraphDataset):
         
         save_dir='datasets/graph_data',
     ):
+        """
+        Parameters
+        ----------
+        models_dataset: Union[EcoreDataset, ArchiMateDataset, OntoUMLDataset]
+            The dataset of models to convert to a graph dataset.
+        task_type: str
+            The type of task to perform on the graph dataset. Must be one of 'node', 'edge', or 'graph'.
+        distance: int
+            The distance to consider when creating the graph. If 0, only the node itself is considered.
+        test_ratio: float
+            The proportion of the dataset to split into the test set.
+        reload: bool
+            Whether to reload the dataset from disk if it already exists.
+        use_attributes: bool
+            Whether to include attributes of the nodes and edges in the graph.
+        use_edge_types: bool
+            Whether to include the types of the edges in the graph.
+        use_node_types: bool
+            Whether to include the types of the nodes in the graph.
+        use_edge_label: bool
+            Whether to include the labels of the edges in the graph.
+        use_special_tokens: bool
+            Whether to include special tokens for the start and end of a node or edge sequence.
+        node_topk: int
+            The number of top nodes to include in the graph. If -1, all nodes are included.
+        use_embeddings: bool
+            Whether to use embeddings for the node and edge attributes.
+        embed_model_name: str
+            The name of the embedding model to use.
+        ckpt: str
+            The path to the checkpoint file of the embedding model.
+        no_shuffle: bool
+            Whether to shuffle the dataset before splitting it into train and test sets.
+        randomize_ne: bool
+            Whether to randomize the node embeddings.
+        randomize_ee: bool
+            Whether to randomize the edge embeddings.
+        random_embed_dim: int
+            The dimension of the random embeddings.
+        limit: int
+            The maximum number of models to include in the dataset.
+        no_labels: bool
+            Whether to include labels for the nodes and edges in the graph.
+        node_cls_label: str
+            The label to use for the node classification task.
+        edge_cls_label: str
+            The label to use for the edge classification task.
+        save_dir: str
+            The directory in which to save the dataset.
+
+        Returns
+        -------
+        A GraphNodeDataset object.
+        """
         super().__init__(
             models_dataset=models_dataset,
             task_type=task_type,

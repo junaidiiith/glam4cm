@@ -185,6 +185,7 @@ class TorchGraph:
                 self.data.edge_attr = embedder.embed(edge_texts) \
                     if len(edge_texts) > 0 else np.empty((self.graph.number_of_edges(), random_embed_dim))
 
+        
         if os.path.exists(f"{self.fp}") and not reload:
             with open(f"{self.fp}", 'rb') as f:
                 obj: Union[TorchEdgeGraph, TorchNodeGraph] = pickle.load(f)
