@@ -61,9 +61,21 @@ def get_parser():
     return parser
 
 
-
 def run(args):
     set_seed(args.seed)
+    dataset_name = args.dataset
+    print("Training model")
+    output_dir = os.path.join(
+        results_dir,
+        dataset_name,
+        f'LM_{NODE_CLS_TASK}',
+        f'{args.node_cls_label}',
+        get_config_str(args)
+    )
+
+    # if os.path.exists(output_dir):
+    #     print(f"Output directory {output_dir} already exists. Exiting.")
+    #     exit(0)
 
     config_params = dict(
         include_dummies = args.include_dummies,
@@ -119,20 +131,6 @@ def run(args):
         if args.freeze_pretrained_weights:
             for param in model.base_model.parameters():
                 param.requires_grad = False
-
-        
-        print("Training model")
-        output_dir = os.path.join(
-            results_dir,
-            dataset_name,
-            f'LM_{NODE_CLS_TASK}',
-            f'{args.node_cls_label}',
-            get_config_str(args)
-        )
-
-        if os.path.exists(output_dir):
-            print(f"Output directory {output_dir} already exists. Exiting.")
-            exit(0)
 
 
         logs_dir = os.path.join(

@@ -20,10 +20,9 @@ def get_config_str(args):
         config_str += "_st"
     if args.no_labels:
         config_str += "_nolb"
-    if args.node_cls_label:
-        config_str += f"_{args.node_cls_label}"
-    if args.edge_cls_label:
-        config_str += f"_{args.edge_cls_label}"
+    config_str += f"_{args.node_cls_label}" if args.node_cls_label else ""
+    config_str += f"_{args.edge_cls_label}" if args.edge_cls_label else ""
+    config_str += f"_{args.distance}" if args.distance else ""
 
     return config_str
 

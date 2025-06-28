@@ -106,7 +106,8 @@ def run(args):
 
     i = 0
     for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
-
+        # if i == 0:
+        #     continue
         print(f'Fold {i+1}/{k}')
 
         train_texts = [texts[i] for i in train_idx]
@@ -132,18 +133,19 @@ def run(args):
         output_dir = os.path.join(
             results_dir,
             dataset_name,
-            f'graph_cls_comp_{i+1}',
+            f'graph_cls_comp_{"dummy" if include_dummies else ""}{i+1}',
         )
 
         logs_dir = os.path.join(
             'logs',
             f"{dataset_name}_{args.model_name if args.ckpt is None else args.ckpt.split('/')[-1]}",
-            f'graph_cls_comp_{i+1}',
+            f'graph_cls_comp_{"dummy" if include_dummies else ""}{i+1}',
         )
 
         print("Running epochs: ", args.num_epochs)
 
         # Training arguments
+        print("Batch size: ", args.train_batch_size)
         training_args = TrainingArguments(
             output_dir=output_dir,
             num_train_epochs=args.num_epochs,
@@ -174,3 +176,4 @@ def run(args):
         print(results)
 
         i += 1
+        # break

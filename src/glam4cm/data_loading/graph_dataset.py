@@ -289,7 +289,8 @@ class GraphDataset(torch.utils.data.Dataset):
         no_labels={self.no_labels},
         node_cls_label={self.node_cls_label},
         edge_cls_label={self.edge_cls_label},
-        node_topk={self.node_topk}
+        node_topk={self.node_topk},
+        ckpt={self.ckpt},
         """
         return utils.md5_hash(string_gen_params)
     
@@ -668,6 +669,7 @@ class GraphEdgeDataset(GraphDataset):
             edge_cls_label: str = None,
             save_dir='datasets/graph_data'
         ):
+        assert task_type in [EDGE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[EDGE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
             models_dataset=models_dataset,
             task_type=task_type,
@@ -893,6 +895,7 @@ class GraphNodeDataset(GraphDataset):
         -------
         A GraphNodeDataset object.
         """
+        assert task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[NODE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
             models_dataset=models_dataset,
             task_type=task_type,

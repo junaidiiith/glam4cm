@@ -1,6 +1,8 @@
 import os
 from glam4cm.downstream_tasks.common_args import (
-    get_common_args_parser, 
+    get_common_args_parser,
+    get_config_params,
+    get_config_str, 
     get_gpt_args_parser
 )
 
@@ -28,21 +30,38 @@ def run(args):
 
     tokenizer = get_tokenizer('bert-base-cased', use_special_tokens=args.use_special_tokens)
 
-    models_dataset_params = dict(
-        language='en',
+    set_seed(args.seed)
+    dataset_name = args.dataset
+    print("Training model")
+    output_dir = os.path.join(
+        results_dir,
+        dataset_name,
+        f'LM_{NODE_CLS_TASK}',
+        f'{args.node_cls_label}',
+        get_config_str(args)
     )
 
-    graph_params = dict(
-        use_special_tokens=args.use_special_tokens,
-        distance=args.distance,
-        reload = args.reload,
-        task_type=NODE_CLS_TASK,
-        node_topk=args.node_topk,
-        node_cls_label=args.node_cls_label,
-    )
+    # if os.path.exists(output_dir):
+    #     print(f"Output directory {output_dir} already exists. Exiting.")
+    #     exit(0)
 
-    models_dataset = get_models_dataset(args.dataset, **models_dataset_params)
-    graph_dataset = GraphNodeDataset(models_dataset, **graph_params)
+    config_params = dict(
+        include_dummies = args.include_dummies,
+        min_enr = args.min_enr,
+        min_edges = args.min_edges,
+        remove_duplicates = args.remove_duplicates,
+        reload=args.reload,
+        language = args.language
+    )
+    dataset_name = args.dataset
+    distance = args.distance
+    dataset = get_models_dataset(dataset_name, **config_params)
+
+    print("Loaded dataset")
+
+    graph_data_params = {**get_config_params(args), 'task_type': NODE_CLS_TASK}
+    print("Loading graph dataset")
+    graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
 
     assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node labels for {args.node_cls_label}"
 

@@ -123,6 +123,7 @@ class ModelDataset:
 
 
     def filter_graphs(self):
+        # print("Filtering graphs with min edges and min enr: ", self.min_edges, self.min_enr)
         graphs = list()
         for graph in self.graphs:
             addable = True
@@ -132,6 +133,7 @@ class ModelDataset:
                 addable = False
             
             if addable:
+                # print("Addable because min edges and min enr: ", graph.number_of_edges())
                 graphs.append(graph)
         
         self.graphs = graphs
@@ -293,7 +295,7 @@ class ArchiMateDataset(ModelDataset):
                             
                         except Exception as e:
                             raise e
-                
+            print("Total graphs:", len(self.graphs)) 
             self.filter_graphs()
             self.save()
         else:
@@ -302,6 +304,7 @@ class ArchiMateDataset(ModelDataset):
         if remove_duplicates:
             self.dedup()
         
+        assert all([g.number_of_edges() >= min_edges for g in self.graphs]), f"Filtered out graphs with less than {min_edges} edges"
         print(f'Loaded {self.name} with {len(self.graphs)} graphs')
         print(f'Graphs: {len(self.graphs)}')
     

@@ -57,6 +57,9 @@ class GNNEdgeClassificationTrainer(Trainer):
         all_preds, all_labels = list(), list()
         epoch_loss = 0
         epoch_metrics = defaultdict(float)
+        # print("Total dataloader size: ", len(self.dataloader))
+        # from tqdm.auto import tqdm
+        # for data in tqdm(self.dataloader):
         for data in self.dataloader:
             self.optimizer.zero_grad()
             self.model.zero_grad()
@@ -81,7 +84,10 @@ class GNNEdgeClassificationTrainer(Trainer):
         
         all_preds = torch.cat(all_preds, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
+        # import time
+        # t1 = time.time()
         epoch_metrics = self.compute_metrics(all_preds, all_labels)
+        # print(f"Time taken: {time.time() - t1}")
         epoch_metrics['loss'] = epoch_loss        
         epoch_metrics['phase'] = 'train'
 

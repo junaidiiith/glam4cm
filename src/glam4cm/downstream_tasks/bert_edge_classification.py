@@ -54,6 +54,17 @@ def get_parser():
 
 def run(args):
     set_seed(args.seed)
+    dataset_name = args.dataset
+    output_dir = os.path.join(
+        results_dir,
+        dataset_name,
+        f"LM_{EDGE_CLS_TASK}",
+        f'{args.edge_cls_label}',
+        get_config_str(args)
+    )
+    if os.path.exists(output_dir):
+        print(f"Output directory {output_dir} already exists. Exiting.")
+        exit(0)
 
     config_params = dict(
         include_dummies = args.include_dummies,
@@ -63,7 +74,7 @@ def run(args):
         language = args.language,
         reload=args.reload
     )
-    dataset_name = args.dataset
+    
     
     print("Loaded dataset")
     dataset = get_models_dataset(dataset_name, **config_params)
@@ -99,32 +110,13 @@ def run(args):
     print("Training model")
     print(f'Number of labels: {num_labels}')
     
-    
-    output_dir = os.path.join(
-        results_dir,
-        dataset_name,
-        f"LM_{EDGE_CLS_TASK}",
-        f'{args.edge_cls_label}',
-        get_config_str(args)
+    model = get_model(
+        args.ckpt if args.ckpt else model_name, 
+        num_labels, 
+        len(tokenizer), 
+        trust_remote_code=args.trust_remote_code
     )
-    if os.path.exists(output_dir):
-        model = get_model(
-            output_dir, 
-            num_labels, 
-            len(tokenizer), 
-            trust_remote_code=args.trust_remote_code
-        )
-        args.num_epochs = 1
-        # print(f"Output directory {output_dir} already exists. Exiting.")
-        # exit(0)
-    else:
-        model = get_model(
-            args.ckpt if args.ckpt else model_name, 
-            num_labels, 
-            len(tokenizer), 
-            trust_remote_code=args.trust_remote_code
-        )
-    
+
     if args.freeze_pretrained_weights:
         for param in model.base_model.parameters():
             param.requires_grad = False

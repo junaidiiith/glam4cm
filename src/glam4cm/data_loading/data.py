@@ -361,7 +361,8 @@ class TorchEdgeGraph(TorchGraph):
         setattr(d, 'test_pos_edge_label', test_data.pos_edge_label)
 
 
-        if hasattr(train_data, 'neg_edge_label_index'):
+        if self.add_negative_train_samples:
+            assert hasattr(train_data, 'neg_edge_label_index')
             assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in train_data.neg_edge_label_index.t().tolist()])
             assert not any([self.graph.numbered_graph.has_edge(*edge) for edge in test_data.neg_edge_label_index.t().tolist()])
             setattr(d, 'train_neg_edge_label_index', train_data.neg_edge_label_index)

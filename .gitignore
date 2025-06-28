@@ -176,3 +176,9 @@ temp*
 all_results.json
 graph_cls_comp_1*
 models*
+
+comparison-models
+get_results.py
+run_tfidf-w2v.py
+worde4mde.tar.gz
+out

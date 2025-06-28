@@ -19,6 +19,9 @@ def get_args():
     parser.add_argument('--reload', action='store_true')
     parser.add_argument('--run_lm', action='store_true')
     parser.add_argument('--run_gnn', action='store_true')
+    parser.add_argument('--min_distance', type=int, default=0)
+    parser.add_argument('--max_distance', type=int, default=3)
+    parser.add_argument('--distances', type=str, default=None)
     
     args = parser.parse_args()
     return args
@@ -31,28 +34,28 @@ dataset_confs = {
         "node_cls_label": ["type", "layer"],
         "edge_cls_label": "type",
         "extra_params": {
-            "num_epochs": 3,
+            "num_epochs": 50,
         }
     },
     'ecore_555': {
         "node_cls_label": ["abstract"],
         "edge_cls_label": "type",
         "extra_params": {
-            "num_epochs": 3,
+            "num_epochs": 50,
         }
     },
     'modelset': {
         "node_cls_label": ["abstract"],
         "edge_cls_label": "type",
         "extra_params": {
-            "num_epochs": 3,
+            "num_epochs": 50,
         }
     },
     'ontouml': {
         "node_cls_label": ["stereotype"],
         "edge_cls_label": "type",
         "extra_params": {
-            "num_epochs": 15,
+            "num_epochs": 50,
             'node_topk': 20
         }
     },
@@ -86,6 +89,14 @@ task_configs = {
     5: {
         "bert_config": {
             "train_batch_size": 64,
+        },
+        "gnn_config": {
+            "task_id": 9,
+        },
+    },
+    11: {
+        "bert_config": {
+            "train_batch_size": 1024,
         },
         "gnn_config": {
             "task_id": 9,
@@ -153,6 +164,8 @@ def get_config_str(command_line):
         config_str += f"_{args['node_cls_label']}"
     if "edge_cls_label" in args:
         config_str += f"_{args['edge_cls_label']}"
+    if "distance" in args:
+        config_str += f"_{args['distance']}"
 
     return config_str
 
@@ -178,13 +191,13 @@ def get_embed_model_name(command_line):
         get_config_str(command_line)
     )
     if not os.path.exists(model_name):
-        print(model_name, os.path.exists(model_name), " does not exi")
+        print(model_name, os.path.exists(model_name), " does not exist")
     return model_name
 
 
 def execute_configs(run_configs, tasks_str: str):
     
-    log_file = f"logs/run_configs_tasks_{tasks_str}_lm.csv"
+    log_file = f"logs/run_configs_tasks_{tasks_str}_cmgpt.csv"
     if os.path.exists(log_file):
         df = pd.read_csv(log_file)
     else:
@@ -206,10 +219,12 @@ def execute_configs(run_configs, tasks_str: str):
     print("Total number of configurations: ", len(run_configs))
     print(f"Total number of remaining configurations: {len(remaining_configs)}")
     print("Total number of configurations to run: ", len(remaining_configs) + sum([len(v) for v in remaining_configs.values()]))
-    print(remaining_configs)
+    import json
+    print(json.dumps(remaining_configs, indent=2), len(remaining_configs))
     
     for lm_script_command in tqdm(lm_script_commands, desc=f'Running tasks: {start}-{end-1}'):
         if args.run_lm:
+            lm_script_command = lm_script_command.replace("train_batch_size", "batch_size")
             print(f'Running LM --> {lm_script_command}')
             result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
 
@@ -238,11 +253,16 @@ def get_run_configs(tasks):
     for task_id in tasks: 
         bert_task_config_str = [f'--task_id={task_id}'] + [f'--{k}={v}' for k, v in task_configs[task_id]['bert_config'].items()] + (['--reload'] if args.reload else [])
         
-        for distance in range(4):
+        if args.distances:
+            distances = [int(i) for i in args.distances.split(',')]
+        else:
+            distances = [d for d in range(args.min_distance, args.max_distance + 1)]
+            
+        for distance in distances:
             distance_config_str = [f'--distance={distance}']
             
             for i in range(len(dataset_updates)):
-                if distance == 0 and i > 1:
+                if i < len(dataset_updates) - 1:
                     continue
                 
                 for dataset, dataset_conf in dataset_confs.items():
@@ -257,6 +277,7 @@ def get_run_configs(tasks):
                             labels_conf_str = [f'--node_cls_label={node_cls_label}', f'--edge_cls_label={edge_cls_label}']
                             
                             config_task_str = [f'--{u}' if u else '' for u in [x for x in dataset_updates[:i+1]]]
+                            # print(config_task_str)
                             # if dataset == 'eamodelset':
                             #     continue
                             if dataset == 'ontouml':
@@ -276,9 +297,9 @@ def get_run_configs(tasks):
                                 distance_config_str
                             )
                             
-                            if distance > 1:
-                                bert_config = bert_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=8")
-                            
+                            # if distance > 1:
+                            #     bert_config = bert_config.replace(f"--train_batch_size={task_configs[task_id]['bert_config']['train_batch_size']}", "--train_batch_size=4")
+                            # print(bert_config)
                             run_configs.append({'lm': bert_config})
                             
                             if gnn_train:

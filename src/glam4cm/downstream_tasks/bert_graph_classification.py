@@ -96,9 +96,9 @@ def run(args):
             f'{args.cls_label}',
             get_config_str(args)
         )
-        if os.path.exists(output_dir):
-            print(f"Output directory {output_dir} already exists. Exiting.")
-            exit(0)
+        # if os.path.exists(output_dir):
+        #     print(f"Output directory {output_dir} already exists. Exiting.")
+        #     exit(0)
 
         logs_dir = os.path.join(
             'logs',
@@ -140,11 +140,11 @@ def run(args):
             logging_dir=logs_dir,
             logging_steps=logging_steps,
             eval_steps=logging_steps,
-            # save_steps=args.num_save_steps,
-            # save_total_limit=2,
-            # load_best_model_at_end=True,
+            save_steps=logging_steps,
+            save_total_limit=2,
+            load_best_model_at_end=True,
             fp16=True,
-            save_strategy="no"
+            save_strategy="steps"
         )
 
         # Trainer

@@ -65,11 +65,11 @@ def run(args):
     aggregation = args.aggregation
 
     input_dim = graph_dataset[0].data.x.shape[1]
-
+    ue = "" if not args.use_edge_attrs else "_ue"
     logs_dir = os.path.join(
         "logs",
         dataset_name,
-        f"GNN_{GRAPH_CLS_TASK}",
+        f"GNN_{GRAPH_CLS_TASK}{ue}",
         f"{graph_dataset.config_hash}",
     )
 

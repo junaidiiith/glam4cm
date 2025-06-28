@@ -38,7 +38,10 @@ def run(args):
 
     graph_data_params = get_config_params(args)
     graph_data_params = {**graph_data_params, 'task_type': EDGE_CLS_TASK}
-    
+    print("Using model: ", graph_data_params['embed_model_name'])
+    if args.ckpt:
+        print("Using checkpoint: ", args.ckpt)
+        
     # if args.use_embeddings:
     #     graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.edge_cls_label}')
 
