@@ -20,7 +20,7 @@ def get_parser():
 
 
 def run(args):
-    set_seed(args.seed)
+    
 
     tokenizer = get_tokenizer('bert-base-cased', special_tokens=True)
 

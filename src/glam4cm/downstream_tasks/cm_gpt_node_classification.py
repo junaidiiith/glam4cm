@@ -26,11 +26,11 @@ def get_parser():
 
 
 def run(args):
-    set_seed(args.seed)
+    
 
     tokenizer = get_tokenizer('bert-base-cased', use_special_tokens=args.use_special_tokens)
 
-    set_seed(args.seed)
+    
     dataset_name = args.dataset
     print("Training model")
     output_dir = os.path.join(

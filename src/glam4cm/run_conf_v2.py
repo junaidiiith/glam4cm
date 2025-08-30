@@ -197,7 +197,7 @@ def get_embed_model_name(command_line):
 
 def execute_configs(run_configs, tasks_str: str):
     
-    log_file = f"logs/run_configs_tasks_{tasks_str}_cmgpt.csv"
+    log_file = f"logs/run_configs_tasks_{tasks_str}.csv"
     if os.path.exists(log_file):
         df = pd.read_csv(log_file)
     else:
@@ -224,8 +224,8 @@ def execute_configs(run_configs, tasks_str: str):
     
     for lm_script_command in tqdm(lm_script_commands, desc=f'Running tasks: {start}-{end-1}'):
         if args.run_lm:
-            lm_script_command = lm_script_command.replace("train_batch_size", "batch_size")
-            print(f'Running LM --> {lm_script_command}')
+            lm_script_to_run_command = lm_script_command.replace("train_batch_size", "batch_size")
+            print(f'Running LM --> {lm_script_to_run_command}')
             result = subprocess.run(f'python glam_test.py {lm_script_command}', shell=True)
 
             status = 'success' if result.returncode == 0 else f'❌ {result.stderr}'
@@ -262,8 +262,8 @@ def get_run_configs(tasks):
             distance_config_str = [f'--distance={distance}']
             
             for i in range(len(dataset_updates)):
-                if i < len(dataset_updates) - 1:
-                    continue
+                # if i < len(dataset_updates) - 1:
+                #     continue
                 
                 for dataset, dataset_conf in dataset_confs.items():
                     if (task_id == 2 and dataset not in ['ecore_555', 'modelset'])\

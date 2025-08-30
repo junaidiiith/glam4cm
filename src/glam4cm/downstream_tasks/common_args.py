@@ -22,7 +22,7 @@ def get_config_str(args):
         config_str += "_nolb"
     config_str += f"_{args.node_cls_label}" if args.node_cls_label else ""
     config_str += f"_{args.edge_cls_label}" if args.edge_cls_label else ""
-    config_str += f"_{args.distance}" if args.distance else ""
+    config_str += f"_{args.distance}"
 
     return config_str
 
@@ -57,6 +57,7 @@ def get_config_params(args):
 
         node_cls_label=args.node_cls_label,
         edge_cls_label=args.edge_cls_label,
+        seed=args.seed
     )
     
 

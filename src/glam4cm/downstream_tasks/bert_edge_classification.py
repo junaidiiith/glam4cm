@@ -53,7 +53,7 @@ def get_parser():
 
 
 def run(args):
-    set_seed(args.seed)
+    
     dataset_name = args.dataset
     output_dir = os.path.join(
         results_dir,

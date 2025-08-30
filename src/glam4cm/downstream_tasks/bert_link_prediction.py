@@ -58,7 +58,7 @@ def get_parser():
 
 
 def run(args):
-    set_seed(args.seed)
+    
 
     config_params = dict(
         include_dummies = args.include_dummies,

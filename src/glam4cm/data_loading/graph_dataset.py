@@ -135,7 +135,10 @@ class GraphDataset(torch.utils.data.Dataset):
         
         exclude_labels: List = None,
         save_dir='datasets/graph_data',
+        seed=42,
     ):
+        utils.set_seed(seed)
+        self.seed = seed
         self.task_type = task_type
         
         if isinstance(models_dataset, EcoreDataset):
@@ -198,6 +201,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
         self.graphs: List[Union[TorchNodeGraph, TorchEdgeGraph]] = []
         self.config = dict(
+            seed=self.seed,
             name=models_dataset.name,
             task_type=task_type,
             node_topk=node_topk,
@@ -291,6 +295,7 @@ class GraphDataset(torch.utils.data.Dataset):
         edge_cls_label={self.edge_cls_label},
         node_topk={self.node_topk},
         ckpt={self.ckpt},
+        seed={self.seed}
         """
         return utils.md5_hash(string_gen_params)
     
@@ -667,7 +672,8 @@ class GraphEdgeDataset(GraphDataset):
 
             node_cls_label: str = None,
             edge_cls_label: str = None,
-            save_dir='datasets/graph_data'
+            save_dir='datasets/graph_data',
+            seed=42,
         ):
         assert task_type in [EDGE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[EDGE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
@@ -704,7 +710,8 @@ class GraphEdgeDataset(GraphDataset):
             randomize_ne=randomize_ne,
             randomize_ee=randomize_ee,
             random_embed_dim=random_embed_dim,
-            save_dir=save_dir
+            save_dir=save_dir,
+            seed=seed,
         )
 
         self.set_torch_graphs(models_dataset, limit)
@@ -840,6 +847,7 @@ class GraphNodeDataset(GraphDataset):
         edge_cls_label: str = None,
         
         save_dir='datasets/graph_data',
+        seed=42,
     ):
         """
         Parameters
@@ -927,6 +935,7 @@ class GraphNodeDataset(GraphDataset):
             randomize_ee=randomize_ee,
             random_embed_dim=random_embed_dim,
             save_dir=save_dir,
+            seed=seed,
         )
 
         self.set_torch_graphs(models_dataset, limit)
