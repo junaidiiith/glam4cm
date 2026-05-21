@@ -18,7 +18,8 @@ from glam4cm.downstream_tasks.common_args import (
     get_config_params,
     get_config_str
 )
-from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.settings import GRAPH_CLS_TASK, results_dir
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed

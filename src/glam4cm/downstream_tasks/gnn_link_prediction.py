@@ -2,10 +2,10 @@ import os
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.gnn_layers import GNNConv, EdgeClassifer
 from glam4cm.settings import LINK_PRED_TASK, results_dir
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
-from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_labels
+from glam4cm.utils import merge_argument_parsers
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 

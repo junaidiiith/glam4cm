@@ -10,7 +10,8 @@ import os
 from transformers import TrainingArguments, Trainer
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.data_loading.utils import oversample_dataset
-from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from sklearn.model_selection import StratifiedKFold

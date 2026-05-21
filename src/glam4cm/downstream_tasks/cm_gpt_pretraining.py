@@ -6,7 +6,7 @@ from glam4cm.downstream_tasks.common_args import (
 
 from glam4cm.data_loading.graph_dataset import get_models_gpt_dataset
 from glam4cm.models.cmgpt import CMGPT
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.trainers.cm_gpt_trainer import CMGPTTrainer
 from glam4cm.utils import merge_argument_parsers, set_seed

@@ -675,7 +675,7 @@ class GraphEdgeDataset(GraphDataset):
             save_dir='datasets/graph_data',
             seed=42,
         ):
-        assert task_type in [EDGE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[EDGE_CLS_TASK, GRAPH_CLS_TASK]}."
+        assert task_type in [LINK_PRED_TASK, EDGE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[LINK_PRED_TASK, EDGE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
             models_dataset=models_dataset,
             task_type=task_type,

@@ -8,10 +8,10 @@ from glam4cm.downstream_tasks.common_args import (
 
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.cmgpt import CMGPT, CMGPTClassifier
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.trainers.cm_gpt_trainer import CMGPTTrainer
-from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
+from glam4cm.utils import merge_argument_parsers, set_encoded_labels
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 
 

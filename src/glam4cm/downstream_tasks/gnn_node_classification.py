@@ -1,7 +1,7 @@
 import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, NodeClassifier
-from glam4cm.downstream_tasks.utils import get_models_dataset
+from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.settings import NODE_CLS_TASK, results_dir
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer

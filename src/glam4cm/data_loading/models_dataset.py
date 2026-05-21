@@ -16,9 +16,17 @@ from glam4cm.settings import (
     seed,
 )
 import numpy as np
-
-
 from glam4cm.settings import logger
+
+
+dataset_to_metamodel = {
+    'modelset': 'ecore',
+    'ecore_555': 'ecore',
+    'mar-ecore-github': 'ecore',
+    'eamodelset': 'ea',
+    'ontouml': 'ontouml',
+}
+
 
 
 class ModelDataset:
@@ -181,6 +189,10 @@ class EcoreDataset(ModelDataset):
             preprocess_graph_text: callable = None,
             include_dummies=False
         ):
+        
+        if include_dummies:
+            assert dataset_name in ['modelset'], "Dummies are only available for modelset"
+        
         super().__init__(
             dataset_name, 
             dataset_dir=dataset_dir, 
@@ -191,8 +203,14 @@ class EcoreDataset(ModelDataset):
             include_dummies=include_dummies
         )
         os.makedirs(save_dir, exist_ok=True)
+        data_path = os.path.join(dataset_dir, dataset_name)
 
-        dataset_exists = os.path.exists(os.path.join(save_dir, f'{dataset_name}.pkl'))
+        pkl_file = f'{self.name}{"_with_dummies" if self.include_dummies else ''}.pkl'
+        file_name = os.path.join(data_path, 'ecore.jsonl') if not include_dummies\
+            else os.path.join(data_path, 'ecore-with-dummy.jsonl')
+
+        dataset_exists = os.path.exists(os.path.join(save_dir, pkl_file))
+        print(f"Dataset exists: {dataset_exists}, reload: {reload}")
         if reload or not dataset_exists:
 
             
@@ -382,4 +400,29 @@ class OntoUMLDataset(ModelDataset):
     def __repr__(self):
         return f"OntoUMLDataset({self.name}, graphs={len(self.graphs)})"
 
+
+
+def get_metamodel_dataset_type(dataset):
+    return dataset_to_metamodel[dataset]
+
+
+def get_model_dataset_class(dataset_name):
+    dataset_type = get_metamodel_dataset_type(dataset_name)
+    if dataset_type == 'ea':
+        dataset_class = ArchiMateDataset
+    elif dataset_type == 'ecore':
+        dataset_class = EcoreDataset
+    elif dataset_type == 'ontouml':
+        dataset_class = OntoUMLDataset
+    else:
+        raise ValueError(f"Unknown dataset type: {dataset_type}")
+    return dataset_class
+
+
+def get_models_dataset(dataset_name, **config_params):
+    dataset_type = get_metamodel_dataset_type(dataset_name)
+    if dataset_type != 'ea' and 'language' in config_params:
+        del config_params['language']
+    dataset_class = get_model_dataset_class(dataset_name)
+    return dataset_class(dataset_name, **config_params)
 

@@ -10,7 +10,8 @@ from glam4cm.downstream_tasks.common_args import (
     get_config_str
 )
 from glam4cm.models.hf import get_model
-from glam4cm.downstream_tasks.utils import get_logging_steps, get_models_dataset
+from glam4cm.downstream_tasks.utils import get_logging_steps
+from glam4cm.data_loading.models_dataset import get_models_dataset
 
 
 from sklearn.metrics import (
