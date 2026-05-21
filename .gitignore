@@ -182,3 +182,7 @@ get_results.py
 run_tfidf-w2v.py
 worde4mde.tar.gz
 out
+
+generate_*.py
+prompts_data*
+plots*
