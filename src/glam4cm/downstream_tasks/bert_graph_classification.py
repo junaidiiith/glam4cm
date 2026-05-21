@@ -50,7 +50,6 @@ def get_parser():
     parser = merge_argument_parsers(common_parser, bert_parser)
 
     parser.add_argument('--cls_label', type=str, default='label')
-    parser.add_argument('--remove_duplicate_graphs', action='store_true')
     return parser
 
 
@@ -78,8 +77,7 @@ def run(args):
 
     fold_id = 0
     for classification_dataset in graph_dataset.get_kfold_lm_graph_classification_data(
-        tokenizer,
-        remove_duplicates=args.remove_duplicate_graphs
+        tokenizer
     ):
         train_dataset = classification_dataset['train']
         test_dataset = classification_dataset['test']

@@ -125,6 +125,7 @@ class GraphDataset(torch.utils.data.Dataset):
         use_embeddings=False,
         use_special_tokens=False,
         embed_model_name='bert-base-uncased',
+        embed_batch_size=32,
         ckpt=None,
         reload=False,
         no_shuffle=False,
@@ -151,7 +152,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self.distance = distance
         self.use_embeddings = use_embeddings
         self.ckpt = ckpt
-        self.embedder = get_embedding_model(embed_model_name, ckpt) if use_embeddings else None
+        self.embedder = get_embedding_model(embed_model_name, ckpt, embed_batch_size) if use_embeddings else None
 
         self.reload = reload
 
@@ -657,6 +658,7 @@ class GraphEdgeDataset(GraphDataset):
             
             node_topk = -1,
             
+            embed_batch_size=32,
             use_embeddings=False,
             embed_model_name='bert-base-uncased',
             ckpt=None,
@@ -679,7 +681,7 @@ class GraphEdgeDataset(GraphDataset):
         super().__init__(
             models_dataset=models_dataset,
             task_type=task_type,
-            
+            embed_batch_size=embed_batch_size,  
             distance=distance,
             test_ratio=test_ratio,
 
@@ -717,7 +719,7 @@ class GraphEdgeDataset(GraphDataset):
         self.set_torch_graphs(models_dataset, limit)
 
         if self.use_embeddings and (isinstance(self.embedder, Word2VecEmbedder) or isinstance(self.embedder, TfidfEmbedder)):
-            texts = self.get_link_prediction_texts(only_texts=True)
+            texts = self.get_edges_texts(only_texts=True)
             texts = sum([v for k, v in texts.items() if not k.endswith("classes")], [])
             print(f"Training {self.embedder.name} Embedder")
             self.embedder.train(texts)
@@ -743,7 +745,7 @@ class GraphEdgeDataset(GraphDataset):
         print(f"Test edge classes: {test_count}")
     
 
-    def get_link_prediction_texts(
+    def get_edges_texts(
         self, 
         label: str = None,
         only_texts: bool = False
@@ -751,12 +753,16 @@ class GraphEdgeDataset(GraphDataset):
         if label is None:
             label = self.edge_cls_label
         
-        assert label is not None, "No edge label found in data. Please define edge label in metadata"
+        if self.task_type == EDGE_CLS_TASK:
+            assert label is not None, "No edge label found in data. Please define edge label in metadata"
 
         data = defaultdict(list)
         for torch_graph in tqdm(self.graphs, desc=f'Getting {self.task_type} Texts'):
             # torch_graph: TorchEdgeGraph = TorchGraph.load(fp)
-            graph_data = torch_graph.get_link_prediction_texts(label, self.task_type, only_texts)
+            if self.task_type == EDGE_CLS_TASK:
+                graph_data = torch_graph.get_edge_classification_texts(label, only_texts)
+            else:
+                graph_data = torch_graph.get_link_prediction_texts()
             for k, v in graph_data.items():
                 data[k] += v
 
@@ -764,8 +770,6 @@ class GraphEdgeDataset(GraphDataset):
         print("Train Texts: ", data[f'train_pos_edges'][:20])
         print("Test Texts: ", data[f'test_pos_edges'][:20])
 
-        # print("Train Classes", edge_label_map.inverse_transform([i.item() for i in data[f'train_edge_classes'][:20]]))
-        # print("Test Classes", edge_label_map.inverse_transform([i.item() for i in data[f'test_edge_classes'][:20]]))
         return data
     
 
@@ -777,7 +781,7 @@ class GraphEdgeDataset(GraphDataset):
         if label is None:
             label = self.edge_cls_label
         
-        data = self.get_link_prediction_texts(label)
+        data = self.get_edges_texts(label)
 
 
         print("Tokenizing data")
@@ -832,6 +836,7 @@ class GraphNodeDataset(GraphDataset):
         use_special_tokens=False,
         node_topk=-1,
 
+        embed_batch_size=32,
         use_embeddings=False,
         embed_model_name='bert-base-uncased',
         ckpt=None,
@@ -922,6 +927,7 @@ class GraphNodeDataset(GraphDataset):
             
             node_topk=node_topk,
 
+            embed_batch_size=embed_batch_size,
             use_embeddings=use_embeddings,
             embed_model_name=embed_model_name,
             ckpt=ckpt,
@@ -1067,7 +1073,7 @@ def get_models_gpt_dataset(
         return [t.page_content for t in text_splitter.create_documents(texts)]
     
     graph_dataset = GraphEdgeDataset(models_dataset, **config_params)
-    texts_data = graph_dataset.get_link_prediction_texts()
+    texts_data = graph_dataset.get_edges_texts()
     texts = texts_data['train_pos_edges'] + texts_data['test_pos_edges']
 
     print("Total texts", len(texts))

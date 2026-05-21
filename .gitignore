@@ -186,3 +186,5 @@ out
 generate_*.py
 prompts_data*
 plots*
+
+sosym_experimental_results_v1*

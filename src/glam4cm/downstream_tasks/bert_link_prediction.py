@@ -59,7 +59,7 @@ def get_parser():
 
 
 def run(args):
-    
+    set_seed(args.seed)
 
     config_params = dict(
         include_dummies = args.include_dummies,
@@ -118,9 +118,9 @@ def run(args):
         f"LM_{LINK_PRED_TASK}",
         get_config_str(args)
     )
-    if os.path.exists(output_dir):
-        print(f"Output directory {output_dir} already exists. Exiting.")
-        exit(0)
+    # if os.path.exists(output_dir):
+    #     print(f"Output directory {output_dir} already exists. Exiting.")
+    #     exit(0)
 
     logs_dir = os.path.join(
         'logs',

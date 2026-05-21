@@ -9,7 +9,8 @@ from glam4cm.utils import merge_argument_parsers
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
-    get_gnn_args_parser
+    get_gnn_args_parser,
+    set_embed_model
 )
 
  
@@ -48,8 +49,7 @@ def run(args):
 
     graph_data_params = get_config_params(args)
     
-    if args.use_embeddings:
-        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f"LM_{LINK_PRED_TASK}")
+    set_embed_model(args, graph_data_params)
     
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(

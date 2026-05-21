@@ -9,7 +9,8 @@ from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_l
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
-    get_gnn_args_parser
+    get_gnn_args_parser,
+    set_embed_model
 )
 
 
@@ -37,8 +38,14 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
     graph_data_params = {**get_config_params(args), 'task_type': NODE_CLS_TASK}
     
-    if args.use_embeddings:
-        graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.node_cls_label}')
+    set_embed_model(args, graph_data_params)
+    
+    # if args.use_embeddings:
+    #     if args.ckpt:
+    #         if not os.path.exists(args.ckpt):
+    #             raise ValueError(f"Embedding model not found at: {args.ckpt}. Please provide a valid checkpoint path for node embeddings.")
+    #         graph_data_params['embed_model_name'] = args.ckpt
+        
 
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)

@@ -400,17 +400,13 @@ class TorchEdgeGraph(TorchGraph):
         return d, node_texts, edge_texts
     
 
-    def get_link_prediction_texts(self, label, task_type, only_texts=False):
+    def get_link_prediction_texts(self):
         data = dict()
         train_pos_edge_index = self.data.edge_index
         test_pos_edge_index = self.data.test_pos_edge_label_index
 
-        if task_type == LINK_PRED_TASK:
-            train_neg_edge_index = self.data.train_neg_edge_label_index
-            test_neg_edge_index = self.data.test_neg_edge_label_index
-        else:
-            train_neg_edge_index = None
-            test_neg_edge_index = None
+        train_neg_edge_index = self.data.train_neg_edge_label_index
+        test_neg_edge_index = self.data.test_neg_edge_label_index
 
         validate_edges(self)
 
@@ -436,9 +432,37 @@ class TorchEdgeGraph(TorchGraph):
             
             # print(f"Number of {edge_index_label} edges: {len(edge_strs)}")
             # print("Edge strings: ", edge_strs[:50])
+        
+        return data
+
+    def get_edge_classification_texts(self, label, only_texts=False):
+        data = dict()
+        train_pos_edge_index = self.data.edge_index
+        test_pos_edge_index = self.data.test_pos_edge_label_index
 
 
-        if task_type == EDGE_CLS_TASK and not only_texts:
+        validate_edges(self)
+
+        # print(train_neg_edge_index.shape)
+
+        edge_indices = {
+            'train_pos': train_pos_edge_index,
+            'test_pos': test_pos_edge_index,
+        }
+
+        for edge_index_label, edge_index in edge_indices.items():
+            if edge_index is None:
+                continue
+            edge_strs = self.get_graph_edge_strs(edge_index=edge_index)
+            
+            edge_strs = list(edge_strs.values())
+            data[f'{edge_index_label}_edges'] = edge_strs
+            
+            # print(f"Number of {edge_index_label} edges: {len(edge_strs)}")
+            # print("Edge strings: ", edge_strs[:50])
+
+
+        if not only_texts:
             train_mask = self.data.train_edge_mask
             test_mask = self.data.test_edge_mask
             train_classes, test_classes = getattr(self.data, f'edge_{label}')[train_mask], getattr(self.data, f'edge_{label}')[test_mask]

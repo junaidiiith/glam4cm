@@ -27,7 +27,8 @@ class Embedder:
 
 def get_embedding_model(
         model_name: str,
-        ckpt: str = None
+        ckpt: str = None,
+        embed_batch_size: int = 32
     ) -> Embedder:
     # if ckpt:
     #     model_name = json.load(open(os.path.join(ckpt, 'config.json')))['_name_or_path']
@@ -35,7 +36,7 @@ def get_embedding_model(
         
     if model_name in [MODERN_BERT, BERT_MODEL]:
         from glam4cm.embeddings.bert import BertEmbedder
-        return BertEmbedder(model_name, ckpt)
+        return BertEmbedder(model_name, ckpt, embed_batch_size)
     elif WORD2VEC_MODEL in model_name:
         from glam4cm.embeddings.w2v import Word2VecEmbedder
         return Word2VecEmbedder()

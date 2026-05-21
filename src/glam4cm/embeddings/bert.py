@@ -1,3 +1,4 @@
+from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
 import torch
 from typing import List, Union
@@ -8,13 +9,13 @@ from glam4cm.settings import device
 import numpy as np
 
 class BertEmbedder(Embedder):
-    def __init__(self, model_name, ckpt=None):
+    def __init__(self, model_name, ckpt=None, batch_size=32):
         super().__init__(name='BERT')
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(ckpt if ckpt else model_name)
         self.model.to(device)
         self.finetuned = bool(ckpt)
-    
+        self.batch_size = batch_size
 
     @property
     def embedding_dim(self) -> int:
@@ -33,14 +34,14 @@ class BertEmbedder(Embedder):
         if isinstance(text, str):
             text = [text]
             
-        print("Number of Texts: ", len(text))
+        print("Number of Texts: ", len(text), " Batch Size: ", self.batch_size)
 
         dataset = EncodingDataset(self.tokenizer, texts=text, remove_duplicates=False)
-        loader = DataLoader(dataset, batch_size=64)
+        loader = DataLoader(dataset, batch_size=self.batch_size)
 
         embeddings = list()
         with torch.no_grad():
-            for batch in loader:
+            for batch in tqdm(loader, desc="Embedding Batches", total=len(loader)):
                 # Move inputs to device and process
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)

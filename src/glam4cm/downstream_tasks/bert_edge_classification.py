@@ -63,9 +63,9 @@ def run(args):
         f'{args.edge_cls_label}',
         get_config_str(args)
     )
-    if os.path.exists(output_dir):
-        print(f"Output directory {output_dir} already exists. Exiting.")
-        exit(0)
+    # if os.path.exists(output_dir):
+    #     print(f"Output directory {output_dir} already exists. Exiting.")
+    #     exit(0)
 
     config_params = dict(
         include_dummies = args.include_dummies,

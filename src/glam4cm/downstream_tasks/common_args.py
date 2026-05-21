@@ -5,6 +5,8 @@ from glam4cm.settings import (
     WORD2VEC_MODEL,
     TFIDF_MODEL
 )
+import os
+
 
 def get_config_str(args):
     config_str = ""
@@ -44,6 +46,7 @@ def get_config_params(args):
 
         use_special_tokens=args.use_special_tokens,
 
+        embed_batch_size=args.embed_batch_size,
         use_embeddings=args.use_embeddings,
         embed_model_name=args.embed_model_name,
         ckpt=args.ckpt,
@@ -107,6 +110,7 @@ def get_common_args_parser():
 
     ### Model Dataset Loading
     parser.add_argument('--distance', type=int, default=0)
+    parser.add_argument('--embed_batch_size', type=int, default=32)
     parser.add_argument('--use_embeddings', action='store_true')
     parser.add_argument('--regen_embeddings', action='store_true')
     parser.add_argument(
@@ -187,3 +191,12 @@ def get_gpt_args_parser():
     parser.add_argument('--n_layer', type=int, default=6)
     parser.add_argument('--lr', type=float, default=1e-5)
     return parser
+
+
+def set_embed_model(args, graph_data_params):
+    
+    if args.use_embeddings:
+        if args.ckpt:
+            if not os.path.exists(args.ckpt):
+                raise ValueError(f"Embedding model not found at: {args.ckpt}. Please provide a valid checkpoint path for node embeddings.")
+            graph_data_params['embed_model_name'] = args.ckpt

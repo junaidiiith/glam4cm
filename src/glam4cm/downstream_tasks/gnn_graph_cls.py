@@ -15,6 +15,7 @@ def get_parser():
 
     parser.add_argument('--cls_label', type=str, default='label')
     parser.add_argument('--global_pool', type=str, default='mean')
+    parser.add_argument('--remove_duplicate_graphs', action='store_true')
     return parser
 
 
