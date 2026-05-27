@@ -161,6 +161,8 @@ def parse_args():
     parser.add_argument("--use_edge_attrs", "--use_attrs", action="store_true", dest="use_edge_attrs")
     parser.add_argument("--embed_batch_size", type=int, default=32)
     parser.add_argument("--neg_sampling_ratio", type=int, default=1)
+    
+    parser.add_argument("--embed_model_name", type=str, default="bert-base-uncased")
 
     args = parser.parse_args()
     if args.configs_file is None and args.task_id is None:
@@ -419,6 +421,7 @@ def llm_tokens(args, dataset: str, distance: int, flags: Dict[str, bool]) -> Lis
         f"--lr={args.lr_llm}",
         f"--train_batch_size={args.batch_size_llm}",
         f"--eval_batch_size={args.eval_batch_size_llm}",
+        f"--embed_model_name={args.embed_model_name}"
     ]
     command.extend(base_common_args(args, dataset, distance, flags))
     if args.task_id == 2:

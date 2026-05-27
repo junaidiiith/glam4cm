@@ -9,6 +9,7 @@ logger.setLevel(logging.DEBUG)
 
 
 BERT_MODEL = 'bert-base-uncased'
+BERT_MODEL_CASED = 'bert-base-cased'
 MODERN_BERT = 'answerdotai/ModernBERT-base'
 WORD2VEC_MODEL = 'word2vec'
 TFIDF_MODEL = 'tfidf'

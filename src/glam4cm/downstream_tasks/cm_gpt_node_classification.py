@@ -54,7 +54,6 @@ def run(args):
         language = args.language
     )
     dataset_name = args.dataset
-    distance = args.distance
     dataset = get_models_dataset(dataset_name, **config_params)
 
     print("Loaded dataset")
