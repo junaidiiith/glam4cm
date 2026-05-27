@@ -1,17 +1,18 @@
-import os
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.gnn_layers import GNNConv, EdgeClassifer
-from glam4cm.settings import LINK_PRED_TASK, results_dir
+from glam4cm.settings import LINK_PRED_TASK
 from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
-from glam4cm.utils import merge_argument_parsers
+from glam4cm.utils import merge_argument_parsers, set_seed
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
+    get_config_str,
     get_gnn_args_parser,
     set_embed_model
 )
+from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
 
  
 def get_parser():
@@ -22,7 +23,7 @@ def get_parser():
 
 
 def run(args):
-
+    set_seed(args.seed)
     
     
     config_params = dict(
@@ -60,6 +61,7 @@ def run(args):
             add_negative_train_samples=True, 
             neg_sampling_ratio=args.neg_sampling_ratio,
     ))
+    set_seed(args.seed)
 
     input_dim = graph_dataset[0].data.x.shape[1]
 
@@ -84,11 +86,11 @@ def run(args):
         edge_dim=edge_dim
     )
 
-    logs_dir = os.path.join(
-        "logs",
-        dataset_name,
+    output_dir = get_experiment_dir(
+        args,
         f"GNN_{LINK_PRED_TASK}",
-        f'{graph_dataset.config_hash}',
+        "link",
+        get_config_str(args),
     )
 
     clf_input_dim = gnn_conv_model.out_dim*num_heads if args.num_heads else output_dim
@@ -113,9 +115,10 @@ def run(args):
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         use_edge_attrs=args.use_edge_attrs,
-        logs_dir=logs_dir
+        logs_dir=output_dir
     )
 
 
     print("Training GNN Link Prediction model")
     trainer.run()
+    save_experiment_results(output_dir, trainer.results)

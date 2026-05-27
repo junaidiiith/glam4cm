@@ -58,7 +58,7 @@ class GraphData(Data):
 class NumpyData:
     def __init__(self, data: dict = {}):
         self.set_data(data)
-    
+
     def __getitem__(self, key):
         return getattr(self, key)
 
@@ -67,7 +67,7 @@ class NumpyData:
             if isinstance(v, torch.Tensor):
                 v = v.numpy()
             setattr(self, k, v)
-    
+
     def __repr__(self):
         response = "NumpyData(" + ", ".join([
                 f"{k}={list(v.shape)}" if isinstance(v, np.ndarray) 
@@ -111,6 +111,7 @@ class TorchGraph:
             edge_cls_label='type',
             
             node_topk: List[Union[str, int]]=None,
+            seed=42,
             fp='test_graph.pkl'
         ):
 
@@ -131,6 +132,7 @@ class TorchGraph:
         self.edge_cls_label = edge_cls_label
         
         self.node_topk = node_topk
+        self.seed = seed
         
         self.distance = distance
         self.test_ratio = test_ratio
@@ -297,6 +299,7 @@ class TorchEdgeGraph(TorchGraph):
             no_labels: bool =False,
             
             node_topk: List[Union[str, int]]=None,
+            seed: int =42,
             fp: str = 'test_graph.pkl'
         ):
 
@@ -315,6 +318,7 @@ class TorchEdgeGraph(TorchGraph):
             node_cls_label=node_cls_label,
             edge_cls_label=edge_cls_label,
             node_topk=node_topk,
+            seed=seed,
             fp=fp
         )
         self.add_negative_train_samples = add_negative_train_samples
@@ -325,6 +329,7 @@ class TorchEdgeGraph(TorchGraph):
 
 
     def get_pyg_data(self):
+        torch.manual_seed(self.seed)
         
         d = GraphData()
 
@@ -493,6 +498,7 @@ class TorchNodeGraph(TorchGraph):
             edge_cls_label: str ='type',
             
             node_topk: List[Union[str, int]]=None,
+            seed: int =42,
             
             fp='test_graph.pkl',
         ):
@@ -513,6 +519,7 @@ class TorchNodeGraph(TorchGraph):
             edge_cls_label=edge_cls_label,
             
             node_topk=node_topk,
+            seed=seed,
             fp=fp
         )
         
@@ -532,7 +539,7 @@ class TorchNodeGraph(TorchGraph):
                 list(self.graph.numbered_graph.nodes), 
                 test_size=self.test_ratio, 
                 shuffle=True, 
-                random_state=42
+                random_state=self.seed
             )
 
         def get_node_label(node):
@@ -596,4 +603,3 @@ def validate_edges(graph: Union[TorchEdgeGraph, TorchNodeGraph]):
     
     if train_neg_edge_index is not None and test_neg_edge_index is not None:
         assert len(set((a, b) for a, b in train_neg_edge_index.T.tolist()).intersection(set((a, b) for a, b in test_neg_edge_index.T.tolist()))) == 0
-    

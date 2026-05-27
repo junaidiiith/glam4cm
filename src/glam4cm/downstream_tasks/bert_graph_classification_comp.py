@@ -1,5 +1,4 @@
 from collections import Counter
-import os
 import json
 from argparse import ArgumentParser
 from random import shuffle
@@ -21,7 +20,8 @@ from transformers import (
 
 from glam4cm.data_loading.encoding import EncodingDataset
 from glam4cm.models.hf import get_model
-from glam4cm.settings import results_dir
+from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
+from glam4cm.utils import set_seed
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -45,7 +45,7 @@ def get_parser():
     parser = ArgumentParser()
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--dataset_name', type=str, default='ecore_555')
-    parser.add_argument('--model_name', type=str, default='bert-base-uncased')
+    parser.add_argument('--embed_model_name', type=str, default='bert-base-uncased')
     parser.add_argument('--ckpt', type=str, default=None)
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--k', type=int, default=10)
@@ -63,13 +63,15 @@ def get_parser():
     parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=1e-5)
+    parser.add_argument('--results_dir', type=str, default='results')
 
     return parser
 
 
 def run(args):
+    set_seed(args.seed)
     dataset_name = args.dataset_name
-    model_name = args.model_name
+    embed_model_name = args.embed_model_name
     include_dummies = args.include_dummies
     
     file_name = 'ecore.jsonl' if include_dummies and dataset_name == 'modelset' else 'ecore-with-dummy.jsonl'
@@ -100,7 +102,7 @@ def run(args):
 
     num_labels = len(y_map)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=args.trust_remote_code)
+    tokenizer = AutoTokenizer.from_pretrained(embed_model_name, trust_remote_code=args.trust_remote_code)
     k = args.k
     kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=args.seed)
 
@@ -123,24 +125,21 @@ def run(args):
         # import code; code.interact(local=locals())
 
         model = get_model(
-            args.ckpt if args.ckpt else model_name, 
+            args.ckpt if args.ckpt else embed_model_name, 
             num_labels, 
             len(tokenizer), 
             trust_remote_code=args.trust_remote_code
         )
 
         print("Training model")
-        output_dir = os.path.join(
-            results_dir,
-            dataset_name,
-            f'graph_cls_comp_{"dummy" if include_dummies else ""}{i+1}',
+        output_dir = get_experiment_dir(
+            args,
+            f"LM_{args.task_type}_comp",
+            "label",
+            f'{"dummy_" if include_dummies else ""}fold_{i+1}',
         )
 
-        logs_dir = os.path.join(
-            'logs',
-            f"{dataset_name}_{args.model_name if args.ckpt is None else args.ckpt.split('/')[-1]}",
-            f'graph_cls_comp_{"dummy" if include_dummies else ""}{i+1}',
-        )
+        logs_dir = output_dir
 
         print("Running epochs: ", args.num_epochs)
 
@@ -158,7 +157,8 @@ def run(args):
             logging_steps=args.num_log_steps,
             eval_steps=args.num_eval_steps,
             fp16=True,
-            save_strategy="no"
+            save_strategy="no",
+            seed=args.seed,
         )
 
         # Trainer
@@ -174,6 +174,7 @@ def run(args):
         trainer.train()
         results = trainer.evaluate()
         print(results)
+        save_experiment_results(output_dir, results)
 
         i += 1
         # break

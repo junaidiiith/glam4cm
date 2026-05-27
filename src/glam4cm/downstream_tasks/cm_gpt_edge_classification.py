@@ -9,7 +9,7 @@ from glam4cm.models.cmgpt import CMGPT, CMGPTClassifier
 from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.trainers.cm_gpt_trainer import CMGPTTrainer
-from glam4cm.utils import merge_argument_parsers
+from glam4cm.utils import merge_argument_parsers, set_seed
 
 
 def get_parser():
@@ -23,7 +23,7 @@ def get_parser():
 
 
 def run(args):
-    
+    set_seed(args.seed)
 
     tokenizer = get_tokenizer('bert-base-cased', special_tokens=True)
 
@@ -34,11 +34,13 @@ def run(args):
     graph_params = dict(
         use_special_tokens=args.use_special_tokens,
         distance=args.distance,
-        reload = args.reload
+        reload = args.reload,
+        seed=args.seed,
     )
 
     models_dataset = get_models_dataset(args.dataset, **models_dataset_params)
     graph_dataset = GraphEdgeDataset(models_dataset, **graph_params)
+    set_seed(args.seed)
 
     assert hasattr(graph_dataset, f'num_nodes_{args.node_cls_label}'), f"Dataset does not have node labels for {args.node_cls_label}"
 

@@ -1,17 +1,18 @@
-import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, NodeClassifier
 from glam4cm.data_loading.models_dataset import get_models_dataset
-from glam4cm.settings import NODE_CLS_TASK, results_dir
+from glam4cm.settings import NODE_CLS_TASK
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_node_classifier import GNNNodeClassificationTrainer as Trainer
 from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_labels
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
+    get_config_str,
     get_gnn_args_parser,
     set_embed_model
 )
+from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
 
 
 def get_parser():
@@ -22,7 +23,7 @@ def get_parser():
 
 
 def run(args):
-
+    set_seed(args.seed)
     
     
     config_params = dict(
@@ -50,6 +51,7 @@ def run(args):
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
+    set_seed(args.seed)
     
     
     graph_torch_data = graph_dataset.get_torch_dataset()
@@ -99,11 +101,11 @@ def run(args):
         bias=True,
     )
 
-    logs_dir = os.path.join(
-        "logs",
-        dataset_name,
+    output_dir = get_experiment_dir(
+        args,
         f"GNN_{NODE_CLS_TASK}",
-        f"{graph_dataset.config_hash}",
+        args.node_cls_label,
+        get_config_str(args),
     )
 
     trainer = Trainer(
@@ -115,8 +117,9 @@ def run(args):
         lr=args.lr,
         num_epochs=args.num_epochs,
         use_edge_attrs=args.use_edge_attrs,
-        logs_dir=logs_dir
+        logs_dir=output_dir
     )
 
     print("Training GNN Node Classification model")
     trainer.run()
+    save_experiment_results(output_dir, trainer.results)

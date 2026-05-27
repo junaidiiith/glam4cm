@@ -1,10 +1,15 @@
-import os
 from glam4cm.data_loading.graph_dataset import GraphNodeDataset
 from glam4cm.models.gnn_layers import GNNConv, GraphClassifer
-from glam4cm.settings import GRAPH_CLS_TASK, DUMMY_GRAPH_CLS_TASK, results_dir
+from glam4cm.settings import GRAPH_CLS_TASK, DUMMY_GRAPH_CLS_TASK
 from glam4cm.trainers.gnn_graph_classifier import GNNGraphClassificationTrainer as Trainer
-from glam4cm.downstream_tasks.common_args import get_common_args_parser, get_config_params, get_gnn_args_parser
-from glam4cm.utils import merge_argument_parsers
+from glam4cm.downstream_tasks.common_args import (
+    get_common_args_parser,
+    get_config_params,
+    get_config_str,
+    get_gnn_args_parser,
+)
+from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
+from glam4cm.utils import merge_argument_parsers, set_seed
 from glam4cm.data_loading.models_dataset import get_models_dataset
 
 
@@ -20,7 +25,7 @@ def get_parser():
 
 
 def run(args):
-    
+    set_seed(args.seed)
     
     config_params = dict(
         include_dummies = args.include_dummies,
@@ -41,6 +46,7 @@ def run(args):
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
+    set_seed(args.seed)
 
     cls_label = f"num_graph_{args.cls_label}"
     assert hasattr(graph_dataset, cls_label), f"Dataset does not have attribute {cls_label}"
@@ -66,12 +72,12 @@ def run(args):
     aggregation = args.aggregation
 
     input_dim = graph_dataset[0].data.x.shape[1]
-    ue = "" if not args.use_edge_attrs else "_ue"
-    logs_dir = os.path.join(
-        "logs",
-        dataset_name,
-        f"GNN_{GRAPH_CLS_TASK}{ue}",
-        f"{graph_dataset.config_hash}",
+    task_type = GRAPH_CLS_TASK if not args.include_dummies else DUMMY_GRAPH_CLS_TASK
+    output_dir = get_experiment_dir(
+        args,
+        f"GNN_{task_type}",
+        args.cls_label,
+        get_config_str(args),
     )
 
     fold_id = 0
@@ -108,8 +114,9 @@ def run(args):
             num_epochs=args.num_epochs,
             batch_size=args.batch_size,
             use_edge_attrs=args.use_edge_attrs,
-            logs_dir=logs_dir + f"_{fold_id}",
+            logs_dir=output_dir,
         )
 
         trainer.run()
+        save_experiment_results(output_dir, trainer.results)
         break

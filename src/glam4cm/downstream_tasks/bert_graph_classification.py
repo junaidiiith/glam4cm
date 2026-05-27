@@ -1,4 +1,3 @@
-import os
 from sklearn.metrics import (
     accuracy_score, 
     balanced_accuracy_score, 
@@ -15,12 +14,18 @@ from glam4cm.models.hf import get_model
 from glam4cm.downstream_tasks.common_args import (
     get_bert_args_parser, 
     get_common_args_parser, 
+    get_config_hash,
     get_config_params,
     get_config_str
 )
-from glam4cm.downstream_tasks.utils import get_logging_steps
+from glam4cm.downstream_tasks.utils import (
+    get_experiment_dir,
+    get_finetuned_model_dir,
+    get_logging_steps,
+    save_experiment_results,
+)
 from glam4cm.data_loading.models_dataset import get_models_dataset
-from glam4cm.settings import GRAPH_CLS_TASK, results_dir
+from glam4cm.settings import GRAPH_CLS_TASK
 from glam4cm.tokenization.utils import get_tokenizer
 from glam4cm.utils import merge_argument_parsers, set_encoded_labels, set_seed
 
@@ -54,7 +59,7 @@ def get_parser():
 
 
 def run(args):
-    
+    set_seed(args.seed)
     
     config_params = dict(
         include_dummies = args.include_dummies,
@@ -71,9 +76,10 @@ def run(args):
     print("Loading graph dataset")
     graph_dataset = GraphNodeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
+    set_seed(args.seed)
 
-    model_name = args.model_name
-    tokenizer = get_tokenizer(model_name, args.use_special_tokens)
+    embed_model_name = args.embed_model_name
+    tokenizer = get_tokenizer(embed_model_name, args.use_special_tokens)
 
     fold_id = 0
     for classification_dataset in graph_dataset.get_kfold_lm_graph_classification_data(
@@ -88,28 +94,20 @@ def run(args):
         print(len(train_dataset), len(test_dataset), num_labels)
 
         print("Training model")
-        output_dir = os.path.join(
-            results_dir,
-            dataset_name,
+        output_dir = get_experiment_dir(
+            args,
             f"LM_{GRAPH_CLS_TASK}",
-            f'{args.cls_label}',
-            get_config_str(args)
+            args.cls_label,
+            get_config_str(args),
         )
         # if os.path.exists(output_dir):
         #     print(f"Output directory {output_dir} already exists. Exiting.")
         #     exit(0)
 
-        logs_dir = os.path.join(
-            'logs',
-            dataset_name,
-            f"LM_{GRAPH_CLS_TASK}",
-            f'{args.cls_label}',
-            f"{graph_dataset.config_hash}_{fold_id}",
-            
-        )
+        logs_dir = output_dir
 
         model = get_model(
-            args.ckpt if args.ckpt else model_name, 
+            args.ckpt if args.ckpt else embed_model_name, 
             num_labels, 
             len(tokenizer), 
             trust_remote_code=args.trust_remote_code
@@ -135,7 +133,7 @@ def run(args):
             per_device_eval_batch_size=args.eval_batch_size,
             warmup_steps=200,
             weight_decay=0.01,
-            learning_rate=5e-5,
+            learning_rate=args.lr,
             logging_dir=logs_dir,
             logging_steps=logging_steps,
             eval_steps=logging_steps,
@@ -143,7 +141,8 @@ def run(args):
             save_total_limit=2,
             load_best_model_at_end=True,
             fp16=True,
-            save_strategy="steps"
+            save_strategy="steps",
+            seed=args.seed,
         )
 
         # Trainer
@@ -160,7 +159,13 @@ def run(args):
         results = trainer.evaluate()
         print(results)
         
-        trainer.save_model()
+        trainer.save_model(get_finetuned_model_dir(
+            args,
+            f"LM_{GRAPH_CLS_TASK}",
+            args.cls_label,
+            get_config_hash(args),
+        ))
+        save_experiment_results(output_dir, results)
         
         fold_id += 1
         break

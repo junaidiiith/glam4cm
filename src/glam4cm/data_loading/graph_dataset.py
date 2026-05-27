@@ -3,7 +3,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sklearn.preprocessing import LabelEncoder
 from collections import Counter, defaultdict
 import os
-from random import shuffle
+from random import Random
 from typing import List, Union
 from sklearn.model_selection import StratifiedKFold
 import torch
@@ -27,7 +27,6 @@ from glam4cm.data_loading.metadata import (
     EcoreMetaData, 
     OntoUMLMetaData
 )
-from glam4cm.settings import seed
 from glam4cm.settings import (
     EDGE_CLS_TASK,
     LINK_PRED_TASK,
@@ -280,6 +279,7 @@ class GraphDataset(torch.utils.data.Dataset):
             node_cls_label=self.node_cls_label,
             edge_cls_label=self.edge_cls_label,
             node_topk=self.node_topk,
+            seed=self.seed,
         )
         return common_params
     
@@ -350,6 +350,15 @@ class GraphDataset(torch.utils.data.Dataset):
         for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
             fp = self.file_paths[graph.hash]
             torch_graph = TorchGraph.load(fp)
+            has_cached_embeddings = (
+                hasattr(torch_graph.data, 'x')
+                and hasattr(torch_graph.data, 'edge_attr')
+            )
+            if self.use_embeddings and not self.reload and not has_cached_embeddings:
+                raise RuntimeError(
+                    f"Embeddings are missing from {fp}. "
+                    "Run the task with --reload to generate or refresh text embeddings."
+                )
             torch_graph.embed(
                 self.embedder, 
                 reload=self.reload,
@@ -363,7 +372,7 @@ class GraphDataset(torch.utils.data.Dataset):
             self.graphs.append(torch_graph)
         
         if not self.no_shuffle:
-            shuffle(self.graphs)
+            Random(self.seed).shuffle(self.graphs)
 
         self.post_process_graphs()
         self.validate_graphs()
@@ -428,7 +437,7 @@ class GraphDataset(torch.utils.data.Dataset):
         n = len(self.graphs)
         train_size = int(n * (1 - self.test_ratio))
         idx = list(range(n))
-        shuffle(idx)
+        Random(self.seed).shuffle(idx)
         train_idx = idx[:train_size]
         test_idx = idx[train_size:]
         return train_idx, test_idx
@@ -436,7 +445,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
     def k_fold_split(self):
         k = int(1 / self.test_ratio)
-        kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+        kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=self.seed)
         n = len(self.graphs)
         for train_idx, test_idx in kfold.split(np.zeros(n), np.zeros(n)):
             yield train_idx, test_idx

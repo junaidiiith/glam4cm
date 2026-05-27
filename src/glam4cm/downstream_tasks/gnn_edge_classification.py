@@ -1,17 +1,18 @@
-import os
 from glam4cm.data_loading.graph_dataset import GraphEdgeDataset
 from glam4cm.models.gnn_layers import GNNConv, EdgeClassifer
 from glam4cm.settings import EDGE_CLS_TASK
 from glam4cm.data_loading.models_dataset import get_models_dataset
 from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_edge_classifier import GNNEdgeClassificationTrainer as Trainer
-from glam4cm.utils import merge_argument_parsers, set_torch_encoding_labels
+from glam4cm.utils import merge_argument_parsers, set_seed, set_torch_encoding_labels
 from glam4cm.downstream_tasks.common_args import (
     get_common_args_parser, 
     get_config_params, 
+    get_config_str,
     get_gnn_args_parser,
     set_embed_model
 )
+from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
 
 
 def get_parser():
@@ -22,7 +23,7 @@ def get_parser():
 
 
 def run(args):
-
+    set_seed(args.seed)
     
     
     config_params = dict(
@@ -48,6 +49,7 @@ def run(args):
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(dataset, **graph_data_params)
     print("Loaded graph dataset")
+    set_seed(args.seed)
 
     graph_torch_data = graph_dataset.get_torch_dataset()
     exclude_labels = getattr(graph_dataset, f"edge_exclude_{args.edge_cls_label}")
@@ -72,14 +74,11 @@ def run(args):
 
     edge_dim = graph_dataset[0].data.edge_attr.shape[1] if args.use_edge_attrs else None
 
-    ue = "" if not args.use_edge_attrs else "_ue"
-    
-    logs_dir = os.path.join(
-        "logs",
-        dataset_name,
+    output_dir = get_experiment_dir(
+        args,
         f"GNN_{EDGE_CLS_TASK}",
-        f"{args.edge_cls_label}{ue}",
-        f"{graph_dataset.config_hash}",
+        args.edge_cls_label,
+        get_config_str(args),
     )
     
 
@@ -116,8 +115,9 @@ def run(args):
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         use_edge_attrs=args.use_edge_attrs,
-        logs_dir=logs_dir,
+        logs_dir=output_dir,
     )
 
     print("Training GNN Edge Classification model")
     trainer.run()
+    save_experiment_results(output_dir, trainer.results)

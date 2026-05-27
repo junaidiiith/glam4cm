@@ -20,7 +20,7 @@ def get_parser():
 
 
 def run(args):
-    
+    set_seed(args.seed)
 
     tokenizer = get_tokenizer('bert-base-cased', special_tokens=True)
 
@@ -40,7 +40,11 @@ def run(args):
         **graph_params
     )
 
-    train_dataset, test_dataset = train_test_split(graph_dataset, test_size=0.05)
+    train_dataset, test_dataset = train_test_split(
+        graph_dataset,
+        test_size=0.05,
+        random_state=args.seed,
+    )
 
     cmgpt = CMGPT(
         vocab_size=len(tokenizer),

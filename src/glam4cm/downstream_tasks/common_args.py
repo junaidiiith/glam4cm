@@ -6,6 +6,7 @@ from glam4cm.settings import (
     TFIDF_MODEL
 )
 import os
+import glam4cm.utils as utils
 
 
 def get_config_str(args):
@@ -35,6 +36,8 @@ def get_config_params(args):
         distance=args.distance,
         reload=args.reload,
         test_ratio=args.test_ratio,
+        add_negative_train_samples=args.add_negative_train_samples,
+        neg_sampling_ratio=args.neg_sampling_ratio,
 
         use_attributes=args.use_attributes,
         use_node_types=args.use_node_types,
@@ -60,11 +63,15 @@ def get_config_params(args):
 
         node_cls_label=args.node_cls_label,
         edge_cls_label=args.edge_cls_label,
-        seed=args.seed
+        seed=args.seed,
     )
     
 
     return common_params
+
+
+def get_config_hash(args):
+    return utils.md5_hash(str(get_config_params(args)))
 
 
 def get_common_args_parser():
@@ -138,6 +145,12 @@ def get_common_args_parser():
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=32)
 
+    # save dirs
+    parser.add_argument('--results_dir', type=str, default='results')
+    parser.add_argument('--logs_dir', type=str, default='logs')
+    parser.add_argument('--datasets_dir', type=str, default='datasets')
+    parser.add_argument('--models_dir', type=str, default='ftlm')
+
     return parser
 
 
@@ -176,6 +189,7 @@ def get_bert_args_parser():
     parser.add_argument('--num_save_steps', type=int, default=200)
     parser.add_argument('--train_batch_size', type=int, default=2)
     parser.add_argument('--eval_batch_size', type=int, default=128)
+    parser.add_argument('--lr', type=float, default=5e-5)
     return parser
 
 
