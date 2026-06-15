@@ -49,18 +49,20 @@ def run(args):
     aggregation = args.aggregation
 
     graph_data_params = get_config_params(args)
+    graph_data_params = {
+        **graph_data_params, 
+        'add_negative_train_samples': True, 
+        'neg_sampling_ratio': args.neg_sampling_ratio,
+        'task_type': LINK_PRED_TASK
+    }
     
-    set_embed_model(args, graph_data_params)
+    set_embed_model(args)
     
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
         dataset,
-        task_type=LINK_PRED_TASK, 
-        **dict(
-            **graph_data_params, 
-            add_negative_train_samples=True, 
-            neg_sampling_ratio=args.neg_sampling_ratio,
-    ))
+        **graph_data_params, 
+    )
     set_seed(args.seed)
 
     input_dim = graph_dataset[0].data.x.shape[1]

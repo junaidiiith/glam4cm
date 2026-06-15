@@ -10,8 +10,9 @@ import os
 import glam4cm.utils as utils
 
 
+
 def get_config_str(args):
-    config_str = ""
+    config_str = f"dataset-{args.dataset}"
     if args.use_attributes:
         config_str += "_attrs"
     if args.use_edge_label:
@@ -33,7 +34,7 @@ def get_config_str(args):
 
 def get_config_params(args):
     common_params = dict(
-        
+
         distance=args.distance,
         reload=args.reload,
         test_ratio=args.test_ratio,
@@ -72,7 +73,7 @@ def get_config_params(args):
 
 
 def get_config_hash(args):
-    return utils.md5_hash(str(get_config_params(args)))
+    return utils.md5_hash(str(get_config_str(args)))
 
 
 def get_common_args_parser():
@@ -119,12 +120,12 @@ def get_common_args_parser():
     ### Model Dataset Loading
     parser.add_argument('--distance', type=int, default=0)
     parser.add_argument('--embed_batch_size', type=int, default=32)
-    parser.add_argument('--use_embeddings', action='store_true')
+    parser.add_argument('--use_embeddings', '--use_embedding', action='store_true', dest='use_embeddings')
     parser.add_argument('--regen_embeddings', action='store_true')
     parser.add_argument(
         '--embed_model_name', 
         type=str, 
-        default=MODERN_BERT, 
+        default=BERT_MODEL, 
         choices=[MODERN_BERT, BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL, BERT_MODEL_CASED]
     )
     
@@ -208,10 +209,10 @@ def get_gpt_args_parser():
     return parser
 
 
-def set_embed_model(args, graph_data_params):
+def set_embed_model(args):
     
     if args.use_embeddings:
         if args.ckpt:
             if not os.path.exists(args.ckpt):
                 raise ValueError(f"Embedding model not found at: {args.ckpt}. Please provide a valid checkpoint path for node embeddings.")
-            graph_data_params['embed_model_name'] = args.ckpt
+            # graph_data_params['embed_model_name'] = args.ckpt

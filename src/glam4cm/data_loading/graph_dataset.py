@@ -151,6 +151,7 @@ class GraphDataset(torch.utils.data.Dataset):
         self.distance = distance
         self.use_embeddings = use_embeddings
         self.ckpt = ckpt
+        
         self.embedder = get_embedding_model(embed_model_name, ckpt, embed_batch_size) if use_embeddings else None
 
         self.reload = reload
@@ -686,6 +687,7 @@ class GraphEdgeDataset(GraphDataset):
             save_dir='datasets/graph_data',
             seed=42,
         ):
+        print(f"Using embeddings: {use_embeddings}, model name: {embed_model_name}, checkpoint: {ckpt}")
         assert task_type in [LINK_PRED_TASK, EDGE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[LINK_PRED_TASK, EDGE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
             models_dataset=models_dataset,
@@ -917,6 +919,8 @@ class GraphNodeDataset(GraphDataset):
         -------
         A GraphNodeDataset object.
         """
+        
+        print(f"Using embeddings: {use_embeddings}, model name: {embed_model_name}, checkpoint: {ckpt}")
         assert task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK], f"Invalid task type: Must be one of {[NODE_CLS_TASK, GRAPH_CLS_TASK]}."
         super().__init__(
             models_dataset=models_dataset,

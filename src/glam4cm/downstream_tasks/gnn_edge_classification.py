@@ -41,7 +41,7 @@ def run(args):
     graph_data_params = get_config_params(args)
     graph_data_params = {**graph_data_params, 'task_type': EDGE_CLS_TASK}
     print("Using model: ", graph_data_params['embed_model_name'])
-    set_embed_model(args, graph_data_params)
+    set_embed_model(args)
         
     # if args.use_embeddings:
     #     graph_data_params['embed_model_name'] = os.path.join(results_dir, dataset_name, f'{args.edge_cls_label}')

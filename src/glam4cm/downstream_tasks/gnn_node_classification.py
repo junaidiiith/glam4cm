@@ -39,7 +39,7 @@ def run(args):
     dataset = get_models_dataset(dataset_name, **config_params)
     graph_data_params = {**get_config_params(args), 'task_type': NODE_CLS_TASK}
     
-    set_embed_model(args, graph_data_params)
+    set_embed_model(args)
     
     # if args.use_embeddings:
     #     if args.ckpt:

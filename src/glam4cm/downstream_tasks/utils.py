@@ -2,7 +2,8 @@ import json
 import os
 
 
-CONFIG_FILE_NAME = "config.json"
+CONFIG_FILE_NAME = "glam4cm_config.json"
+LEGACY_CONFIG_FILE_NAME = "config.json"
 RESULTS_FILE_NAME = "results.json"
 TENSORBOARD_LOGS_FILE_NAME = "tensorboard_logs.json"
 
@@ -38,6 +39,7 @@ def get_experiment_dir(args, task_type, cls_label, config_str):
     )
     os.makedirs(experiment_dir, exist_ok=True)
     _write_json(os.path.join(experiment_dir, CONFIG_FILE_NAME), vars(args))
+    _write_json(os.path.join(experiment_dir, LEGACY_CONFIG_FILE_NAME), vars(args))
     return experiment_dir
 
 

@@ -47,6 +47,22 @@ CONFIG_FLAGS = [
     "use_edge_types",
 ]
 
+GNN_CONFIG_FLAGS = [
+    "use_edge_attrs",
+    "use_embeddings",
+]
+
+DATASET_IGNORED_CONFIG_FLAGS = {
+    "eamodelset": {
+        "use_attributes",
+        "use_edge_label",
+    },
+    "ontouml": {
+        "use_edge_label",
+        "use_edge_types",
+    },
+}
+
 EDGE_ATTR_GNN_MODELS = {
     "GATConv",
     "GATv2Conv",
@@ -82,6 +98,11 @@ EMBEDDING_ONLY_ARGS = {
     "randomize_ne",
     "regen_embeddings",
     "use_embeddings",
+}
+
+OPTION_ALIASES = {
+    "use_embedding": "use_embeddings",
+    "use_attrs": "use_edge_attrs",
 }
 
 
@@ -157,7 +178,7 @@ def parse_args():
     parser.add_argument("--aggregation", type=str, default="sum")
     parser.add_argument("--l_norm", action="store_true")
     parser.add_argument("--bias", action="store_true")
-    parser.add_argument("--use_embeddings", action="store_true")
+    parser.add_argument("--use_embeddings", "--use_embedding", action="store_true", dest="use_embeddings")
     parser.add_argument("--use_edge_attrs", "--use_attrs", action="store_true", dest="use_edge_attrs")
     parser.add_argument("--embed_batch_size", type=int, default=32)
     parser.add_argument("--neg_sampling_ratio", type=int, default=1)
@@ -184,7 +205,9 @@ def split_option(token: str) -> Tuple[str, Optional[str]]:
     key = token[2:]
     if "=" in key:
         key, value = key.split("=", 1)
+        key = OPTION_ALIASES.get(key, key)
         return key, value
+    key = OPTION_ALIASES.get(key, key)
     return key, None
 
 
@@ -213,6 +236,25 @@ def command_params(tokens: List[str]) -> Dict[str, object]:
         params[key] = True if value is None else value
         index += 1
     return params
+
+
+def ignored_config_flags(dataset: object) -> set:
+    return DATASET_IGNORED_CONFIG_FLAGS.get(str(dataset).lower(), set())
+
+
+def canonicalize_flags_for_dataset(dataset: object, flags: Dict[str, bool]) -> Dict[str, bool]:
+    canonical = dict(flags)
+    for flag in ignored_config_flags(dataset):
+        canonical[flag] = False
+    return canonical
+
+
+def canonicalize_tokens_for_dataset(tokens: List[str]) -> List[str]:
+    params = command_params(tokens)
+    ignored_flags = ignored_config_flags(params.get("dataset", "ecore_555"))
+    if not ignored_flags:
+        return tokens
+    return remove_args(tokens, ignored_flags)
 
 
 def set_arg(tokens: List[str], key: str, value: object) -> List[str]:
@@ -325,8 +367,8 @@ def ensure_link_prediction_params(tokens: List[str], neg_sampling_ratio: int) ->
     if task_id not in [4, 8]:
         return tokens
     params = command_params(tokens)
-    if not params.get("add_negative_train_samples"):
-        tokens = set_arg(tokens, "add_negative_train_samples", True)
+    # if not params.get("add_negative_train_samples"):
+    #     tokens = set_arg(tokens, "add_negative_train_samples", True)
     if "neg_sampling_ratio" not in params:
         tokens = set_arg(tokens, "neg_sampling_ratio", neg_sampling_ratio)
     return tokens
@@ -334,18 +376,25 @@ def ensure_link_prediction_params(tokens: List[str], neg_sampling_ratio: int) ->
 
 def read_configs_file(path: str, run_llm: bool, run_gnn: bool, models_dir: str, neg_sampling_ratio: int) -> List[Dict[str, object]]:
     items = []
+    seen_config_keys = set()
     with open(path, "r") as f:
         for line_number, line in enumerate(f, start=1):
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
             tokens = normalize_config_line(stripped)
+            tokens = canonicalize_tokens_for_dataset(tokens)
             task_id = get_task_id(tokens)
             if not task_accepts_line(task_id, run_llm, run_gnn):
                 continue
             tokens = ensure_link_prediction_params(tokens, neg_sampling_ratio)
             if task_id in GNN_TO_LLM_TASK:
                 tokens = infer_embedding_checkpoint(tokens, models_dir)
+            parsed_params = parsed_config_for_log(tokens)
+            parsed_key = config_key(parsed_params)
+            if parsed_key in seen_config_keys:
+                continue
+            seen_config_keys.add(parsed_key)
             items.append({
                 "index": len(items),
                 "source": f"{path}:{line_number}",
@@ -400,15 +449,35 @@ def validate_generated_labels(args):
         raise ValueError("--cls_label is mandatory for graph classification")
 
 
-def config_flag_combinations(args) -> List[Dict[str, bool]]:
+def config_flag_combinations(args, dataset: str) -> List[Dict[str, bool]]:
+    ignored_flags = ignored_config_flags(dataset)
     requested = {
         flag
         for flag in CONFIG_FLAGS
         if getattr(args, flag)
+    } - ignored_flags
+    combinations = []
+    seen = set()
+    for values in itertools.product([False, True], repeat=len(CONFIG_FLAGS)):
+        config = canonicalize_flags_for_dataset(dataset, dict(zip(CONFIG_FLAGS, values)))
+        if all(config[flag] for flag in requested):
+            key = tuple(config[flag] for flag in CONFIG_FLAGS)
+            if key in seen:
+                continue
+            seen.add(key)
+            combinations.append(config)
+    return combinations
+
+
+def gnn_config_combinations(args) -> List[Dict[str, bool]]:
+    requested = {
+        flag
+        for flag in GNN_CONFIG_FLAGS
+        if getattr(args, flag)
     }
     combinations = []
-    for values in itertools.product([False, True], repeat=len(CONFIG_FLAGS)):
-        config = dict(zip(CONFIG_FLAGS, values))
+    for values in itertools.product([False, True], repeat=len(GNN_CONFIG_FLAGS)):
+        config = dict(zip(GNN_CONFIG_FLAGS, values))
         if all(config[flag] for flag in requested):
             combinations.append(config)
     return combinations
@@ -427,13 +496,20 @@ def llm_tokens(args, dataset: str, distance: int, flags: Dict[str, bool]) -> Lis
     if args.task_id == 2:
         command.append(f"--cls_label={args.cls_label}")
     if args.task_id == 4:
-        command.append("--add_negative_train_samples")
         command.append(f"--neg_sampling_ratio={args.neg_sampling_ratio}")
     return command
 
 
-def gnn_tokens(args, dataset: str, distance: int, flags: Dict[str, bool], model_name: str, paired_llm_tokens: List[str]) -> Optional[List[str]]:
-    if args.use_edge_attrs and model_name not in EDGE_ATTR_GNN_MODELS:
+def gnn_tokens(
+    args,
+    dataset: str,
+    distance: int,
+    flags: Dict[str, bool],
+    gnn_flags: Dict[str, bool],
+    model_name: str,
+    paired_llm_tokens: List[str],
+) -> Optional[List[str]]:
+    if gnn_flags["use_edge_attrs"] and model_name not in EDGE_ATTR_GNN_MODELS:
         return None
     command = [
         f"--task_id={LLM_TO_GNN_TASK[args.task_id]}",
@@ -450,7 +526,6 @@ def gnn_tokens(args, dataset: str, distance: int, flags: Dict[str, bool], model_
         f"--embed_batch_size={args.embed_batch_size}",
     ]
     if LLM_TO_GNN_TASK[args.task_id] == 8:
-        command.append("--add_negative_train_samples")
         command.append(f"--neg_sampling_ratio={args.neg_sampling_ratio}")
     if args.num_heads is not None:
         command.append(f"--num_heads={args.num_heads}")
@@ -460,9 +535,9 @@ def gnn_tokens(args, dataset: str, distance: int, flags: Dict[str, bool], model_
         command.append("--l_norm")
     if args.bias:
         command.append("--bias")
-    if args.use_edge_attrs:
+    if gnn_flags["use_edge_attrs"]:
         command.append("--use_edge_attrs")
-    if args.use_embeddings:
+    if gnn_flags["use_embeddings"]:
         command.append("--use_embeddings")
         command.append(f"--ckpt={model_dir_for_tokens(paired_llm_tokens, args.models_dir)}")
     command.extend(base_common_args(args, dataset, distance, flags))
@@ -475,31 +550,41 @@ def generated_configs(args, run_llm: bool, run_gnn: bool) -> List[Dict[str, obje
     validate_generated_labels(args)
     items = []
     base_index = 0
-    for dataset, distance, flags in itertools.product(
-        args.dataset,
-        range(args.min_k, args.max_k + 1),
-        config_flag_combinations(args),
-    ):
-        paired_llm = llm_tokens(args, dataset, distance, flags)
-        if run_llm:
-            items.append({
-                "index": base_index,
-                "source": "generated",
-                "kind": "llm",
-                "tokens": paired_llm,
-            })
-        if run_gnn:
-            for model_name in args.gnn_conv_model:
-                paired_gnn = gnn_tokens(args, dataset, distance, flags, model_name, paired_llm)
-                if paired_gnn is None:
-                    continue
+    for dataset in args.dataset:
+        for distance, flags in itertools.product(
+            range(args.min_k, args.max_k + 1),
+            config_flag_combinations(args, dataset),
+        ):
+            paired_llm = llm_tokens(args, dataset, distance, flags)
+            if run_llm:
                 items.append({
                     "index": base_index,
                     "source": "generated",
-                    "kind": "gnn",
-                    "tokens": paired_gnn,
+                    "kind": "llm",
+                    "tokens": paired_llm,
                 })
-        base_index += 1
+            if run_gnn:
+                for gnn_flags, model_name in itertools.product(
+                    gnn_config_combinations(args),
+                    args.gnn_conv_model,
+                ):
+                    paired_gnn = gnn_tokens(
+                        args,
+                        dataset,
+                        distance,
+                        flags,
+                        gnn_flags,
+                        model_name,
+                        paired_llm,
+                    )
+                    if paired_gnn is not None:
+                        items.append({
+                            "index": base_index,
+                            "source": "generated",
+                            "kind": "gnn",
+                            "tokens": paired_gnn,
+                        })
+            base_index += 1
     return items
 
 
