@@ -73,7 +73,9 @@ def get_config_params(args):
 
 
 def get_config_hash(args):
-    return utils.md5_hash(str(get_config_str(args)))
+    config_str = str(get_config_str(args))
+    print("Config string:", config_str)
+    return utils.md5_hash(config_str)
 
 
 def get_common_args_parser():
@@ -119,25 +121,26 @@ def get_common_args_parser():
 
     ### Model Dataset Loading
     parser.add_argument('--distance', type=int, default=0)
-    parser.add_argument('--embed_batch_size', type=int, default=32)
-    parser.add_argument('--use_embeddings', '--use_embedding', action='store_true', dest='use_embeddings')
-    parser.add_argument('--regen_embeddings', action='store_true')
+
     parser.add_argument(
         '--embed_model_name', 
         type=str, 
         default=BERT_MODEL, 
         choices=[MODERN_BERT, BERT_MODEL, WORD2VEC_MODEL, TFIDF_MODEL, BERT_MODEL_CASED]
     )
-    
+    parser.add_argument('--embed_batch_size', type=int, default=32)
+    parser.add_argument('--use_embeddings', '--use_embedding', action='store_true', dest='use_embeddings')
+    parser.add_argument('--regen_embeddings', action='store_true')
     parser.add_argument('--trust_remote_code', action='store_true')
     parser.add_argument('--max_length', type=int, default=512)
     parser.add_argument('--ckpt', type=str, default=None)
-    
 
     parser.add_argument('--no_shuffle', action='store_true')
     parser.add_argument('--randomize_ne', action='store_true')
     parser.add_argument('--randomize_ee', action='store_true')
     parser.add_argument('--random_embed_dim', type=int, default=128)
+
+
 
 
     parser.add_argument('--test_ratio', type=float, default=0.2)
@@ -175,7 +178,7 @@ def get_gnn_args_parser():
     parser.add_argument('--gnn_conv_model', type=str, default='SAGEConv')
 
     parser.add_argument('--use_edge_attrs', action='store_true')
-    
+                    
     return parser
 
 
