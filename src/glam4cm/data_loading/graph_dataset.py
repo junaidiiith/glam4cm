@@ -230,6 +230,15 @@ class GraphDataset(torch.utils.data.Dataset):
         os.makedirs(self.save_dir, exist_ok=True)
 
     
+    def get_models_by_limit(self, models_dataset: Union[EcoreDataset, ArchiMateDataset], limit: int = -1):
+        models_size = len(models_dataset) \
+            if (limit == -1 or limit > len(models_dataset)) else limit
+            
+        sample = Random(self.seed).sample([i for i in range(len(models_dataset))], models_size)
+        models = [models_dataset[i] for i in sample]
+        return models
+
+    
     @property
     def node_dim(self):
         pass
@@ -326,13 +335,10 @@ class GraphDataset(torch.utils.data.Dataset):
             torch_graph = TorchEdgeGraph(graph, **edge_params)
             return torch_graph
         
-        
-        models_size = len(models_dataset) \
-            if (limit == -1 or limit > len(models_dataset)) else limit
-        
-        self.set_file_hashes(models_dataset[:models_size])
+        models = self.get_models_by_limit(models_dataset, limit)
+        self.set_file_hashes(models)
 
-        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
+        for graph in tqdm(models, desc=f'Creating {self.task_type} graphs'):
             fp = self.file_paths[graph.hash]
             if not os.path.exists(fp) or self.reload:
                 if self.task_type in [NODE_CLS_TASK, GRAPH_CLS_TASK, DUMMY_GRAPH_CLS_TASK]:
@@ -345,10 +351,9 @@ class GraphDataset(torch.utils.data.Dataset):
 
 
     def embed(self, models_dataset, limit):
-        models_size = len(models_dataset) \
-            if (limit == -1 or limit > len(models_dataset)) else limit
+        models = self.get_models_by_limit(models_dataset, limit)
         print("Limit: ", limit)
-        for graph in tqdm(models_dataset[:models_size], desc=f'Creating {self.task_type} graphs'):
+        for graph in tqdm(models, desc=f'Creating {self.task_type} graphs'):
             fp = self.file_paths[graph.hash]
             torch_graph = TorchGraph.load(fp)
             has_cached_embeddings = (

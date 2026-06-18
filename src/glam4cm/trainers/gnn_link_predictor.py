@@ -30,6 +30,7 @@ class GNNLinkPredictionTrainer(Trainer):
             num_epochs=100,
             batch_size=32,
             use_edge_attrs=False,
+            message_passing_edges="train_graph",
             logs_dir='./logs'
         ) -> None:
 
@@ -46,9 +47,53 @@ class GNNLinkPredictionTrainer(Trainer):
             dataset, batch_size=batch_size, shuffle=True
         )
         self.results = list()
+        valid_message_passing_edges = {
+            "train_graph",
+            "label_edges",
+            "label_edges_with_negatives",
+        }
+        if message_passing_edges not in valid_message_passing_edges:
+            raise ValueError(
+                f"Invalid message_passing_edges={message_passing_edges}. "
+                f"Choose from {sorted(valid_message_passing_edges)}"
+            )
+        self.message_passing_edges = message_passing_edges
 
         print("GNN Trainer initialized.")
 
+
+    def get_message_passing_inputs(self, data, phase):
+        if self.message_passing_edges == "train_graph":
+            edge_index = data.edge_index
+            edge_attr = data.edge_attr[data.train_edge_mask] if self.use_edge_attrs else None
+        elif self.message_passing_edges == "label_edges":
+            edge_index = data.train_pos_edge_label_index
+            edge_attr = data.edge_attr[data.train_edge_mask] if self.use_edge_attrs else None
+        elif self.message_passing_edges == "label_edges_with_negatives" and phase == "test":
+            edge_index = torch.cat([
+                data.train_pos_edge_label_index,
+                data.train_neg_edge_label_index
+            ], dim=1)
+            edge_attr = None
+        else:
+            edge_index = data.train_pos_edge_label_index
+            edge_attr = data.edge_attr[data.train_edge_mask] if self.use_edge_attrs else None
+        return edge_index, edge_attr
+
+
+    def get_candidate_edge_attr(self, data, edge_mask=None, edge_index=None):
+        if not self.use_edge_attrs:
+            return None
+        if edge_mask is not None:
+            return data.edge_attr[edge_mask]
+        if edge_index is None:
+            raise ValueError("edge_index is required when creating synthetic edge attributes.")
+        edge_dim = data.edge_attr.shape[1]
+        return torch.zeros(
+            (edge_index.shape[1], edge_dim),
+            dtype=data.edge_attr.dtype,
+            device=data.edge_attr.device,
+        )
 
 
     def train(self):
@@ -72,14 +117,15 @@ class GNNLinkPredictionTrainer(Trainer):
             x = data.x
             pos_edge_index =  data.train_pos_edge_label_index
             neg_edge_index = data.train_neg_edge_label_index
-            train_mask = data.train_edge_mask
-            edge_attr = data.edge_attr[train_mask] if self.use_edge_attrs else None
+            message_edge_index, message_edge_attr = self.get_message_passing_inputs(data, "train")
             
-            h = self.get_logits(x, pos_edge_index, edge_attr)
+            h = self.get_logits(x, message_edge_index, message_edge_attr)
             # h = x
 
-            pos_scores = self.get_prediction_score(h, pos_edge_index, edge_attr)
-            neg_scores = self.get_prediction_score(h, neg_edge_index, edge_attr)
+            pos_edge_attr = self.get_candidate_edge_attr(data, data.train_edge_mask)
+            neg_edge_attr = self.get_candidate_edge_attr(data, edge_index=neg_edge_index)
+            pos_scores = self.get_prediction_score(h, pos_edge_index, pos_edge_attr)
+            neg_scores = self.get_prediction_score(h, neg_edge_index, neg_edge_attr)
             loss = self.compute_loss(pos_scores, neg_scores)
             all_labels.append(torch.cat([torch.ones(pos_scores.size(0)), torch.zeros(neg_scores.size(0))]))
             all_preds.append(torch.cat([pos_scores.detach().cpu(), neg_scores.detach().cpu()]))
@@ -110,24 +156,17 @@ class GNNLinkPredictionTrainer(Trainer):
                 
                 x = data.x
                 
-                train_edge_index = torch.cat([
-                    data.train_pos_edge_label_index,
-                    data.train_neg_edge_label_index
-                ], dim=1)
-                train_edge_attr = (
-                    data.edge_attr[data.train_edge_mask]
-                    if self.use_edge_attrs else None
-                )
+                train_edge_index, train_edge_attr = self.get_message_passing_inputs(data, "test")
                 
                 h = self.get_logits(x, train_edge_index, train_edge_attr)
                 
                 pos_edge_index =  data.test_pos_edge_label_index
                 neg_edge_index = data.test_neg_edge_label_index
-                test_mask = data.test_edge_mask
-                edge_attr = data.edge_attr[test_mask] if self.use_edge_attrs else None
+                edge_attr = self.get_candidate_edge_attr(data, data.test_edge_mask)
 
                 pos_score = self.get_prediction_score(h, pos_edge_index, edge_attr)
-                neg_score = self.get_prediction_score(h, neg_edge_index, edge_attr)
+                neg_edge_attr = self.get_candidate_edge_attr(data, edge_index=neg_edge_index)
+                neg_score = self.get_prediction_score(h, neg_edge_index, neg_edge_attr)
 
                 loss = self.compute_loss(pos_score, neg_score)
                 all_labels.append(torch.cat([torch.ones(pos_score.size(0)), torch.zeros(neg_score.size(0))]))

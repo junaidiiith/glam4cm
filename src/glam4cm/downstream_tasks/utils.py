@@ -1,5 +1,6 @@
 import json
 import os
+from glam4cm.utils import md5_hash
 
 
 CONFIG_FILE_NAME = "glam4cm_config.json"
@@ -16,6 +17,12 @@ def _json_default(value):
     return str(value)
 
 
+
+def get_config_hash(string):
+    print("Config string:", string)
+    return md5_hash(string)
+
+
 def _write_json(path, value):
     with open(path, "w") as f:
         json.dump(value, f, indent=4, default=_json_default)
@@ -29,13 +36,16 @@ def get_experiment_dir(args, task_type, cls_label, config_str):
     ``LM_node_cls`` or ``GNN_node_cls``. This keeps BERT and GNN artifacts
     separate while keeping their result layout identical.
     """
+    config_str = config_str or "default"
+    print("Config string:", config_str)
+    config_hash = md5_hash(config_str)
     dataset = getattr(args, "dataset", getattr(args, "dataset_name", "default"))
     experiment_dir = os.path.join(
         getattr(args, "results_dir", "results"),
         task_type,
         dataset,
         str(cls_label or "default"),
-        config_str or "default",
+        config_hash,
     )
     os.makedirs(experiment_dir, exist_ok=True)
     _write_json(os.path.join(experiment_dir, CONFIG_FILE_NAME), vars(args))
@@ -44,13 +54,20 @@ def get_experiment_dir(args, task_type, cls_label, config_str):
 
 
 def get_finetuned_model_dir(args, task_type, cls_label, config_id):
+    """
+    Create the canonical downstream model directory for one run config.
+    """
+    config_id = config_id or "default"
+    config_id = str(config_id)
+    config_hash = md5_hash(config_id)
+    print("Config string:", config_id)
     dataset = getattr(args, "dataset", getattr(args, "dataset_name", "default"))
     model_dir = os.path.join(
         getattr(args, "models_dir", "ftlm"),
         task_type,
         dataset,
         str(cls_label or "default"),
-        config_id or "default",
+        config_hash,
     )
     os.makedirs(model_dir, exist_ok=True)
     _write_json(os.path.join(model_dir, CONFIG_FILE_NAME), vars(args))

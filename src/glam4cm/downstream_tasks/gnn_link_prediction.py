@@ -6,19 +6,41 @@ from glam4cm.tokenization.special_tokens import *
 from glam4cm.trainers.gnn_link_predictor import GNNLinkPredictionTrainer as Trainer
 from glam4cm.utils import merge_argument_parsers, set_seed
 from glam4cm.downstream_tasks.common_args import (
-    get_common_args_parser, 
+    get_common_args_parser,
+    get_config_hash, 
     get_config_params, 
     get_config_str,
     get_gnn_args_parser,
     set_embed_model
 )
 from glam4cm.downstream_tasks.utils import get_experiment_dir, save_experiment_results
+from glam4cm.diagnostics.gnn_link_prediction import write_link_prediction_diagnostics
 
  
 def get_parser():
     common_parser = get_common_args_parser()
     gnn_parser = get_gnn_args_parser()
     parser = merge_argument_parsers(common_parser, gnn_parser)
+    parser.add_argument(
+        "--diagnose_gnn_lp",
+        action="store_true",
+        help="Build the GNN link prediction dataset, write diagnostics, and exit before training.",
+    )
+    parser.add_argument(
+        "--diagnostics_output",
+        type=str,
+        default=None,
+        help="Optional JSON path for --diagnose_gnn_lp output.",
+    )
+    parser.add_argument(
+        "--lp_message_passing_edges",
+        choices=["train_graph", "label_edges", "label_edges_with_negatives"],
+        default="train_graph",
+        help=(
+            "Edges used to compute node embeddings for link prediction. "
+            "train_graph uses only observed positive training edges."
+        ),
+    )
     return parser
 
 
@@ -57,6 +79,13 @@ def run(args):
     }
     
     set_embed_model(args)
+    output_dir = get_experiment_dir(
+        args,
+        f"GNN_{LINK_PRED_TASK}",
+        "link",
+        get_config_str(args),
+
+    )
     
     print("Loading graph dataset")
     graph_dataset = GraphEdgeDataset(
@@ -64,6 +93,14 @@ def run(args):
         **graph_data_params, 
     )
     set_seed(args.seed)
+    
+    if args.diagnose_gnn_lp:
+        write_link_prediction_diagnostics(
+            graph_dataset,
+            args=args,
+            output_path=args.diagnostics_output,
+        )
+        return
 
     input_dim = graph_dataset[0].data.x.shape[1]
 
@@ -88,13 +125,6 @@ def run(args):
         edge_dim=edge_dim
     )
 
-    output_dir = get_experiment_dir(
-        args,
-        f"GNN_{LINK_PRED_TASK}",
-        "link",
-        get_config_str(args),
-    )
-
     clf_input_dim = gnn_conv_model.out_dim*num_heads if args.num_heads else output_dim
     mlp_predictor = EdgeClassifer(
         input_dim=clf_input_dim,
@@ -117,6 +147,7 @@ def run(args):
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         use_edge_attrs=args.use_edge_attrs,
+        message_passing_edges=args.lp_message_passing_edges,
         logs_dir=output_dir
     )
 
